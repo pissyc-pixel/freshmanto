@@ -1,22 +1,38 @@
+import { demoEndingMarkdown, demoEndingSummary } from "@/app/demo-content";
 import { AppShell } from "@/components/app-shell";
-import { PlaceholderPanel } from "@/components/placeholder-panel";
+import { FactList } from "@/components/fact-list";
+import { ReportPreview } from "@/components/report-preview";
+import { ResumeItemList } from "@/components/resume-item-list";
+import { SectionCard } from "@/components/section-card";
 
 export default function EndingPage() {
   return (
     <AppShell
       eyebrow="结局页"
-      title="结局先由规则标签判定，再交给 AI 生成报告。"
-      description="阶段 2 和阶段 3 会把学期表现、毕业风险和履历结果接入这里。"
+      title="先判定结局，再生成毕业报告"
+      description="结局标签、长期均分和履历亮点来自规则层；AI 只把这些事实整理成可阅读的总结。"
     >
-      <PlaceholderPanel
-        title="判定流程"
-        description="规则层输出结局标签与事实摘要，AI 表达层只负责转写为结局报告。"
-      >
-        <p className="text-sm leading-6 text-stone-700">
-          默认目标是正常毕业，只有长期挂科或持续失控才会进入风险结局分支。
-        </p>
-      </PlaceholderPanel>
+      <div className="space-y-6">
+        <SectionCard title="规则层结局摘要" description="这里展示的是 AI 生成前的原始依据。">
+          <FactList items={demoEndingSummary.notableFacts} />
+        </SectionCard>
+
+        <SectionCard title="履历亮点" description="结局报告可引用这些结构化亮点，但不允许捏造未出现的经历。">
+          <ResumeItemList items={demoEndingSummary.resumeHighlights} />
+        </SectionCard>
+
+        <SectionCard title="AI 结局报告预览" description="prompt 输入只包含结构化摘要，报告文本由最小封装生成。">
+          <ReportPreview
+            title="ending-report"
+            contractLabel="facts only"
+            promptInput={{
+              runId: "demo-run-ui",
+              summary: demoEndingSummary
+            }}
+            markdown={demoEndingMarkdown}
+          />
+        </SectionCard>
+      </div>
     </AppShell>
   );
 }
-

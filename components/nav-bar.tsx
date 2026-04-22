@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 const items = [
-  { href: "/", label: "开局" },
+  { href: "/", label: "开局页" },
   { href: "/game", label: "主游戏页" },
   { href: "/settlement", label: "月结算" },
   { href: "/journal", label: "月记" },
@@ -24,4 +24,3 @@ export function NavBar() {
     </nav>
   );
 }
-

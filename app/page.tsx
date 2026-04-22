@@ -1,61 +1,61 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
-import { PlaceholderPanel } from "@/components/placeholder-panel";
+import { FactList } from "@/components/fact-list";
+import { SectionCard } from "@/components/section-card";
 
 const launchHighlights = [
-  "随机开局由规则层生成，不由 AI 判定。",
-  "月度行动、结算、事件与毕业风险全部在核心引擎中计算。",
-  "AI 仅负责月记和结局报告表达层。"
+  "随机开局、行动结算、事件触发和毕业判定全部由规则层负责。",
+  "UI 页面只展示结构化结果，并为后续数据层接入预留 props 和接口。",
+  "AI 只消费结构化摘要来生成月记与结局报告，不参与任何规则判定。"
+];
+
+const demoFlow = [
+  "开局页提供演示入口和模块边界说明。",
+  "主游戏页展示当前属性、时间块和行动入口。",
+  "月结算页展示本月变化与 AI 月记调用预览。",
+  "月记、履历、结局页负责查看归档文本和长期结果。"
 ];
 
 export default function StartPage() {
   return (
     <AppShell
       eyebrow="大学生模拟器 v0"
-      title="先把本地闭环跑通，再逐层扩展。"
-      description="阶段 1 先完成模块边界、共享类型、占位页面与文档，为后续并行开发留出清晰写入面。"
+      title="面向联调的 Demo UI 与 AI 表达层"
+      description="这个版本聚焦可演示的页面骨架与 AI 转写封装：先把展示流跑通，再把规则层和数据层按接口接进来。"
       actions={
         <>
           <Link
             href="/game"
             className="rounded-full bg-amber-600 px-5 py-3 font-semibold text-white transition hover:bg-amber-700"
           >
-            进入主游戏页占位
+            进入主游戏页
           </Link>
           <Link
             href="/docs"
             className="rounded-full border border-amber-900/15 bg-white/60 px-5 py-3 font-semibold text-stone-800 transition hover:bg-white/90"
           >
-            查看文档索引说明
+            查看文档索引
           </Link>
         </>
       }
     >
       <section className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
-        <PlaceholderPanel
-          title="当前骨架重点"
-          description="页面已经预留为后续阶段接入随机开局、月度行动、AI 月记和结局展示。"
-        >
-          <ul className="space-y-3 text-sm leading-6 text-stone-700">
-            {launchHighlights.map((item) => (
-              <li key={item} className="rounded-2xl border border-amber-900/10 bg-white/70 px-4 py-3">
-                {item}
-              </li>
-            ))}
-          </ul>
-        </PlaceholderPanel>
-        <PlaceholderPanel
-          title="阶段路线"
-          description="主 agent 先搭地基，再并行拆给数据层、规则层、UI/AI 层。"
+        <SectionCard title="Demo 范围" description="这组页面只负责展示与串联，不写规则、不落完整数据层。">
+          <FactList items={launchHighlights} />
+        </SectionCard>
+        <SectionCard
+          title="演示流程"
+          description="当前页面以静态示例数据驱动，后续可以直接替换成规则层输出和数据库读取结果。"
         >
           <ol className="space-y-3 text-sm leading-6 text-stone-700">
-            <li>1. 初始化 Next.js + TypeScript + Tailwind 工程。</li>
-            <li>2. 固化类型、目录边界与架构文档。</li>
-            <li>3. 进入并行辅助开发并在最后整合联调。</li>
+            {demoFlow.map((item, index) => (
+              <li key={item} className="rounded-2xl border border-[var(--border)] bg-white/70 px-4 py-3">
+                {index + 1}. {item}
+              </li>
+            ))}
           </ol>
-        </PlaceholderPanel>
+        </SectionCard>
       </section>
     </AppShell>
   );
 }
-
