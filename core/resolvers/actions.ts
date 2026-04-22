@@ -8,6 +8,8 @@ import type {
   RiskState,
 } from "@/types/game";
 
+type SupportedAction = MonthlyActionPlan["actions"][number]["action"] | "big_meal";
+
 type ActionResolution = {
   stats: DynamicStats;
   moneyDelta: number;
@@ -52,6 +54,72 @@ function createResumeItem(run: GameRun, title: string, summary: string, category
   };
 }
 
+function roundToNearestTen(value: number): number {
+  return Math.round(value / 10) * 10;
+}
+
+function countConsecutiveStudyMonths(run: GameRun): number {
+  let streak = 0;
+
+  for (let index = run.monthlySummaries.length - 1; index >= 0; index -= 1) {
+    if (!run.monthlySummaries[index].actions.includes("study")) {
+      break;
+    }
+    streak += 1;
+  }
+
+  return streak;
+}
+
+function productivityMultiplier(run: GameRun): number {
+  let multiplier = 1;
+
+  if (run.stats.stress >= 85) {
+    multiplier *= 0.55;
+  } else if (run.stats.stress >= 70) {
+    multiplier *= 0.75;
+  }
+
+  if (run.stats.mood <= 15) {
+    multiplier *= 0.7;
+  } else if (run.stats.mood <= 35) {
+    multiplier *= 0.85;
+  }
+
+  return Math.max(0.35, Number(multiplier.toFixed(2)));
+}
+
+function studyStreakMultiplier(run: GameRun, studyCountThisMonth: number): number {
+  const streak = countConsecutiveStudyMonths(run) + studyCountThisMonth;
+
+  if (streak <= 0) {
+    return 1;
+  }
+  if (streak === 1) {
+    return 0.82;
+  }
+  if (streak === 2) {
+    return 0.68;
+  }
+  return 0.55;
+}
+
+function refusalReason(run: GameRun, action: SupportedAction): string | null {
+  if (action === "study" && (run.stats.stress >= 90 || run.stats.mood <= 8)) {
+    return "state-refused-study";
+  }
+
+  if ((action === "job_prep" || action === "part_time") && (run.stats.stress >= 90 || run.stats.mood <= 10)) {
+    return "state-refused-work";
+  }
+
+  return null;
+}
+
+function isProductiveAction(action: SupportedAction): boolean {
+  return action === "study" || action === "job_prep" || action === "part_time" || action === "remedy";
+}
+
 export function resolveActionPlan(run: GameRun, plan: MonthlyActionPlan): ActionResolution {
   const stats = emptyStatsDelta();
   const risk: RiskState = {
@@ -63,9 +131,12 @@ export function resolveActionPlan(run: GameRun, plan: MonthlyActionPlan): Action
   const resumeAdditions: ResumeItem[] = [];
   let moneyDelta = 0;
   let askFamilyUsed = false;
+  let studyCountThisMonth = 0;
 
   for (const requestedAction of plan.actions) {
-    if (requestedAction.action === "part_time" && requestedAction.time === "night") {
+    const action = requestedAction.action as SupportedAction;
+
+    if (action === "part_time" && requestedAction.time === "night") {
       resolvedActions.push({
         ...requestedAction,
         accepted: false,
@@ -75,7 +146,7 @@ export function resolveActionPlan(run: GameRun, plan: MonthlyActionPlan): Action
       continue;
     }
 
-    if (requestedAction.action === "ask_family") {
+    if (action === "ask_family") {
       if (run.cooldowns.askFamilyMonths > 0) {
         resolvedActions.push({
           ...requestedAction,
@@ -99,31 +170,59 @@ export function resolveActionPlan(run: GameRun, plan: MonthlyActionPlan): Action
       continue;
     }
 
+    const stateRefusalReason = refusalReason(run, action);
+    if (stateRefusalReason) {
+      resolvedActions.push({
+        ...requestedAction,
+        accepted: false,
+        reason: stateRefusalReason,
+      });
+      flags.push(stateRefusalReason);
+      stats.stress += 1;
+      continue;
+    }
+
+    const efficiency = productivityMultiplier(run);
     resolvedActions.push({
       ...requestedAction,
       accepted: true,
     });
 
-    switch (requestedAction.action) {
-      case "study":
-        stats.semesterAcademics += 12;
-        stats.stress += 4;
+    if (isProductiveAction(action) && efficiency < 1) {
+      flags.push("stress-efficiency-penalty");
+    }
+
+    switch (action) {
+      case "study": {
+        const studyMultiplier = Number((efficiency * studyStreakMultiplier(run, studyCountThisMonth)).toFixed(2));
+        studyCountThisMonth += 1;
+
+        if (studyMultiplier < 1) {
+          flags.push("study-diminishing-returns");
+        }
+
+        stats.semesterAcademics += Math.max(2, Math.round(8 * studyMultiplier));
+        stats.stress += 5;
         stats.mood -= 1;
-        stats.fulfillment += 2;
-        risk.academicRisk -= 3;
+        stats.fulfillment += Math.max(1, Math.round(2 * studyMultiplier));
+        risk.academicRisk -= Math.max(1, Math.round(2 * studyMultiplier));
         break;
+      }
       case "job_prep":
-        stats.stress += 2;
-        stats.fulfillment += 3;
-        stats.money -= 30;
+        stats.stress += 3;
+        stats.fulfillment += Math.max(1, Math.round(3 * efficiency));
+        stats.money -= 40;
         resumeAdditions.push(
-          createResumeItem(run, "简历投递记录", "开始整理方向并投递岗位。", "job_progress"),
+          createResumeItem(run, "简历投递准备", "开始整理方向、修改简历并尝试投递岗位。", "job_progress"),
         );
         break;
       case "part_time":
-        moneyDelta += 450;
-        stats.stress += 3;
-        stats.fulfillment += 1;
+        moneyDelta += roundToNearestTen(420 * efficiency);
+        stats.stress += 4;
+        stats.fulfillment += Math.max(1, Math.round(2 * efficiency));
+        if (efficiency < 0.7) {
+          stats.mood -= 1;
+        }
         break;
       case "social":
         stats.money -= 120;
@@ -136,11 +235,17 @@ export function resolveActionPlan(run: GameRun, plan: MonthlyActionPlan): Action
         stats.mood += 6;
         stats.stress -= 5;
         break;
+      case "big_meal":
+        stats.money -= 180;
+        stats.mood += 8;
+        stats.stress -= 6;
+        stats.fulfillment += 1;
+        break;
       case "student_activity":
         stats.money -= 30;
         stats.mood += 2;
         stats.social += 4;
-        stats.fulfillment += 4;
+        stats.fulfillment += Math.max(2, Math.round(4 * Math.max(0.75, efficiency)));
         resumeAdditions.push(
           createResumeItem(run, "校园活动参与", "参加讲座、社团或学生事务活动。", "campus_activity"),
         );
@@ -148,8 +253,8 @@ export function resolveActionPlan(run: GameRun, plan: MonthlyActionPlan): Action
       case "remedy":
         stats.money -= 60;
         stats.stress -= 6;
-        stats.semesterAcademics += 6;
-        risk.academicRisk -= 8;
+        stats.semesterAcademics += Math.max(3, Math.round(5 * Math.max(0.75, efficiency)));
+        risk.academicRisk -= Math.max(4, Math.round(7 * Math.max(0.75, efficiency)));
         break;
       default:
         break;
@@ -168,4 +273,3 @@ export function resolveActionPlan(run: GameRun, plan: MonthlyActionPlan): Action
     askFamilyUsed,
   };
 }
-

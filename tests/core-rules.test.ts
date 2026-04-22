@@ -8,7 +8,13 @@ import {
   settleSemester,
 } from "@/core/game-engine";
 import { evaluateSemesterFeedback } from "@/core/resolvers";
-import type { CourseAttendanceStrategy, GameRun, MonthlyActionPlan } from "@/types/game";
+import type {
+  CourseAttendanceStrategy,
+  GameRun,
+  MonthlyActionPlan,
+  SemesterFeedback,
+  StructuredMonthlySummary,
+} from "@/types/game";
 
 function createDecision(
   attendanceStrategy: CourseAttendanceStrategy,
@@ -21,6 +27,79 @@ function createDecision(
     attendanceStrategy,
     actions,
   };
+}
+
+function createBigMealAction(): MonthlyActionPlan["actions"][number] {
+  return {
+    action: "big_meal" as MonthlyActionPlan["actions"][number]["action"],
+    time: "day",
+  };
+}
+
+function withMonth(run: GameRun, currentMonth: number): GameRun {
+  return {
+    ...run,
+    currentMonth,
+  };
+}
+
+function createHistoricalSummary(
+  month: number,
+  feedback: SemesterFeedback,
+  actions: string[] = ["study"],
+): StructuredMonthlySummary {
+  return {
+    month,
+    actions: actions as StructuredMonthlySummary["actions"],
+    attendanceStrategy: "mixed",
+    schedule: createMonthlySchedule(month),
+    statsBefore: {
+      money: 1000,
+      mood: 60,
+      stress: 30,
+      fulfillment: 40,
+      social: 36,
+      semesterAcademics: 20,
+    },
+    statsAfter: {
+      money: 1000,
+      mood: 60,
+      stress: 30,
+      fulfillment: 42,
+      social: 36,
+      semesterAcademics: 48,
+    },
+    statsDelta: {
+      money: 0,
+      mood: 0,
+      stress: 0,
+      fulfillment: 2,
+      social: 0,
+      semesterAcademics: 28,
+    },
+    moneyDelta: 0,
+    academicFeedback: feedback,
+    eventIds: [],
+    resumeAdditions: [],
+    notableFacts: [],
+    resolvedActions: [],
+    flags: [],
+    cooldowns: {
+      askFamilyMonths: 0,
+    },
+    course: {
+      strategy: "mixed",
+      attendanceCounted: true,
+      directRollCallPenalty: 0,
+      academicRiskDelta: 0,
+      academicGain: 12,
+      moodDelta: 0,
+    },
+  };
+}
+
+function studyActionGain(summary: ReturnType<typeof resolveMonthlyTurn>["summary"]): number {
+  return summary.statsDelta.semesterAcademics - summary.course.academicGain - summary.course.directRollCallPenalty;
 }
 
 describe("opening generation", () => {
@@ -133,6 +212,129 @@ describe("monthly resolution", () => {
 
     expect(result.summary.eventIds.length).toBeGreaterThan(0);
     expect(result.summary.notableFacts.some((fact) => fact.includes("event:"))).toBe(true);
+  });
+
+  it("applies fixed living expenses and supports a big meal recovery action", () => {
+    const run = withMonth(
+      createInitialGameRun({
+        id: "big-meal-run",
+        randomValues: [0.53, 0.31, 0.42, 0.57, 0.63, 0.21, 0.34, 0.45],
+      }),
+      3,
+    );
+
+    const result = resolveMonthlyTurn(
+      run,
+      createDecision("mixed", [createBigMealAction()]),
+    );
+
+    expect(result.summary.eventIds).toContain("monthly-living-expense");
+    expect(result.summary.resolvedActions.some((item) => item.action === "big_meal" && item.accepted)).toBe(true);
+    expect(result.summary.statsDelta.mood).toBeGreaterThan(0);
+    expect(result.summary.statsDelta.stress).toBeLessThan(0);
+    expect(result.summary.moneyDelta).toBeLessThan(run.profile.monthlyAllowance);
+  });
+
+  it("reduces study gains on repeated months and when the player is overstressed", () => {
+    const baseRun = withMonth(
+      createInitialGameRun({
+        id: "study-balance-run",
+        randomValues: [0.48, 0.22, 0.36, 0.52, 0.68, 0.19, 0.28, 0.41],
+      }),
+      3,
+    );
+
+    const firstMonth = resolveMonthlyTurn(
+      baseRun,
+      createDecision("mixed", [{ action: "study", time: "day" }]),
+    );
+    const secondMonth = resolveMonthlyTurn(
+      firstMonth.run,
+      createDecision("mixed", [{ action: "study", time: "day" }]),
+    );
+    const stressedRun = {
+      ...baseRun,
+      stats: {
+        ...baseRun.stats,
+        stress: 86,
+        mood: 18,
+      },
+    };
+    const stressedMonth = resolveMonthlyTurn(
+      stressedRun,
+      createDecision("mixed", [{ action: "study", time: "day" }]),
+    );
+
+    expect(studyActionGain(firstMonth.summary)).toBeGreaterThan(studyActionGain(secondMonth.summary));
+    expect(studyActionGain(firstMonth.summary)).toBeGreaterThan(studyActionGain(stressedMonth.summary));
+  });
+
+  it("triggers state-driven scholarship and economic pressure events", () => {
+    const baseRun = createInitialGameRun({
+      id: "state-event-run",
+      randomValues: [0.14, 0.23, 0.4, 0.51, 0.62, 0.18, 0.29, 0.33],
+    });
+    const scholarshipRun: GameRun = {
+      ...withMonth(baseRun, 6),
+      monthlySummaries: [
+        createHistoricalSummary(4, "excellent"),
+        createHistoricalSummary(5, "excellent"),
+      ],
+      stats: {
+        ...baseRun.stats,
+        semesterAcademics: 58,
+      },
+    };
+    const lowMoneyRun: GameRun = {
+      ...withMonth(baseRun, 5),
+      stats: {
+        ...baseRun.stats,
+        money: -1900,
+      },
+    };
+
+    const scholarshipResult = resolveMonthlyTurn(scholarshipRun, createDecision("mixed", []));
+    const lowMoneyResult = resolveMonthlyTurn(lowMoneyRun, createDecision("mixed", []));
+
+    expect(scholarshipResult.summary.eventIds).toContain("academic-scholarship");
+    expect(lowMoneyResult.summary.eventIds).toContain("economic-pressure");
+    expect(lowMoneyResult.summary.flags).toContain("economic-pressure");
+  });
+
+  it("penalizes overloaded players with refusal events and rejected productive actions", () => {
+    const baseRun = withMonth(
+      createInitialGameRun({
+        id: "burnout-run",
+        randomValues: [0.32, 0.26, 0.47, 0.59, 0.67, 0.24, 0.35, 0.46],
+      }),
+      7,
+    );
+    const burnoutRun: GameRun = {
+      ...baseRun,
+      stats: {
+        ...baseRun.stats,
+        stress: 92,
+        mood: 8,
+      },
+      risk: {
+        ...baseRun.risk,
+        burnout: 18,
+      },
+    };
+
+    const result = resolveMonthlyTurn(
+      burnoutRun,
+      createDecision("mixed", [
+        { action: "study", time: "day" },
+        { action: "job_prep", time: "night" },
+      ]),
+    );
+
+    expect(result.summary.eventIds).toContain("burnout-slump");
+    expect(result.summary.flags).toContain("state-refused-study");
+    expect(result.summary.flags).toContain("state-refused-work");
+    expect(result.summary.resolvedActions.some((item) => item.reason === "state-refused-study")).toBe(true);
+    expect(result.summary.resolvedActions.some((item) => item.reason === "state-refused-work")).toBe(true);
   });
 });
 

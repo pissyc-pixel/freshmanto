@@ -40,6 +40,13 @@ function calculateAverage(semesters: SemesterRecord[]): number {
   return Math.round((total / semesters.length) * 10) / 10;
 }
 
+function calculateMentalPenalty(run: GameRun): number {
+  const stressPenalty = run.stats.stress >= 75 ? Math.floor((run.stats.stress - 70) / 6) : 0;
+  const burnoutPenalty = Math.floor(run.risk.burnout / 12);
+
+  return Math.max(0, stressPenalty + burnoutPenalty);
+}
+
 function deriveRiskFlags(run: GameRun, nextRecord: SemesterRecord): string[] {
   const flags = new Set(run.riskFlags);
 
@@ -60,7 +67,7 @@ function deriveRiskFlags(run: GameRun, nextRecord: SemesterRecord): string[] {
 }
 
 export function settleSemester(run: GameRun): SemesterSettlementResult {
-  const rawScore = run.stats.semesterAcademics - run.risk.academicRisk;
+  const rawScore = run.stats.semesterAcademics - run.risk.academicRisk - calculateMentalPenalty(run);
   const academicScore = clamp(Math.round(rawScore), 0, 100);
   const feedback = evaluateSemesterFeedback(academicScore);
   const passed = canPassFinal(academicScore, run.profile.luck);
