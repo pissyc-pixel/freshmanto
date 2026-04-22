@@ -21,7 +21,7 @@ type LogFeedProps = {
 export function LogFeed({
   items,
   variant = "system",
-  emptyMessage = "这里暂时还没有可展示的记录。",
+  emptyMessage = "这里暂时还没有可回看的记录。",
 }: LogFeedProps) {
   if (items.length === 0) {
     return (
@@ -38,7 +38,7 @@ export function LogFeed({
           item.periodLabel ?? (item.year && item.month ? formatMonthLabel(item.year, item.month) : undefined);
         const badge =
           variant === "player"
-            ? item.badge ?? "玩家回顾"
+            ? item.badge ?? "本月回顾"
             : formatSystemLogType(item.logType ?? "record");
         const articleClass =
           variant === "player"
@@ -62,7 +62,7 @@ export function LogFeed({
             <p className="mt-3 text-sm leading-6 text-stone-700">{item.message}</p>
             {variant === "player" && item.details && item.details.length > 0 ? (
               <div className="mt-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">我还记得的几件事</p>
+                <p className="text-xs font-semibold tracking-[0.12em] text-stone-500">这几件事我还记得</p>
                 <ul className="mt-2 space-y-2 text-sm leading-6 text-stone-600">
                   {item.details.map((detail) => (
                     <li key={detail} className="rounded-2xl bg-white/90 px-3 py-2">

@@ -26,16 +26,21 @@ function formatSignedValue(value: number): string {
 
 function buildOutcomeSentence(turn: ActionTurnSummary): string {
   const actionLabel = formatActionType(turn.resolvedAction.action);
+  const attendanceLabel = formatAttendanceStrategy(turn.attendanceStrategy);
 
   if (!turn.resolvedAction.accepted) {
-    return `这次原本想做“${actionLabel}”，但最后没做成，所以这一轮更像是临时停顿了一下。`;
+    return `这一步原本想做「${actionLabel}」，但最后没有做成。课程这边还是按「${attendanceLabel}」往前走，这一轮更像是临时停了一下。`;
   }
 
   if (!turn.advancesCalendar) {
-    return `这次做的是“${actionLabel}”这种即时安排，状态已经立刻变化了，但周历还留在原地。`;
+    return `这次做的是「${actionLabel}」这种即时安排，状态已经立刻变化，但本周时间还没往前走，所以你还能继续安排正式行动。`;
   }
 
-  return `这次把行动落在“${actionLabel}”上，系统已经把这一轮正式结算进本月进度里。`;
+  return `这次把「${actionLabel}」正式落在了本周里，课程这边走的是「${attendanceLabel}」，这一轮已经结算进本月进度。`;
+}
+
+function buildTimeChangeLabel(turn: ActionTurnSummary): string {
+  return turn.advancesCalendar ? "本周已推进" : "本周还没推进";
 }
 
 export function ActionResultCard({
@@ -45,12 +50,13 @@ export function ActionResultCard({
   title = "本次行动结果",
 }: ActionResultCardProps) {
   const stats = [
-    { label: "金钱", value: turn.statsDelta.money },
-    { label: "心情", value: turn.statsDelta.mood },
-    { label: "压力", value: turn.statsDelta.stress },
-    { label: "学业", value: turn.statsDelta.semesterAcademics },
+    { label: "时间", value: buildTimeChangeLabel(turn), emphasis: false },
+    { label: "金钱", value: formatSignedValue(turn.statsDelta.money), emphasis: true },
+    { label: "心情", value: formatSignedValue(turn.statsDelta.mood), emphasis: true },
+    { label: "压力", value: formatSignedValue(turn.statsDelta.stress), emphasis: true },
+    { label: "学业", value: formatSignedValue(turn.statsDelta.semesterAcademics), emphasis: true },
   ];
-  const statusBadge = turn.advancesCalendar ? "周历已推进" : "周历未推进";
+  const statusBadge = turn.advancesCalendar ? "本周进度已结算" : "本周进度未结算";
   const eventBadge = eventLines.length > 0 ? `额外变化 ${eventLines.length}` : "额外变化 0";
 
   return (
@@ -67,9 +73,7 @@ export function ActionResultCard({
 
       <div className="mt-4 space-y-2">
         <h3 className="text-lg font-semibold text-stone-900">{formatActionType(turn.resolvedAction.action)}</h3>
-        <p className="text-sm leading-6 text-stone-700">
-          这一轮按“{formatAttendanceStrategy(turn.attendanceStrategy)}”走课。{buildOutcomeSentence(turn)}
-        </p>
+        <p className="text-sm leading-6 text-stone-700">{buildOutcomeSentence(turn)}</p>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2 text-xs font-medium text-stone-700">
@@ -77,12 +81,12 @@ export function ActionResultCard({
         <span className="rounded-full bg-white px-3 py-1">{eventBadge}</span>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {stats.map((item) => (
           <div key={item.label} className="rounded-2xl bg-white/85 px-4 py-3">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-stone-500">{item.label}</p>
+            <p className="text-xs font-medium tracking-[0.16em] text-stone-500">{item.label}</p>
             <p className="mt-2 text-lg font-semibold text-stone-900">
-              {item.label} {formatSignedValue(item.value)}
+              {item.label} {item.value}
             </p>
           </div>
         ))}
@@ -90,7 +94,7 @@ export function ActionResultCard({
 
       <div className="mt-5 space-y-3">
         <div className="rounded-2xl bg-white/80 px-4 py-3 text-sm leading-6 text-stone-700">
-          <p className="font-semibold text-stone-900">这一轮之后</p>
+          <p className="font-semibold text-stone-900">这一轮之后还能做什么</p>
           <p className="mt-1">{nextStepHint}</p>
         </div>
 
@@ -105,7 +109,7 @@ export function ActionResultCard({
           </div>
         ) : (
           <div className="rounded-2xl bg-stone-100/85 px-4 py-3 text-sm leading-6 text-stone-700">
-            这一轮没有额外事件，主要就是状态和节奏立刻发生了变化。
+            这一轮没有额外事件，主要就是状态和时间安排立刻发生了变化。
           </div>
         )}
       </div>
