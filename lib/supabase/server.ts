@@ -1,16 +1,16 @@
-import { createClient } from "@supabase/supabase-js";
-import { isSupabaseAdminConfigured, supabaseConfig } from "@/lib/supabase/config";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { assertSupabaseAdminConfigured, supabaseConfig } from "@/lib/supabase/config";
+import type { Database } from "@/types/db";
+
+export type ServerSupabaseClient = SupabaseClient<Database>;
 
 export function createSupabaseServerClient() {
-  if (!isSupabaseAdminConfigured()) {
-    throw new Error("Supabase server client is not configured.");
-  }
+  assertSupabaseAdminConfigured();
 
-  return createClient(supabaseConfig.url, supabaseConfig.secretKey, {
+  return createClient<Database>(supabaseConfig.url, supabaseConfig.secretKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false
     }
   });
 }
-

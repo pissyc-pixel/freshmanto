@@ -55,6 +55,18 @@ npm run dev
 
 然后访问 [http://localhost:3000](http://localhost:3000)。
 
+## 数据层初始化
+
+最小 Supabase schema 位于 `db/schema.sql`。
+
+建议在 Supabase SQL Editor 中执行该文件，完成以下表初始化：
+
+- `runs`
+- `monthly_states`
+- `game_event_logs`
+- `ai_reports`
+- `resume_items`
+
 ## 当前阶段说明
 
 阶段 1 只完成：
@@ -71,4 +83,3 @@ npm run dev
 - UI + AI 表达层
 
 阶段 3 由主 agent 进行整合联调与文档更新。
-
