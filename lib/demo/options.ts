@@ -127,6 +127,16 @@ const systemLogTypeLabels = {
   settlement: "结算留档",
 } as const;
 
+const weekdayClassDayLabels = {
+  mon: "周一白天",
+  tue: "周二白天",
+  wed: "周三白天",
+  thu: "周四白天",
+  fri: "周五白天",
+  sat: "周六白天",
+  sun: "周日白天",
+} as const;
+
 const rejectionReasonLabels: Record<string, string> = {
   "invalid-night-part-time": "夜里没法去做兼职，只能作罢",
   "ask-family-on-cooldown": "这个月还没过冷却，再开口会更别扭",
@@ -175,6 +185,15 @@ function formatSignedValue(value: number, suffix = ""): string {
 
 function formatWeekLabel(week: number): string {
   return `第${week}周`;
+}
+
+function formatClassDayList(rawDays: string): string {
+  return rawDays
+    .split(",")
+    .map((day) => day.trim())
+    .filter((day): day is keyof typeof weekdayClassDayLabels => day in weekdayClassDayLabels)
+    .map((day) => weekdayClassDayLabels[day])
+    .join("、");
 }
 
 function describeRejectionReason(reason?: string): string {
@@ -258,6 +277,15 @@ function describeNotableFact(fact: string): string | undefined {
   if (fact.startsWith("event:monthly-living-expense:")) {
     const amount = Number(fact.split(":").at(-1) ?? 0);
     return `房租、吃饭和日常开销一共扣掉了 ${amount} 元固定生活成本。`;
+  }
+
+  if (fact.startsWith("skip_class released ")) {
+    const rawDays = fact
+      .replace("skip_class released ", "")
+      .replace(" daytime blocks", "");
+    const classDays = formatClassDayList(rawDays);
+
+    return classDays.length > 0 ? `这周已经腾出来的白天：${classDays}。` : "这周临时腾出了一部分白天时间。";
   }
 
   if (fact.startsWith("event:")) {

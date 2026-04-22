@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createWeeklyCalendar } from "@/core/game-engine";
+import { ActionResultCard } from "@/components/action-result-card";
 import { AppShell } from "@/components/app-shell";
 import { ActionPlanForm } from "@/components/action-plan-form";
 import { LogFeed } from "@/components/log-feed";
@@ -10,15 +11,17 @@ import { TimeBlockStrip } from "@/components/time-block-strip";
 import { getServerDemoBundle } from "@/lib/demo/server";
 import {
   buildPlayerFacingMonthlyLog,
+  formatAttendanceStrategy,
   formatMonthLabel,
-  formatPlayerFacingFact,
-  formatPlayerFacingFlag,
-  formatPlayerFacingTurn,
   formatStatLabel,
 } from "@/lib/demo/options";
 import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
 import type { DynamicStats } from "@/types/game";
-import { buildWeeklyScheduleBlocks, resolveCurrentWeekState } from "@/app/game/view-model";
+import {
+  buildCurrentActionFeedback,
+  buildWeeklyScheduleBlocks,
+  resolveCurrentWeekState,
+} from "@/app/game/view-model";
 
 export const dynamic = "force-dynamic";
 
@@ -86,12 +89,12 @@ export default async function GamePage({ searchParams }: GamePageProps) {
     year: log.year,
     month: log.month,
   }));
-  const lastTurnDetails = lastTurn
-    ? [
-        ...lastTurn.notableFacts.map(formatPlayerFacingFact),
-        ...lastTurn.flags.map(formatPlayerFacingFlag),
-      ]
-    : [];
+  const latestActionFeedback = lastTurn
+    ? buildCurrentActionFeedback({
+        turn: lastTurn,
+        currentWeekState,
+      })
+    : null;
 
   return (
     <AppShell
@@ -130,12 +133,13 @@ export default async function GamePage({ searchParams }: GamePageProps) {
         >
           <div className="space-y-3 text-sm leading-6 text-stone-700">
             <p>
-              当前周课程策略：<strong>{lastTurn?.attendanceStrategy ?? currentWeekState.attendanceStrategy}</strong>
+              当前周课程策略：
+              <strong>{formatAttendanceStrategy(lastTurn?.attendanceStrategy ?? currentWeekState.attendanceStrategy)}</strong>
             </p>
             <p>
               已释放的课程白天：
               {currentWeekState.releasedClassDays.length > 0
-                ? ` ${currentWeekState.releasedClassDays.join(", ")}`
+                ? ` ${schedule.find((week) => week.isCurrent)?.timeSummary?.replace("这周已经腾出来的上课白天：", "")}`
                 : " 暂无"}
             </p>
             <p>
@@ -155,21 +159,14 @@ export default async function GamePage({ searchParams }: GamePageProps) {
 
         <SectionCard
           title="上一轮反馈"
-          description="这里会告诉你最近一次动作具体发生了什么。"
+          description="这里直接显示最近一次动作的即时结果，以及你接下来还能怎么安排这一周。"
         >
-          {lastTurn ? (
-            <div className="space-y-3 text-sm leading-6 text-stone-700">
-              <p>{formatPlayerFacingTurn(lastTurn)}</p>
-              {lastTurnDetails.length > 0 ? (
-                <ul className="space-y-2">
-                  {lastTurnDetails.map((detail) => (
-                    <li key={detail} className="rounded-2xl bg-stone-100/80 px-3 py-2">
-                      {detail}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
+          {lastTurn && latestActionFeedback ? (
+            <ActionResultCard
+              turn={lastTurn}
+              eventLines={latestActionFeedback.eventLines}
+              nextStepHint={latestActionFeedback.nextStepHint}
+            />
           ) : (
             <p className="text-sm leading-6 text-stone-600">
               这个月还没有结算过任何动作。先做一个决定，系统会立刻更新剩余时间和当前状态。
