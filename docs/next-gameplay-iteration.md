@@ -72,6 +72,36 @@
 
 ## 并行边界
 
+## 续跑恢复（2026-04-23）
+
+### 当前仓库状态
+
+- 工作树干净，可直接在现有提交链上继续增量修改。
+- 已存在上一轮主 agent 规划提交：`18278fa docs: plan next gameplay iteration and subagent boundaries`
+- 已存在三块实现提交：
+  - `81f6c76 feat: improve player feedback logs and humanized monthly journal`
+  - `133e4af feat: add expenses rebalance study and state-linked random events`
+  - `0ef170a feat: refactor flow into time-cost actions with continuous decisions`
+- 这说明本轮不需要重做 A / B / C，而是要在现状上补齐“真正收口”的整合、回归、审查与修补。
+
+### 已确认完成的部分
+
+- 周内剩余时间与连续行动入口已经进入主流程。
+- `skip_class`、`big_meal`、周补给 / 周支出、状态联动事件、即时反馈卡、第一人称月记 prompt / fallback 已有代码落点。
+- 规则判定仍在代码层，AI 仍只负责月记与结局表达。
+
+### 当前阻塞
+
+- 回归测试里仍有旧语义残留，至少 `tests/core-rules.test.ts` 还按“每次推进后直接进入下一周”断言，和当前“同一周持续行动直到时间耗尽”的规则不一致。
+- 本轮提交链缺少独立的“主 agent 整合联调”提交和“代码审查后修补”提交，验收闭环还没补全。
+
+### 本次续跑的增量边界
+
+- Subagent A：只检查时间流 / 行动系统里仍未覆盖的边角与测试语义收口，不推翻当前多动作时间池实现。
+- Subagent B：只检查经济压力、学习收益递减、状态联动事件的缺口与失衡点，不重写事件框架。
+- Subagent C：只检查行动后即时反馈、中文化文本、月记 / 结局表达与玩家可读性缺口，不把规则塞回 AI。
+- 主 agent：负责合并 A / B / C 的增量结果、统一共享接口、修复回归测试与文档，再做独立代码审查和收尾修补。
+
 ### 阶段 1：主 agent 规划
 
 - 只更新规划文档，不改业务实现。
