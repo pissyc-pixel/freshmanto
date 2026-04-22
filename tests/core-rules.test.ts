@@ -6,6 +6,7 @@ import {
   evaluateGraduationOutcome,
   resolveActionTurn,
   resolveMonthlyTurn,
+  resolveWeekEnd,
   settleSemester,
 } from "@/core/game-engine";
 import { evaluateSemesterFeedback } from "@/core/resolvers";
@@ -216,7 +217,7 @@ describe("monthly resolution", () => {
     expect(result.summary.notableFacts.some((fact) => fact.includes("event:"))).toBe(true);
   });
 
-  it("settles weekly allowance and weekly living costs only on advancing turns while keeping big meal free of time", () => {
+  it("keeps the turn in the same week until time is exhausted while settling weekly costs once per week", () => {
     const run = withMonth(
       createInitialGameRun({
         id: "big-meal-run",
@@ -235,7 +236,8 @@ describe("monthly resolution", () => {
       attendanceStrategy: "mixed",
       action: { action: "study", time: "day" },
     });
-    const mealBetweenWeeks = resolveActionTurn(firstWeekStudy.run, {
+    const forcedWeekEnd = resolveWeekEnd(firstWeekStudy.run, "mixed");
+    const mealBetweenWeeks = resolveActionTurn(forcedWeekEnd.run, {
       attendanceStrategy: "mixed",
       action: createBigMealAction(),
     });
@@ -247,12 +249,16 @@ describe("monthly resolution", () => {
     expect(mealBeforeWeek.turnSummary.advancesCalendar).toBe(false);
     expect(mealBeforeWeek.turnSummary.moneyDelta).toBe(-180);
     expect(mealBeforeWeek.run.activeMonth?.currentWeek).toBe(1);
+    expect(mealBeforeWeek.turnSummary.weekTimeBefore).toBe(mealBeforeWeek.turnSummary.weekTimeAfter);
     expect(mealBeforeWeek.turnSummary.statsDelta.mood).toBe(8);
     expect(mealBeforeWeek.turnSummary.statsDelta.stress).toBe(-6);
 
     expect(firstWeekStudy.turnSummary.advancesCalendar).toBe(true);
     expect(firstWeekStudy.turnSummary.moneyDelta).toBe(weeklyAllowance - weeklyExpense);
-    expect(firstWeekStudy.run.activeMonth?.currentWeek).toBe(2);
+    expect(firstWeekStudy.run.activeMonth?.currentWeek).toBe(1);
+    expect(firstWeekStudy.turnSummary.weekTimeAfter).toBeLessThan(firstWeekStudy.turnSummary.weekTimeBefore);
+
+    expect(forcedWeekEnd.run.activeMonth?.currentWeek).toBe(2);
 
     expect(mealBetweenWeeks.turnSummary.advancesCalendar).toBe(false);
     expect(mealBetweenWeeks.turnSummary.moneyDelta).toBe(-180);
@@ -260,7 +266,7 @@ describe("monthly resolution", () => {
 
     expect(secondWeekStudy.turnSummary.advancesCalendar).toBe(true);
     expect(secondWeekStudy.turnSummary.moneyDelta).toBe(weeklyAllowance - weeklyExpense);
-    expect(secondWeekStudy.run.activeMonth?.currentWeek).toBe(3);
+    expect(secondWeekStudy.run.activeMonth?.currentWeek).toBe(2);
   });
 
   it("reduces study gains on repeated months and when the player is overstressed", () => {
@@ -297,6 +303,42 @@ describe("monthly resolution", () => {
     expect(studyActionGain(firstMonth.summary)).toBeGreaterThan(studyActionGain(stressedMonth.summary));
   });
 
+  it("keeps weekly living costs above a basic ordinary allowance so money pressure persists", () => {
+    const baseRun = withMonth(
+      createInitialGameRun({
+        id: "weekly-money-pressure-run",
+        randomValues: [0.24, 0.34, 0.41, 0.52, 0.68, 0.19, 0.28, 0.41],
+      }),
+      4,
+    );
+    const pressuredRun: GameRun = {
+      ...baseRun,
+      profile: {
+        ...baseRun.profile,
+        familyBackground: "ordinary",
+        cityTier: "tier_2",
+        monthlyAllowance: 1400,
+      },
+      stats: {
+        ...baseRun.stats,
+        money: 1400,
+      },
+    };
+    let nextRun = pressuredRun;
+
+    for (let week = 0; week < 4; week += 1) {
+      const actionResult = resolveActionTurn(nextRun, {
+        attendanceStrategy: "mixed",
+        action: { action: "study", time: "night" },
+      });
+      const weekEndResult = resolveWeekEnd(actionResult.run, "mixed");
+      nextRun = weekEndResult.run;
+    }
+
+    expect(getWeeklyLivingExpense(pressuredRun)).toBeGreaterThan(getWeeklyAllowance(pressuredRun));
+    expect(nextRun.stats.money).toBeLessThan(pressuredRun.stats.money);
+  });
+
   it("reduces study gains across repeated weekly turns in the same month", () => {
     const run = withMonth(
       createInitialGameRun({
@@ -315,9 +357,37 @@ describe("monthly resolution", () => {
       action: { action: "study", time: "night" },
     });
 
+    expect(firstTurn.turnSummary.statsDelta.semesterAcademics).toBeLessThanOrEqual(5);
     expect(firstTurn.turnSummary.statsDelta.semesterAcademics).toBeGreaterThan(
       secondTurn.turnSummary.statsDelta.semesterAcademics,
     );
+  });
+
+  it("collapses study efficiency under high stress and low mood", () => {
+    const baseRun = withMonth(
+      createInitialGameRun({
+        id: "study-collapse-run",
+        randomValues: [0.39, 0.28, 0.36, 0.52, 0.68, 0.19, 0.28, 0.41],
+      }),
+      6,
+    );
+    const stressedRun: GameRun = {
+      ...baseRun,
+      stats: {
+        ...baseRun.stats,
+        stress: 88,
+        mood: 18,
+      },
+    };
+
+    const result = resolveActionTurn(stressedRun, {
+      attendanceStrategy: "mixed",
+      action: { action: "study", time: "night" },
+    });
+
+    expect(result.turnSummary.flags).toContain("stress-efficiency-penalty");
+    expect(result.turnSummary.flags).toContain("study-efficiency-collapsed");
+    expect(result.turnSummary.statsDelta.semesterAcademics).toBeLessThanOrEqual(2);
   });
 
   it("changes event weights with stress, social, academics, and money state", () => {
@@ -389,6 +459,68 @@ describe("monthly resolution", () => {
 
     expect(result.summary.eventIds.length).toBeGreaterThan(0);
     expect(result.summary.eventIds).toContain("monthly-routine-reset");
+  });
+
+  it("resolves state-linked monthly events for high stress, high social, high academics, and low money", () => {
+    const baseRun = createInitialGameRun({
+      id: "state-linked-event-run",
+      randomValues: [0.17, 0.24, 0.4, 0.51, 0.62, 0.18, 0.29, 0.33],
+    });
+    const highStressRun: GameRun = {
+      ...withMonth(baseRun, 6),
+      stats: {
+        ...baseRun.stats,
+        stress: 86,
+        mood: 46,
+      },
+    };
+    const highSocialRun: GameRun = {
+      ...withMonth(baseRun, 6),
+      stats: {
+        ...baseRun.stats,
+        social: 78,
+      },
+    };
+    const highAcademicRun: GameRun = {
+      ...withMonth(baseRun, 6),
+      monthlySummaries: [
+        createHistoricalSummary(4, "excellent"),
+        createHistoricalSummary(5, "excellent"),
+      ],
+      stats: {
+        ...baseRun.stats,
+        semesterAcademics: 58,
+      },
+    };
+    const lowMoneyRun: GameRun = {
+      ...withMonth(baseRun, 6),
+      stats: {
+        ...baseRun.stats,
+        money: -1200,
+      },
+    };
+
+    const highStressMonth = resolveMonthlyTurn(
+      highStressRun,
+      createDecision("mixed", [{ action: "relax", time: "night" }]),
+    );
+    const highSocialMonth = resolveMonthlyTurn(
+      highSocialRun,
+      createDecision("mixed", [{ action: "relax", time: "night" }]),
+    );
+    const highAcademicMonth = resolveMonthlyTurn(
+      highAcademicRun,
+      createDecision("mixed", [{ action: "study", time: "night" }]),
+    );
+    const lowMoneyMonth = resolveMonthlyTurn(
+      lowMoneyRun,
+      createDecision("mixed", [{ action: "study", time: "night" }]),
+    );
+
+    expect(highStressMonth.summary.eventIds).toContain("stress-surge");
+    expect(highSocialMonth.summary.eventIds).toContain("social-mutual-aid");
+    expect(["academic-scholarship", "teacher-attention"]).toContain(highAcademicMonth.summary.eventIds[0]);
+    expect(lowMoneyMonth.summary.eventIds).toContain("economic-pressure");
   });
 
   it("penalizes overloaded players with refusal events and rejected productive actions", () => {

@@ -65,6 +65,12 @@ const WEEKLY_BACKGROUND_SPEND = {
   affluent: 170,
 } as const;
 
+const WEEKLY_SUPPLY_EXPENSE_BY_CITY = {
+  tier_1: 120,
+  tier_2: 100,
+  tier_3: 80,
+} as const;
+
 const SCHOLARSHIP_BY_SCHOOL = {
   qingbei: 1500,
   nankai_tianda: 1200,
@@ -88,7 +94,9 @@ export function getWeeklyAllowance(run: GameRun): number {
 
 export function getWeeklyLivingExpense(run: GameRun): number {
   return roundToNearestTen(
-    getMonthlyLivingExpense(run) / 4 + WEEKLY_BACKGROUND_SPEND[run.profile.familyBackground],
+    getMonthlyLivingExpense(run) / 4 +
+      WEEKLY_BACKGROUND_SPEND[run.profile.familyBackground] +
+      WEEKLY_SUPPLY_EXPENSE_BY_CITY[run.profile.cityTier],
   );
 }
 
@@ -244,6 +252,30 @@ export const starterEventTemplates: EventRuleTemplate[] = [
       },
       flags: ["economic-pressure"],
       notableFact: "event:economic-pressure",
+    },
+  },
+  {
+    id: "stress-surge",
+    title: "Stress Surge",
+    severity: "important",
+    phase: "monthly",
+    polarity: "negative",
+    triggerMonths: ALL_MONTHS,
+    conditions: ["stress_high"],
+    baseWeight: 8,
+    summary: "A month of sustained pressure starts cutting into sleep, patience, and follow-through.",
+    supportsRemedy: true,
+    effect: {
+      stats: {
+        mood: -2,
+        stress: 4,
+        fulfillment: -2,
+      },
+      risk: {
+        burnout: 2,
+      },
+      flags: ["stress-surge"],
+      notableFact: "event:stress-surge",
     },
   },
   {

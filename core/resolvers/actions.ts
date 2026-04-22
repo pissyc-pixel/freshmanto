@@ -316,7 +316,7 @@ export function resolveActionPlan(run: GameRun, plan: MonthlyActionPlan): Action
           flags.push("study-efficiency-collapsed");
         }
 
-        actionStatsDelta.semesterAcademics += Math.max(1, Math.round(6 * studyMultiplier));
+        actionStatsDelta.semesterAcademics += Math.max(1, Math.round(5 * studyMultiplier));
         actionStatsDelta.stress += 6;
         actionStatsDelta.mood -= studyMultiplier <= 0.5 ? 2 : 1;
         actionStatsDelta.fulfillment += Math.max(1, Math.round(2 * Math.max(0.6, studyMultiplier)));
