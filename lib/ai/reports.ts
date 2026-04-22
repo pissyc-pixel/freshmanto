@@ -64,17 +64,23 @@ function renderOutcomeSentence(input: EndingReportPromptInput): string {
   }
 }
 
+function renderMarkdownFactBlock(lead: string, facts: string[]): string {
+  return [lead, ...facts.map((fact) => `- ${fact}`)].join("\n");
+}
+
 export function renderMonthlyJournalFallback(input: MonthlyJournalPromptInput): AiReportResult {
   const { summary, year, month } = input;
   const playerLog = buildPlayerFacingMonthlyLog(summary, year, month);
   const actionText = summary.actions.map(formatActionType).join("、");
   const resumeText =
     summary.resumeAdditions.length > 0
-      ? `这个月还留下了能写进履历的痕迹：${summary.resumeAdditions.map((item) => item.title).join("、")}。`
+      ? `这个月多少还留下了一点以后回头能看见的东西：${summary.resumeAdditions
+          .map((item) => item.title)
+          .join("、")}。`
       : "这个月没有新增履历条目，但生活本身也不是白过。";
   const groundedFacts =
     playerLog.details.length > 0
-      ? `如果只挑几件这个月真的发生过的事，那就是：${playerLog.details.slice(0, 5).join("；")}。`
+      ? renderMarkdownFactBlock("这个月真正留在我脑子里的几件事是：", playerLog.details.slice(0, 5))
       : "这个月没有额外被记录下来的大事，更多是日常一点点往前推。";
 
   return {
@@ -83,12 +89,13 @@ export function renderMonthlyJournalFallback(input: MonthlyJournalPromptInput): 
     markdown: [
       `# ${formatMonthLabel(year, month).replace(" · ", " ")}`,
       "",
-      `这个月我主要把心思放在${actionText || "调整状态"}上，课程这边走的是“${formatAttendanceStrategy(summary.attendanceStrategy)}”的路子。`,
+      `这个月我主要把心思放在${actionText || "调整状态"}上，上课这边基本按“${formatAttendanceStrategy(summary.attendanceStrategy)}”的节奏往前走。`,
       renderMonthlyMoodLine(input),
-      `月底摊开来看，我手里还有 ${summary.statsAfter.money} 块，心情是 ${summary.statsAfter.mood}，压力来到 ${summary.statsAfter.stress}，当学期学业值落在 ${summary.statsAfter.semesterAcademics}。`,
-      `规则层给我的学业反馈是：${formatSemesterFeedback(summary.academicFeedback)}。`,
+      `月底再把账和状态摊开看，我手里还剩 ${summary.statsAfter.money} 块，心情在 ${summary.statsAfter.mood}，压力到了 ${summary.statsAfter.stress}，学业这条线停在 ${summary.statsAfter.semesterAcademics}。`,
+      `如果把老师和结果给我的信号压成一句话，这个月大概还算“${formatSemesterFeedback(summary.academicFeedback)}”。`,
       groundedFacts,
       resumeText,
+      "写到这里，这个月也算真的翻过去了一页。",
     ].join("\n\n"),
   };
 }
@@ -108,12 +115,12 @@ export function renderEndingReportFallback(input: EndingReportPromptInput): AiRe
       "# 毕业回望",
       "",
       renderOutcomeSentence(input),
-      `规则层最后落下来的毕业标签是“${formatGraduationOutcome(summary.outcome)}”，长期学业均值停在 ${summary.longTermAcademicAverage}，结束时是第 ${summary.finalYear} 学年。`,
+      `如果把这四年的结果压成一句话，我最后拿到的是“${formatGraduationOutcome(summary.outcome)}”。长期那条学业线大概停在 ${summary.longTermAcademicAverage}，写到这里时我已经走到第 ${summary.finalYear} 学年。`,
       highlights,
       endingFacts.length > 0
-        ? `真正撑起这段大学经历的，是这些已经发生过的事：${endingFacts.join("；")}。`
+        ? renderMarkdownFactBlock("再回头看，最能说明这段路是怎么走过来的，其实是这些已经发生过的事：", endingFacts)
         : "这份回望只整理已经存在的事实，不会替我补写不存在的故事。",
-      "这份回望只负责表达，不参与任何规则判定。",
+      "这份回望只把已经发生的事重新说一遍，不会替我补写不存在的结局。",
     ].join("\n\n"),
   };
 }

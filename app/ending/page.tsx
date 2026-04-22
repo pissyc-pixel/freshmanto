@@ -27,7 +27,7 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
       <AppShell
         eyebrow="结局"
         title="还没有可查看的结局"
-        description="结局页会展示规则层已经判定出的结局标签，以及毕业后保存下来的 AI 回望。"
+        description="结局页会展示目前已经能确定的结局走向，以及毕业后保存下来的 AI 回望。"
       >
         <SectionCard title="暂无结局" description="先创建 run 并继续推进月份。">
           <p className="text-sm leading-6 text-stone-600">
@@ -46,12 +46,12 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
     <AppShell
       eyebrow="结局"
       title={bundle.run.status === "completed" ? "正式结局回望" : "当前结局预览"}
-      description="规则层先决定结局标签和事实摘要；只有在毕业结算真正落地后，AI 才会把这些事实整理成玩家可见的回望。"
+      description="这里只展示目前已经能确定的结局线索；等毕业结算真正落地后，AI 才会把这些事实整理成完整回望。"
     >
       <div className="space-y-6">
         <SectionCard
-          title="规则层结局摘要"
-          description={`当前判定：${predictedOutcome}。长期学业均值：${bundle.endingSummary.longTermAcademicAverage}。`}
+          title="当前已经能确定的结局线索"
+          description={`眼下更像会走到：${predictedOutcome}。长期学业均值大约是 ${bundle.endingSummary.longTermAcademicAverage}。`}
         >
           <FactList
             items={[

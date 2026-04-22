@@ -1,5 +1,10 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { buildEndingReportPrompt } from "@/core/prompts/ending-report";
+import { buildMonthlyJournalPrompt } from "@/core/prompts/monthly-journal";
+import { ReportPreview } from "@/components/report-preview";
 import { renderEndingReportFallback, renderMonthlyJournalFallback } from "@/lib/ai/reports";
 import {
   buildPlayerFacingMonthlyLog,
@@ -238,6 +243,7 @@ describe("player-facing narrative helpers", () => {
     expect(report.markdown).toContain("正常混课");
     expect(report.markdown).toContain("组织院系分享会");
     expect(report.markdown).toContain("没有额外推进周历");
+    expect(report.markdown).not.toContain("规则层");
     expect(report.markdown).not.toContain("绩点");
   });
 
@@ -251,5 +257,62 @@ describe("player-facing narrative helpers", () => {
     expect(report.markdown).toContain("累计未通过学期数：1");
     expect(report.markdown).toContain("长期风险标签累计 2 个");
     expect(report.markdown).not.toContain("failed-semesters:1");
+    expect(report.markdown).not.toContain("规则层");
+  });
+
+  it("hides structured prompt JSON from player-facing report preview by default", () => {
+    const markup = renderToStaticMarkup(
+      createElement(ReportPreview, {
+        title: "第2学年 · 第3月 月记",
+        contractLabel: "fallback",
+        promptInput: {
+          runId: "run-1",
+          summary: {
+            eventIds: ["monthly-living-expense"],
+          },
+        },
+        markdown: "这个月我总算缓过来一点。",
+      }),
+    );
+
+    expect(markup).toContain("玩家可见正文");
+    expect(markup).toContain("默认隐藏");
+    expect(markup).not.toContain("\"runId\"");
+    expect(markup).not.toContain("\"eventIds\"");
+  });
+
+  it("builds prompts that insist on first-person and reject system-report wording", () => {
+    const monthlyPrompt = buildMonthlyJournalPrompt(monthlyInput);
+    const endingPrompt = buildEndingReportPrompt(endingInput);
+    const monthlyPromptText = monthlyPrompt.messages.map((message) => message.content).join("\n");
+    const endingPromptText = endingPrompt.messages.map((message) => message.content).join("\n");
+
+    expect(monthlyPromptText).toContain("第一人称");
+    expect(monthlyPromptText).toContain("不要写成系统播报");
+    expect(monthlyPromptText).toMatch(/不要出现.*规则层|系统判定|字段名/);
+    expect(endingPromptText).toContain("第一人称毕业回望");
+    expect(endingPromptText).toContain("不要写成系统汇报");
+    expect(endingPromptText).toMatch(/不要出现.*规则层|系统判定|机器字段/);
+  });
+
+  it("renders a player-readable action result card for the latest turn", async () => {
+    const { ActionResultCard } = await import("@/components/action-result-card");
+    const markup = renderToStaticMarkup(
+      createElement(ActionResultCard, {
+        turn: monthlyInput.summary.turns[1],
+        eventLines: ["这一轮没有额外事件，接下来还可以继续安排本周的正式行动。"],
+        nextStepHint: "接下来还能继续安排本周的正式行动。",
+      }),
+    );
+
+    expect(markup).toContain("本次行动结果");
+    expect(markup).toContain("Week 1");
+    expect(markup).toContain("夜间");
+    expect(markup).toContain("吃大餐");
+    expect(markup).toContain("金钱 -180");
+    expect(markup).toContain("心情 +8");
+    expect(markup).toContain("压力 -6");
+    expect(markup).toContain("学业 0");
+    expect(markup).toContain("接下来还能继续安排本周的正式行动");
   });
 });

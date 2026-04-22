@@ -23,7 +23,7 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
       <AppShell
         eyebrow="履历"
         title="还没有履历数据。"
-        description="履历页会展示 run 过程中累积出来的履历条目、成长轨迹和日志视角。"
+        description="履历页会展示这段大学经历里慢慢累积出来的履历条目、成长轨迹和两套日志视角。"
       >
         <SectionCard title="暂无履历" description="先创建 run 并推进月份。">
           <p className="text-sm leading-6 text-stone-600">
@@ -65,7 +65,7 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
     <AppShell
       eyebrow="履历"
       title="履历与成长回看"
-      description="履历条目展示你留下了什么，前台日志帮助你回忆这个月怎么过，后台日志则保留系统留档。"
+      description="履历条目告诉你留下了什么，前台日志帮你回忆这个月怎么过，后台日志则单独留给系统排查。"
     >
       <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <SectionCard title="履历条目" description="这些条目都来自规则层结算结果，并且已经持久化保存。">
@@ -78,7 +78,7 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
               month: item.month,
               tags: Array.isArray(item.metadata_json.tags)
                 ? item.metadata_json.tags.filter((tag): tag is string => typeof tag === "string")
-                : []
+                : [],
             }))}
           />
         </SectionCard>

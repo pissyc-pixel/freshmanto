@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ActionResultCard } from "@/components/action-result-card";
 import { AppShell } from "@/components/app-shell";
 import { FactList } from "@/components/fact-list";
 import { LogFeed } from "@/components/log-feed";
@@ -89,6 +90,7 @@ export default async function SettlementPage({ searchParams }: SettlementPagePro
 
   const summary = monthlyState.snapshot_json;
   const playerLog = buildPlayerFacingMonthlyLog(summary, monthlyState.year, monthlyState.month);
+  const lastTurn = summary.turns.at(-1);
   const systemLogs = bundle.logs
     .filter((item) => item.year === monthlyState.year && item.month === monthlyState.month)
     .map((item) => ({
@@ -105,6 +107,12 @@ export default async function SettlementPage({ searchParams }: SettlementPagePro
     ...summary.notableFacts.map(formatPlayerFacingFact),
     ...summary.flags.map(formatPlayerFacingFlag),
   ];
+  const actionEventLines =
+    summary.eventIds.length > 0
+      ? [
+          `这次收束之后，这个月还额外触发了 ${summary.eventIds.length} 个变化，它们已经并进下面的月度回顾里。`,
+        ]
+      : [];
 
   return (
     <AppShell
@@ -132,6 +140,19 @@ export default async function SettlementPage({ searchParams }: SettlementPagePro
         <SectionCard title="结算总览" description="先看这个月最后落在了什么状态上。">
           <StatsGrid items={buildDeltaItems(summary.statsAfter, summary.statsDelta)} />
         </SectionCard>
+
+        {lastTurn ? (
+          <SectionCard
+            title="最近一次行动"
+            description="先看把这个月真正收束起来的最后一轮行动，它改了什么、接下来又能做什么。"
+          >
+            <ActionResultCard
+              turn={lastTurn}
+              eventLines={actionEventLines}
+              nextStepHint="这轮已经把本月推进成结算了。接下来可以先读月记，也可以直接进入下个月。"
+            />
+          </SectionCard>
+        ) : null}
 
         <SectionCard
           title="前台日志：这个月发生了什么"

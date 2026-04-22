@@ -20,7 +20,8 @@ export function buildMonthlyJournalPrompt(input: MonthlyJournalPromptInput): AiP
           "你要把结构化月度摘要写成第一人称月记，像大学生在月底复盘自己的生活。",
           "可以写情绪、疲惫、松一口气、遗憾，但这些情绪必须由输入里的事实支撑。",
           "绝对不要编造新事件、额外成绩、隐藏关系、未给出的 offer、奖项或剧情。",
-          "不要解释规则如何计算，也不要替玩家下额外结论。"
+          "不要解释规则如何计算，也不要替玩家下额外结论。",
+          "不要出现“规则层”“系统判定”“statsDelta”“eventIds”“notableFacts”这类幕后说法或字段名。"
         ].join("\n")
       },
       {
@@ -39,7 +40,8 @@ export function buildMonthlyJournalPrompt(input: MonthlyJournalPromptInput): AiP
               "只能使用 input.summary 中已经存在的事实和数值",
               "不要新增决定性事件或新人物关系",
               "不要解释规则判定过程",
-              "语气要像大学生日记，不要写成系统播报"
+              "语气要像大学生日记，不要写成系统播报",
+              "不要原样复读 JSON 字段名、机器标记或内部状态标签"
             ],
             preferredStructure: ["标题", "2-4 段第一人称正文", "结尾一句收束"],
             input

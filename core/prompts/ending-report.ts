@@ -19,7 +19,8 @@ export function buildEndingReportPrompt(input: EndingReportPromptInput): AiPromp
           "你只负责表达规则层已经确认的毕业结果，不参与判定。",
           "请把输入写成第一人称毕业回望，像一个学生回头看完四年的总结。",
           "可以表达松一口气、遗憾、释然、复杂感，但都必须建立在提供的事实之上。",
-          "不要改 outcome，不要发明新的履历亮点，也不要补充规则层没提供的原因链。"
+          "不要改 outcome，不要发明新的履历亮点，也不要补充规则层没提供的原因链。",
+          "不要出现“规则层”“系统判定”“failed-semesters”“risk-flags”这类幕后说法或机器字段。"
         ].join("\n")
       },
       {
@@ -38,7 +39,8 @@ export function buildEndingReportPrompt(input: EndingReportPromptInput): AiPromp
               "只能引用 input.summary 中已有的事实",
               "不得修改 outcome",
               "不要解释规则判定过程",
-              "不要写成系统汇报"
+              "不要写成系统汇报",
+              "如果输入里有机器标记，要翻译成玩家读得懂的自然中文，不要原样照抄"
             ],
             preferredStructure: ["标题", "2-4 段第一人称正文", "一句收束"],
             input

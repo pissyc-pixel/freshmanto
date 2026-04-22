@@ -27,7 +27,7 @@ export function ReportPreview({
           </pre>
         ) : (
           <div className="mt-4 rounded-2xl bg-stone-900/80 p-4 text-sm leading-6 text-stone-200">
-            当前页面默认隐藏结构化原始 JSON，避免把系统字段、事件标记和内部摘要直接暴露给玩家。
+            这一侧默认隐藏后台结构化原文，避免把系统字段、事件标记和内部摘要直接塞给玩家。
           </div>
         )}
       </article>

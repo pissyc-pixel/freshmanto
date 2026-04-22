@@ -21,7 +21,7 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
       <AppShell
         eyebrow="月记"
         title="还没有月记归档"
-        description="月记页只展示已经保存到数据库里的 AI 月记与对应正文。"
+        description="月记页只展示已经存档的正文，不直接把后台结构化输入摊给玩家。"
       >
         <SectionCard title="暂无月记" description="先在主游戏页完成至少一次月结算。">
           <p className="text-sm leading-6 text-stone-600">
@@ -38,7 +38,7 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
     <AppShell
       eyebrow="月记"
       title="月记归档"
-      description="这里保留每个月已经生成并保存的月记正文，方便确认叙事是否贴着规则层事实。"
+      description="这里保留每个月已经生成并保存的月记正文，方便回看自己当时到底是怎么过的。"
     >
       <div className="space-y-6">
         {monthlyReports.length === 0 ? (
