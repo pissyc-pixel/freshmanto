@@ -4,6 +4,7 @@ import {
   createInitialGameRun,
   createMonthlySchedule,
   evaluateGraduationOutcome,
+  resolveActionTurn,
   resolveMonthlyTurn,
   settleSemester,
 } from "@/core/game-engine";
@@ -267,6 +268,29 @@ describe("monthly resolution", () => {
 
     expect(studyActionGain(firstMonth.summary)).toBeGreaterThan(studyActionGain(secondMonth.summary));
     expect(studyActionGain(firstMonth.summary)).toBeGreaterThan(studyActionGain(stressedMonth.summary));
+  });
+
+  it("reduces study gains across repeated weekly turns in the same month", () => {
+    const run = withMonth(
+      createInitialGameRun({
+        id: "weekly-study-diminish-run",
+        randomValues: [0.44, 0.28, 0.36, 0.52, 0.68, 0.19, 0.28, 0.41],
+      }),
+      3,
+    );
+
+    const firstTurn = resolveActionTurn(run, {
+      attendanceStrategy: "mixed",
+      action: { action: "study", time: "night" },
+    });
+    const secondTurn = resolveActionTurn(firstTurn.run, {
+      attendanceStrategy: "mixed",
+      action: { action: "study", time: "night" },
+    });
+
+    expect(firstTurn.turnSummary.statsDelta.semesterAcademics).toBeGreaterThan(
+      secondTurn.turnSummary.statsDelta.semesterAcademics,
+    );
   });
 
   it("triggers state-driven scholarship and economic pressure events", () => {

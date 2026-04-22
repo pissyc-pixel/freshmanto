@@ -1,4 +1,5 @@
 import type {
+  ActionType,
   DynamicStats,
   FamilyBackground,
   GameRun,
@@ -8,7 +9,7 @@ import type {
   RiskState,
 } from "@/types/game";
 
-type SupportedAction = MonthlyActionPlan["actions"][number]["action"] | "big_meal";
+type SupportedAction = ActionType;
 
 type ActionResolution = {
   stats: DynamicStats;
@@ -71,6 +72,12 @@ function countConsecutiveStudyMonths(run: GameRun): number {
   return streak;
 }
 
+function countStudyTurnsThisMonth(run: GameRun): number {
+  return run.activeMonth?.turns.filter(
+    (turn) => turn.resolvedAction.accepted && turn.resolvedAction.action === "study",
+  ).length ?? 0;
+}
+
 function productivityMultiplier(run: GameRun): number {
   let multiplier = 1;
 
@@ -90,7 +97,7 @@ function productivityMultiplier(run: GameRun): number {
 }
 
 function studyStreakMultiplier(run: GameRun, studyCountThisMonth: number): number {
-  const streak = countConsecutiveStudyMonths(run) + studyCountThisMonth;
+  const streak = countConsecutiveStudyMonths(run) + countStudyTurnsThisMonth(run) + studyCountThisMonth;
 
   if (streak <= 0) {
     return 1;

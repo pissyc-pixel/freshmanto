@@ -20,6 +20,7 @@ const actionSchema = z.enum([
   "part_time",
   "social",
   "relax",
+  "big_meal",
   "student_activity",
   "remedy",
   "ask_family"

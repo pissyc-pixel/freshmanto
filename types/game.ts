@@ -32,6 +32,7 @@ export type ActionType =
   | "part_time"
   | "social"
   | "relax"
+  | "big_meal"
   | "student_activity"
   | "remedy"
   | "ask_family";
@@ -60,7 +61,10 @@ export type EventTriggerCondition =
   | "money_low"
   | "stress_high"
   | "academic_risk_high"
-  | "social_low";
+  | "social_low"
+  | "social_high"
+  | "mood_low"
+  | "academic_streak_high";
 
 export type StarterProfile = {
   talents: Talent[];
@@ -189,6 +193,7 @@ export type ActionTurnSummary = {
   turn: number;
   week: number;
   slotLabel: string;
+  advancesCalendar: boolean;
   attendanceStrategy: CourseAttendanceStrategy;
   chosenAction: PlannedAction;
   resolvedAction: ResolvedAction;

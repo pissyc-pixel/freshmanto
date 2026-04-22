@@ -21,7 +21,7 @@ type LogFeedProps = {
 export function LogFeed({
   items,
   variant = "system",
-  emptyMessage = "这里暂时还没有可展示的记录。"
+  emptyMessage = "这里暂时还没有可展示的记录。",
 }: LogFeedProps) {
   if (items.length === 0) {
     return (

@@ -140,6 +140,22 @@ function ensureActiveMonth(run: GameRun): ActiveMonthState {
   };
 }
 
+function createInstantCourseResolution(strategy: CourseResolution["strategy"]): CourseResolution {
+  return {
+    strategy,
+    attendanceCounted: true,
+    directRollCallPenalty: 0,
+    rollCallRiskDelta: 0,
+    usualScoreRiskDelta: 0,
+    proxyCost: 0,
+    remedyPressure: 0,
+    academicRiskDelta: 0,
+    academicGain: 0,
+    moodDelta: 0,
+    stressDelta: 0,
+  };
+}
+
 function aggregateCourse(turns: ActionTurnSummary[]): CourseResolution {
   const latest = turns.at(-1)?.course ?? resolveCourseStrategy("mixed");
 
@@ -235,6 +251,7 @@ function buildMonthlySummary(input: {
 export function resolveActionTurn(run: GameRun, plan: ActionTurnPlan): ResolvedTurnResult {
   const activeMonth = ensureActiveMonth(run);
   const week = activeMonth.weeklyCalendar[activeMonth.currentWeek - 1];
+  const advancesCalendar = plan.action.action !== "big_meal";
 
   if (!week) {
     throw new Error(`Month ${run.currentMonth} has no remaining weekly turns.`);
@@ -242,7 +259,9 @@ export function resolveActionTurn(run: GameRun, plan: ActionTurnPlan): ResolvedT
 
   const statsBefore = run.stats;
   const allowanceDelta = activeMonth.allowanceApplied ? 0 : run.profile.monthlyAllowance;
-  const course = resolveCourseStrategy(plan.attendanceStrategy);
+  const course = advancesCalendar
+    ? resolveCourseStrategy(plan.attendanceStrategy)
+    : createInstantCourseResolution(plan.attendanceStrategy);
   const actionResolution = resolveActionPlan(run, {
     attendanceStrategy: plan.attendanceStrategy,
     actions: [plan.action],
@@ -269,6 +288,7 @@ export function resolveActionTurn(run: GameRun, plan: ActionTurnPlan): ResolvedT
     turn: activeMonth.turns.length + 1,
     week: week.week,
     slotLabel: week.label,
+    advancesCalendar,
     attendanceStrategy: plan.attendanceStrategy,
     chosenAction: plan.action,
     resolvedAction,
@@ -291,7 +311,7 @@ export function resolveActionTurn(run: GameRun, plan: ActionTurnPlan): ResolvedT
   const updatedActiveMonth: ActiveMonthState = {
     ...activeMonth,
     allowanceApplied: true,
-    currentWeek: activeMonth.currentWeek + 1,
+    currentWeek: activeMonth.currentWeek + (advancesCalendar ? 1 : 0),
     turns: [...activeMonth.turns, turnSummary],
     lastResolvedTurn: turnSummary,
   };
@@ -373,14 +393,14 @@ export function resolveActionTurn(run: GameRun, plan: ActionTurnPlan): ResolvedT
 }
 
 export function resolveMonthlyTurn(run: GameRun, plan: MonthlyActionPlan): ResolvedMonthResult {
-  const queuedActions = plan.actions.length > 0 ? plan.actions : [DEFAULT_BATCH_ACTION];
+  const queuedActions = [...(plan.actions.length > 0 ? plan.actions : [DEFAULT_BATCH_ACTION])];
 
   let nextRun = run;
   let monthlySummary: StructuredMonthlySummary | undefined;
   let cursor = 0;
 
   while (!monthlySummary) {
-    const action = queuedActions[Math.min(cursor, queuedActions.length - 1)] ?? DEFAULT_BATCH_ACTION;
+    const action = queuedActions[cursor] ?? DEFAULT_BATCH_ACTION;
     const result = resolveActionTurn(nextRun, {
       attendanceStrategy: plan.attendanceStrategy,
       action,
@@ -390,7 +410,11 @@ export function resolveMonthlyTurn(run: GameRun, plan: MonthlyActionPlan): Resol
     monthlySummary = result.monthlySummary;
     cursor += 1;
 
-    if (cursor > WEEKS_PER_MONTH + 1) {
+    if (!result.turnSummary.advancesCalendar && cursor >= queuedActions.length) {
+      queuedActions.push(DEFAULT_BATCH_ACTION);
+    }
+
+    if (cursor > WEEKS_PER_MONTH * 3) {
       throw new Error("Monthly resolution exceeded the expected weekly turn count.");
     }
   }

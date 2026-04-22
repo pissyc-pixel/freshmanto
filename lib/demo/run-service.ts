@@ -135,6 +135,7 @@ function createTurnLog(input: {
     message: "weekly turn resolved",
     metadata: {
       week: input.turnSummary.week,
+      advancesCalendar: input.turnSummary.advancesCalendar,
       attendanceStrategy: input.turnSummary.attendanceStrategy,
       action: input.turnSummary.resolvedAction.action,
       flags: input.turnSummary.flags,

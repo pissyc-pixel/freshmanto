@@ -1,5 +1,6 @@
 import type {
   ActionTime,
+  ActionTurnSummary,
   ActionType,
   CityTier,
   CollegeTrack,
@@ -11,7 +12,7 @@ import type {
   SemesterFeedback,
   StructuredMonthlySummary,
   Talent,
-  TimeBlockKind
+  TimeBlockKind,
 } from "@/types/game";
 
 export const attendanceStrategyOptions: Array<{
@@ -19,12 +20,12 @@ export const attendanceStrategyOptions: Array<{
   label: string;
   description: string;
 }> = [
-  { value: "serious", label: "认真上课", description: "学业收益最高，但留给自己的缓冲会更少。" },
+  { value: "serious", label: "认真上课", description: "课堂收益最稳，但留给自己的缓冲最少。" },
   { value: "mixed", label: "正常混课", description: "兼顾课程和生活，适合作为默认策略。" },
-  { value: "skip_sometimes", label: "偶尔翘课", description: "能短暂喘口气，但课程风险会慢慢积累。" },
-  { value: "skip_often", label: "经常翘课", description: "会很快把学业风险推高，属于高风险玩法。" },
-  { value: "proxy", label: "代课 / 代签到", description: "表面上还在出勤，长期来看更容易翻车。" },
-  { value: "phone", label: "上课刷手机", description: "人到了教室，但注意力没到，后续隐患会变多。" }
+  { value: "skip_sometimes", label: "偶尔翘课", description: "能喘口气，但点名和平时分风险会慢慢积累。" },
+  { value: "skip_often", label: "经常翘课", description: "风险滚得很快，属于高风险玩法。" },
+  { value: "proxy", label: "代课 / 代签到", description: "花钱保出勤，但后续补救成本会更高。" },
+  { value: "phone", label: "上课刷手机", description: "算出勤，但会错过课堂信息，学业隐患会变多。" },
 ];
 
 export const actionOptions: Array<{
@@ -32,14 +33,15 @@ export const actionOptions: Array<{
   label: string;
   description: string;
 }> = [
-  { value: "study", label: "复习 / 学习", description: "提升当学期学业值，也会带来一点压力。" },
+  { value: "study", label: "复习 / 学习", description: "稳步推进学业，但收益不再无限叠高。" },
   { value: "job_prep", label: "实习 / 求职准备", description: "为履历铺路，会消耗一些金钱和精力。" },
   { value: "part_time", label: "兼职 / 赚钱", description: "补充现金流，但不能安排在夜间。" },
-  { value: "social", label: "社交 / 关系", description: "帮助修复心情和社交状态。" },
-  { value: "relax", label: "娱乐 / 放松", description: "降压很快，但通常要花钱。" },
-  { value: "student_activity", label: "学生活动 / 讲座 / 社团", description: "有机会留下履历痕迹，也更有生活感。" },
-  { value: "remedy", label: "补救 / 应急处理", description: "用来收拾局面，优先缓解风险。" },
-  { value: "ask_family", label: "向家里要钱", description: "补钱快，但冷却更长，也更有心理负担。" }
+  { value: "social", label: "社交 / 关系", description: "花点钱换心情和人脉，后面可能派上用场。" },
+  { value: "relax", label: "娱乐 / 放松", description: "快速降压，但通常也要花钱。" },
+  { value: "big_meal", label: "吃大餐", description: "即时消费，不推进周历，花钱换心情和喘息感。" },
+  { value: "student_activity", label: "学生活动 / 讲座 / 社团", description: "更有生活感，也有机会留下履历痕迹。" },
+  { value: "remedy", label: "补救 / 应急处理", description: "优先止损，把已经堆起来的风险往回拉。" },
+  { value: "ask_family", label: "向家里要钱", description: "来钱快，但会带来明显压力，而且有冷却。" },
 ];
 
 export const actionTimeOptions: Array<{
@@ -47,7 +49,7 @@ export const actionTimeOptions: Array<{
   label: string;
 }> = [
   { value: "day", label: "白天" },
-  { value: "night", label: "夜间" }
+  { value: "night", label: "夜间" },
 ];
 
 const talentLabels: Record<Talent, string> = {
@@ -55,7 +57,7 @@ const talentLabels: Record<Talent, string> = {
   "quick-learner": "上手快",
   "social-butterfly": "社交达人",
   "stress-resistant": "抗压",
-  resourceful: "会找资源"
+  resourceful: "会找资源",
 };
 
 const familyLabels: Record<FamilyBackground, string> = {
@@ -63,7 +65,7 @@ const familyLabels: Record<FamilyBackground, string> = {
   ordinary: "普通家庭",
   stable: "家庭稳定",
   "well-connected": "家里有人脉",
-  affluent: "家境优渥"
+  affluent: "家境优渥",
 };
 
 const trackLabels: Record<CollegeTrack, string> = {
@@ -71,7 +73,7 @@ const trackLabels: Record<CollegeTrack, string> = {
   science: "理科",
   engineering: "工科",
   business: "商科",
-  medicine: "医学"
+  medicine: "医学",
 };
 
 const schoolTierLabels: Record<SchoolTier, string> = {
@@ -80,34 +82,34 @@ const schoolTierLabels: Record<SchoolTier, string> = {
   "985": "985",
   "211": "211",
   first_tier: "一本",
-  second_tier: "二本"
+  second_tier: "二本",
 };
 
 const cityTierLabels: Record<CityTier, string> = {
   tier_1: "一线城市",
   tier_2: "二线城市",
-  tier_3: "三线城市"
+  tier_3: "三线城市",
 };
 
 const outcomeLabels: Record<GraduationOutcome, string> = {
   graduate: "正常毕业",
   delayed: "延毕",
   cannot_graduate: "无法正常毕业",
-  drop_out: "肄业"
+  drop_out: "肄业",
 };
 
 const feedbackLabels: Record<SemesterFeedback, string> = {
-  excellent: "表现很亮眼",
-  stable: "整体稳住了",
-  strained: "有点吃力",
-  warning: "已经亮黄灯",
-  critical: "快要撑不住了"
+  excellent: "优异",
+  stable: "稳定",
+  strained: "吃力",
+  warning: "预警",
+  critical: "高危",
 };
 
 const timeBlockLabels: Record<TimeBlockKind, string> = {
-  free: "整天都能自己安排",
-  half_free: "白天较忙，仍有可调空间",
-  busy_day: "白天被课程或义务占满"
+  free: "全天都能自己安排",
+  half_free: "只有半天空档",
+  busy_day: "白天基本被课程或义务占满",
 };
 
 const statLabels: Record<keyof DynamicStats, string> = {
@@ -116,14 +118,44 @@ const statLabels: Record<keyof DynamicStats, string> = {
   stress: "压力",
   fulfillment: "成就感",
   social: "社交",
-  semesterAcademics: "当学期学业"
+  semesterAcademics: "当学期学业值",
 };
 
 const systemLogTypeLabels = {
-  action: "行动记录",
-  event: "事件记录",
-  settlement: "结算记录"
+  action: "行动留档",
+  event: "事件留档",
+  settlement: "结算留档",
 } as const;
+
+const rejectionReasonLabels: Record<string, string> = {
+  "invalid-night-part-time": "夜里没法去做兼职，只能作罢",
+  "ask-family-on-cooldown": "这个月还没过冷却，再开口会更别扭",
+  "state-refused-study": "状态太差了，根本坐不下来学习",
+  "state-refused-work": "状态扛不住，连工作和投递都提不起劲",
+  "turn-resolution-missing": "这一步没有被完整结算出来",
+};
+
+const flagLabels: Record<string, string> = {
+  "study-diminishing-returns": "这段时间连续学习太多，边际收益已经明显往下掉了。",
+  "stress-efficiency-penalty": "压力和心情在拖后腿，这个月很多行动都没有平时顺手。",
+  "ask-family-on-cooldown": "刚向家里开过口，这个月再伸手只会更有压力。",
+  "invalid-night-part-time": "想靠夜里兼职补钱行不通，时间窗口不允许。",
+  "midterm-pressure": "之前积下来的学业风险在这个月集中冒头了。",
+  "economic-pressure": "手头太紧，经济压力已经开始明显影响状态。",
+  "burnout-slump": "压力和低落堆在一起，整个人都有点摆烂下去的趋势。",
+  "state-refused-study": "有时候不是不想努力，是状态已经差到学不进去。",
+  "state-refused-work": "这阵子连找工作和赚钱的心气都被压住了。",
+};
+
+const eventNarratives: Record<string, string> = {
+  "monthly-living-expense": "房租、吃饭和日常花销照常扣掉，生活成本不会因为你忙就消失。",
+  "freshman-orientation": "开学适应和破冰活动让你没那么像局外人了。",
+  "midterm-pressure": "之前遗漏的课程信息和学业风险，在这个月一起压了上来。",
+  "academic-scholarship": "连续几个月把状态稳住之后，终于换来了一点奖学金和认可。",
+  "social-mutual-aid": "社交值高的时候，身边的人真的会在签到和资料上拉你一把。",
+  "economic-pressure": "钱一紧，焦虑感就会从生活边角慢慢渗进来。",
+  "burnout-slump": "心情和压力一起失控的时候，人会先开始不想面对任何事。",
+};
 
 export type PlayerFacingMonthlyLog = {
   badge: string;
@@ -133,79 +165,153 @@ export type PlayerFacingMonthlyLog = {
   details: string[];
 };
 
-export function formatTalent(value: Talent) {
-  return talentLabels[value];
+function uniqueStrings(items: Array<string | undefined | null>): string[] {
+  return [...new Set(items.filter((item): item is string => Boolean(item && item.trim())))];
 }
 
-export function formatFamilyBackground(value: FamilyBackground) {
-  return familyLabels[value];
+function formatSignedValue(value: number, suffix = ""): string {
+  return `${value >= 0 ? "+" : ""}${value}${suffix}`;
 }
 
-export function formatCollegeTrack(value: CollegeTrack) {
-  return trackLabels[value];
+function formatWeekLabel(week: number): string {
+  return `第${week}周`;
 }
 
-export function formatSchoolTier(value: SchoolTier) {
-  return schoolTierLabels[value];
-}
-
-export function formatCityTier(value: CityTier) {
-  return cityTierLabels[value];
-}
-
-export function formatActionType(value: ActionType) {
-  return actionOptions.find((item) => item.value === value)?.label ?? value;
-}
-
-export function formatAttendanceStrategy(value: CourseAttendanceStrategy) {
-  return attendanceStrategyOptions.find((item) => item.value === value)?.label ?? value;
-}
-
-export function formatSemesterFeedback(value: SemesterFeedback) {
-  return feedbackLabels[value];
-}
-
-export function formatGraduationOutcome(value: GraduationOutcome) {
-  return outcomeLabels[value];
-}
-
-export function formatTimeBlockKind(value: TimeBlockKind) {
-  return timeBlockLabels[value];
-}
-
-export function formatStatLabel(key: keyof DynamicStats) {
-  return statLabels[key];
-}
-
-export function formatMonthLabel(year: number, month: number) {
-  return `第${year}学年 · 第${month}月`;
-}
-
-export function formatSystemLogType(value: keyof typeof systemLogTypeLabels | string) {
-  return systemLogTypeLabels[value as keyof typeof systemLogTypeLabels] ?? value;
-}
-
-function buildMoodSentence(summary: StructuredMonthlySummary) {
-  const { semesterAcademics, stress, mood, fulfillment } = summary.statsDelta;
-
-  if (semesterAcademics >= 10) {
-    return "这段时间在学业上明显追了回来。";
+function describeRejectionReason(reason?: string): string {
+  if (!reason) {
+    return "这一步没能顺利做成";
   }
 
-  if (stress >= 8) {
-    return "整个月都像在赶路，压力感有点顶。";
-  }
-
-  if (mood >= 8 || fulfillment >= 8) {
-    return "虽然忙，但心里还是有点发亮。";
-  }
-
-  return "节奏不算炸裂，但也没有真正闲下来。";
+  return rejectionReasonLabels[reason] ?? `这一步被规则判定为未生效（${reason}）`;
 }
 
-function buildMonthlyTitle(summary: StructuredMonthlySummary) {
-  if (summary.statsDelta.semesterAcademics >= 10) {
-    return "这个月像是终于把状态拽回来了";
+function describeTurnImpact(turn: ActionTurnSummary): string | undefined {
+  const parts: string[] = [];
+
+  if (turn.statsDelta.money !== 0) {
+    parts.push(`钱 ${formatSignedValue(turn.statsDelta.money)} 元`);
+  }
+  if (turn.statsDelta.mood !== 0) {
+    parts.push(`心情 ${formatSignedValue(turn.statsDelta.mood)}`);
+  }
+  if (turn.statsDelta.stress !== 0) {
+    parts.push(`压力 ${formatSignedValue(turn.statsDelta.stress)}`);
+  }
+  if (turn.statsDelta.semesterAcademics !== 0) {
+    parts.push(`学业值 ${formatSignedValue(turn.statsDelta.semesterAcademics)}`);
+  }
+  if (turn.statsDelta.social !== 0) {
+    parts.push(`社交 ${formatSignedValue(turn.statsDelta.social)}`);
+  }
+  if (turn.statsDelta.fulfillment !== 0) {
+    parts.push(`成就感 ${formatSignedValue(turn.statsDelta.fulfillment)}`);
+  }
+
+  return parts.length > 0 ? `这一轮下来${parts.join("，")}。` : undefined;
+}
+
+function describeTurn(turn: ActionTurnSummary): string {
+  const weekLabel = formatWeekLabel(turn.week);
+  const attendance = formatAttendanceStrategy(turn.attendanceStrategy);
+  const chosenAction = formatActionType(turn.chosenAction.action);
+  const resolvedAction = formatActionType(turn.resolvedAction.action);
+  const actionSentence = turn.advancesCalendar
+    ? turn.resolvedAction.accepted
+      ? `${weekLabel}我把行动放在“${resolvedAction}”上，课程这边走的是“${attendance}”。`
+      : `${weekLabel}我原本想做“${chosenAction}”，但最后没做成，${describeRejectionReason(turn.resolvedAction.reason)}。课程这边走的是“${attendance}”。`
+    : turn.resolvedAction.accepted
+      ? `${weekLabel}我临时去做了“${resolvedAction}”，想先把这一口气缓回来。`
+      : `${weekLabel}我原本想临时做“${chosenAction}”，但最后没成，${describeRejectionReason(turn.resolvedAction.reason)}。`;
+  const impact = describeTurnImpact(turn);
+  const calendarNote = turn.advancesCalendar ? undefined : "这次属于即时消费，没有额外推进周历。";
+
+  return uniqueStrings([actionSentence, impact, calendarNote]).join(" ");
+}
+
+function describeEvent(eventId: string): string | undefined {
+  return eventNarratives[eventId];
+}
+
+function describeNotableFact(fact: string): string | undefined {
+  if (fact.startsWith("allowance:")) {
+    const amount = Number(fact.split(":")[1] ?? 0);
+    return `这个月生活费到账 ${amount} 元，至少先把手头周转了一下。`;
+  }
+
+  if (fact.startsWith("roll-call-risk:")) {
+    return "翘课和混课留下了点名风险，后面还得提防突然翻车。";
+  }
+
+  if (fact.startsWith("usual-score-risk:")) {
+    return "平时分风险还在往上堆，拖久了会更难补。";
+  }
+
+  if (fact.startsWith("proxy-cost:")) {
+    const amount = Number(fact.split(":")[1] ?? 0);
+    return `为了代签到或代课，又额外花掉了 ${amount} 元。`;
+  }
+
+  if (fact.startsWith("remedy-pressure:")) {
+    return "眼下虽然糊过去了，但后续补救还得继续花精力。";
+  }
+
+  if (fact.startsWith("event:monthly-living-expense:")) {
+    const amount = Number(fact.split(":").at(-1) ?? 0);
+    return `房租、吃饭和日常开销一共扣掉了 ${amount} 元固定生活成本。`;
+  }
+
+  if (fact.startsWith("event:")) {
+    return describeEvent(fact.replace("event:", ""));
+  }
+
+  return fact;
+}
+
+function describeFlag(flag: string): string | undefined {
+  return flagLabels[flag];
+}
+
+function describeEndingNotableFact(fact: string): string {
+  if (fact.startsWith("failed-semesters:")) {
+    const count = Number(fact.split(":")[1] ?? 0);
+    return `累计未通过学期数：${count}。`;
+  }
+
+  if (fact.startsWith("risk-flags:")) {
+    const count = Number(fact.split(":")[1] ?? 0);
+    return `长期风险标签累计 ${count} 个。`;
+  }
+
+  return fact;
+}
+
+function buildMoodSentence(summary: StructuredMonthlySummary): string {
+  if (summary.eventIds.includes("academic-scholarship")) {
+    return "前段时间没白熬，终于从结果上感受到一点被肯定的回响。";
+  }
+
+  if (summary.statsDelta.stress >= 8) {
+    return "这个月明显像在赶路，很多时候不是从容安排，而是硬着头皮往前顶。";
+  }
+
+  if (summary.statsDelta.mood >= 8 || summary.statsDelta.fulfillment >= 8) {
+    return "虽然也忙，但月底回头看，还是会觉得自己没白折腾。";
+  }
+
+  if (summary.flags.includes("burnout-slump") || summary.flags.includes("state-refused-study")) {
+    return "状态波动比想象中大，有些事情不是不想做，而是真的提不起劲。";
+  }
+
+  return "它不算戏剧化，但每一步都很像大学生活会留下来的那种细碎痕迹。";
+}
+
+function buildMonthlyTitle(summary: StructuredMonthlySummary): string {
+  if (summary.eventIds.includes("academic-scholarship")) {
+    return "这个月终于尝到一点被回报的感觉";
+  }
+
+  if (summary.flags.includes("economic-pressure")) {
+    return "这个月最明显的感受，是钱真的会把日子压得很窄";
   }
 
   if (summary.statsDelta.stress >= 8) {
@@ -213,28 +319,109 @@ function buildMonthlyTitle(summary: StructuredMonthlySummary) {
   }
 
   if (summary.resumeAdditions.length > 0) {
-    return "这个月不只是忙，还留下了点能写进履历的东西";
+    return "这个月不只是忙，多少还留下了点能写进履历的东西";
   }
 
-  return "这个月的我在生活和学业之间继续找平衡";
+  return "这个月我还在学业、生活和情绪之间找平衡";
+}
+
+function buildDetailLines(summary: StructuredMonthlySummary): string[] {
+  const turnLines = (summary.turns ?? []).map(describeTurn);
+  const eventLines = (summary.eventIds ?? []).map(describeEvent);
+  const factLines = (summary.notableFacts ?? []).map(describeNotableFact);
+  const flagLines = (summary.flags ?? []).map(describeFlag);
+  const resumeLines = (summary.resumeAdditions ?? []).map((item) => `履历新增了“${item.title}”。`);
+
+  return uniqueStrings([
+    ...turnLines,
+    ...eventLines,
+    ...factLines,
+    ...flagLines,
+    ...resumeLines,
+  ]);
+}
+
+export function formatTalent(value: Talent): string {
+  return talentLabels[value];
+}
+
+export function formatFamilyBackground(value: FamilyBackground): string {
+  return familyLabels[value];
+}
+
+export function formatCollegeTrack(value: CollegeTrack): string {
+  return trackLabels[value];
+}
+
+export function formatSchoolTier(value: SchoolTier): string {
+  return schoolTierLabels[value];
+}
+
+export function formatCityTier(value: CityTier): string {
+  return cityTierLabels[value];
+}
+
+export function formatActionType(value: ActionType): string {
+  return actionOptions.find((item) => item.value === value)?.label ?? value;
+}
+
+export function formatAttendanceStrategy(value: CourseAttendanceStrategy): string {
+  return attendanceStrategyOptions.find((item) => item.value === value)?.label ?? value;
+}
+
+export function formatSemesterFeedback(value: SemesterFeedback): string {
+  return feedbackLabels[value];
+}
+
+export function formatGraduationOutcome(value: GraduationOutcome): string {
+  return outcomeLabels[value];
+}
+
+export function formatTimeBlockKind(value: TimeBlockKind): string {
+  return timeBlockLabels[value];
+}
+
+export function formatStatLabel(key: keyof DynamicStats): string {
+  return statLabels[key];
+}
+
+export function formatMonthLabel(year: number, month: number): string {
+  return `第${year}学年 · 第${month}月`;
+}
+
+export function formatSystemLogType(value: keyof typeof systemLogTypeLabels | string): string {
+  return systemLogTypeLabels[value as keyof typeof systemLogTypeLabels] ?? value;
+}
+
+export function formatPlayerFacingTurn(turn: ActionTurnSummary): string {
+  return describeTurn(turn);
+}
+
+export function formatPlayerFacingFact(fact: string): string {
+  return describeNotableFact(fact) ?? fact;
+}
+
+export function formatPlayerFacingFlag(flag: string): string {
+  return describeFlag(flag) ?? flag;
+}
+
+export function formatEndingNotableFact(fact: string): string {
+  return describeEndingNotableFact(fact);
 }
 
 export function buildPlayerFacingMonthlyLog(
   summary: StructuredMonthlySummary,
   year: number,
-  month: number
+  month: number,
 ): PlayerFacingMonthlyLog {
-  const actionText = summary.actions.map(formatActionType).join("、");
-  const details = [
-    ...summary.notableFacts,
-    ...summary.resumeAdditions.map((item) => `新增履历：${item.title}`)
-  ];
+  const actionText = uniqueStrings((summary.actions ?? []).map(formatActionType)).join("、");
+  const details = buildDetailLines(summary);
 
   return {
     badge: "本月回顾",
     periodLabel: formatMonthLabel(year, month),
     title: buildMonthlyTitle(summary),
-    message: `这月我主要把时间放在${actionText || "调整状态"}，课程上走的是“${formatAttendanceStrategy(summary.attendanceStrategy)}”路线。${buildMoodSentence(summary)}`,
-    details
+    message: `这个月我主要把时间放在${actionText || "调整状态"}上，课程走的是“${formatAttendanceStrategy(summary.attendanceStrategy)}”。${buildMoodSentence(summary)} 月底手里还剩 ${summary.statsAfter.money} 元，心情 ${summary.statsAfter.mood}，压力 ${summary.statsAfter.stress}，学业反馈是“${formatSemesterFeedback(summary.academicFeedback)}”。`,
+    details,
   };
 }

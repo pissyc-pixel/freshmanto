@@ -274,6 +274,42 @@ describe("demo run service", () => {
     expect(store.logs.some((log) => log.message === "weekly turn resolved")).toBe(true);
   });
 
+  it("applies a big meal immediately without consuming the current week", async () => {
+    const store = createStore();
+    const run = createInitialGameRun({
+      id: "run-big-meal",
+      randomValues: [0.2, 0.6, 0.4, 0.5, 0.3, 0.1, 0.7, 0.2]
+    });
+    store.run = {
+      id: run.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      status: "active",
+      current_year: run.currentYear,
+      current_month: run.currentMonth,
+      profile_json: run.profile,
+      current_state_json: run
+    };
+
+    const result = await advanceDemoTurn({
+      repository: createRepository(store),
+      runId: run.id,
+      plan: {
+        attendanceStrategy: "mixed",
+        action: { action: "big_meal", time: "night" }
+      },
+      generateReport: fakeAiReport
+    });
+
+    expect(result.monthCompleted).toBe(false);
+    expect(result.turnSummary.advancesCalendar).toBe(false);
+    expect(result.turnSummary.week).toBe(1);
+    expect(result.run.activeMonth?.currentWeek).toBe(1);
+    expect(result.run.stats.money).toBeLessThan(run.stats.money + run.profile.monthlyAllowance);
+    expect(result.run.stats.mood).toBeGreaterThanOrEqual(run.stats.mood);
+    expect(store.monthlyStates).toHaveLength(0);
+  });
+
   it("tracks skipping and proxy choices through risk and cost instead of direct academic penalties", () => {
     const run = createInitialGameRun({
       id: "attendance-chain",
