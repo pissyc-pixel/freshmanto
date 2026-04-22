@@ -4,11 +4,13 @@ export type TimeBlockView = {
   label: string;
   kind: TimeBlockKind;
   detail: string;
+  released?: boolean;
 };
 
 export type WeeklyTimeBlockView = {
   label: string;
   detail: string;
+  timeSummary?: string;
   isCurrent?: boolean;
   days: TimeBlockView[];
 };
@@ -24,9 +26,9 @@ const kindStyles: Record<TimeBlockView["kind"], string> = {
 };
 
 const kindLabels: Record<TimeBlockView["kind"], string> = {
-  free: "全天空闲",
+  free: "全天可支配",
   half_free: "半天空档",
-  busy_day: "白天忙碌",
+  busy_day: "白天被课占住",
 };
 
 export function TimeBlockStrip({ blocks }: TimeBlockStripProps) {
@@ -50,6 +52,11 @@ export function TimeBlockStrip({ blocks }: TimeBlockStripProps) {
             ) : null}
           </div>
           <p className="mt-3 text-sm leading-6 text-stone-600">{block.detail}</p>
+          {block.timeSummary ? (
+            <p className="mt-2 text-xs font-medium uppercase tracking-[0.2em] text-stone-500">
+              {block.timeSummary}
+            </p>
+          ) : null}
 
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
             {block.days.map((day) => (
@@ -59,9 +66,16 @@ export function TimeBlockStrip({ blocks }: TimeBlockStripProps) {
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-semibold text-stone-900">{day.label}</span>
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${kindStyles[day.kind]}`}>
-                    {kindLabels[day.kind]}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {day.released ? (
+                      <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white">
+                        已释放
+                      </span>
+                    ) : null}
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${kindStyles[day.kind]}`}>
+                      {kindLabels[day.kind]}
+                    </span>
+                  </div>
                 </div>
                 <p className="mt-2 text-xs leading-5 text-stone-600">{day.detail}</p>
               </div>

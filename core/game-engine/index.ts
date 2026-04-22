@@ -4,6 +4,7 @@ export {
   createWeeklyCalendar,
   evaluateGraduationOutcome,
   resolveActionTurn,
+  resolveWeekEnd,
   resolveMonthlyTurn,
   settleSemester,
 } from "@/core/game-engine/monthly";

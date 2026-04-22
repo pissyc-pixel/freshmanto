@@ -2,25 +2,30 @@ import { createInitialGameRun } from "@/core/generators";
 import { resolveActionPlan } from "@/core/resolvers/actions";
 import { resolveCourseStrategy } from "@/core/resolvers/attendance";
 import { resolveMonthEvents } from "@/core/resolvers/events";
-import { createMonthlySchedule, createWeeklyCalendar } from "@/core/resolvers/schedule";
+import {
+  createMonthlySchedule,
+  createWeekTimeState,
+  createWeeklyCalendar,
+  getActionTimeCost,
+  releaseSkippedClassDays,
+} from "@/core/resolvers/schedule";
 import { evaluateGraduationOutcome, evaluateSemesterFeedback, settleSemester } from "@/core/resolvers/semester";
 import type {
   ActionTurnPlan,
   ActionTurnSummary,
   ActiveMonthState,
   CooldownState,
+  CourseAttendanceStrategy,
   CourseResolution,
   DynamicStats,
   GameRun,
   MonthlyActionPlan,
-  ResolvedMonthResult,
   ResolvedTurnResult,
   RiskState,
   StructuredMonthlySummary,
 } from "@/types/game";
 
 const WEEKS_PER_MONTH = 4;
-const DEFAULT_BATCH_ACTION: ActionTurnPlan["action"] = { action: "relax", time: "night" };
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -68,6 +73,36 @@ function mergeRisk(base: RiskState, delta: RiskState): RiskState {
 
 function dedupe(values: string[]): string[] {
   return [...new Set(values)];
+}
+
+function emptyStatsDelta(): DynamicStats {
+  return {
+    money: 0,
+    mood: 0,
+    stress: 0,
+    fulfillment: 0,
+    social: 0,
+    semesterAcademics: 0,
+  };
+}
+
+function emptyRiskDelta(): RiskState {
+  return {
+    academicRisk: 0,
+    burnout: 0,
+  };
+}
+
+function createEmptyActionResolution(): ReturnType<typeof resolveActionPlan> {
+  return {
+    stats: emptyStatsDelta(),
+    moneyDelta: 0,
+    risk: emptyRiskDelta(),
+    resolvedActions: [],
+    flags: [],
+    resumeAdditions: [],
+    askFamilyUsed: false,
+  };
 }
 
 function updateCooldownsDuringMonth(run: GameRun, askFamilyUsed: boolean): CooldownState {
@@ -127,6 +162,8 @@ function ensureActiveMonth(run: GameRun): ActiveMonthState {
     return run.activeMonth;
   }
 
+  const weeklyCalendar = createWeeklyCalendar(run.currentMonth);
+
   return {
     year: run.currentYear,
     month: run.currentMonth,
@@ -134,13 +171,15 @@ function ensureActiveMonth(run: GameRun): ActiveMonthState {
     totalWeeks: WEEKS_PER_MONTH,
     allowanceApplied: false,
     cooldownsAtStart: { ...run.cooldowns },
-    weeklyCalendar: createWeeklyCalendar(run.currentMonth),
+    weeklyCalendar,
+    currentWeekState: createWeekTimeState(weeklyCalendar[0], "mixed"),
+    completedWeeks: [],
     statsAtStart: cloneStats(run.stats),
     turns: [],
   };
 }
 
-function createInstantCourseResolution(strategy: CourseResolution["strategy"]): CourseResolution {
+function createInstantCourseResolution(strategy: CourseAttendanceStrategy): CourseResolution {
   return {
     strategy,
     attendanceCounted: true,
@@ -156,23 +195,34 @@ function createInstantCourseResolution(strategy: CourseResolution["strategy"]): 
   };
 }
 
-function aggregateCourse(turns: ActionTurnSummary[]): CourseResolution {
-  const latest = turns.at(-1)?.course ?? resolveCourseStrategy("mixed");
+function createCourseStatsDelta(course: CourseResolution, allowanceDelta = 0): DynamicStats {
+  return {
+    money: allowanceDelta - course.proxyCost,
+    mood: course.moodDelta,
+    stress: course.stressDelta,
+    fulfillment: 0,
+    social: 0,
+    semesterAcademics: course.academicGain,
+  };
+}
 
-  return turns.reduce<CourseResolution>(
-    (summary, turn, index) => ({
-      strategy: index === turns.length - 1 ? turn.course.strategy : summary.strategy,
-      attendanceCounted: summary.attendanceCounted && turn.course.attendanceCounted,
-      directRollCallPenalty: summary.directRollCallPenalty + turn.course.directRollCallPenalty,
-      rollCallRiskDelta: summary.rollCallRiskDelta + turn.course.rollCallRiskDelta,
-      usualScoreRiskDelta: summary.usualScoreRiskDelta + turn.course.usualScoreRiskDelta,
-      proxyCost: summary.proxyCost + turn.course.proxyCost,
-      remedyPressure: summary.remedyPressure + turn.course.remedyPressure,
-      academicRiskDelta: summary.academicRiskDelta + turn.course.academicRiskDelta,
-      academicGain: summary.academicGain + turn.course.academicGain,
-      moodDelta: summary.moodDelta + turn.course.moodDelta,
-      stressDelta: summary.stressDelta + turn.course.stressDelta,
-      note: turn.course.note,
+function aggregateCourse(completedWeeks: ActiveMonthState["completedWeeks"]): CourseResolution {
+  const latest = completedWeeks.at(-1)?.course ?? resolveCourseStrategy("mixed");
+
+  return completedWeeks.reduce<CourseResolution>(
+    (summary, completedWeek, index) => ({
+      strategy: index === completedWeeks.length - 1 ? completedWeek.attendanceStrategy : summary.strategy,
+      attendanceCounted: summary.attendanceCounted && completedWeek.course.attendanceCounted,
+      directRollCallPenalty: summary.directRollCallPenalty + completedWeek.course.directRollCallPenalty,
+      rollCallRiskDelta: summary.rollCallRiskDelta + completedWeek.course.rollCallRiskDelta,
+      usualScoreRiskDelta: summary.usualScoreRiskDelta + completedWeek.course.usualScoreRiskDelta,
+      proxyCost: summary.proxyCost + completedWeek.course.proxyCost,
+      remedyPressure: summary.remedyPressure + completedWeek.course.remedyPressure,
+      academicRiskDelta: summary.academicRiskDelta + completedWeek.course.academicRiskDelta,
+      academicGain: summary.academicGain + completedWeek.course.academicGain,
+      moodDelta: summary.moodDelta + completedWeek.course.moodDelta,
+      stressDelta: summary.stressDelta + completedWeek.course.stressDelta,
+      note: completedWeek.course.note ?? summary.note,
     }),
     {
       ...latest,
@@ -215,7 +265,10 @@ function buildMonthlySummary(input: {
   const statsBefore = input.activeMonth.statsAtStart;
   const statsDelta = diffStats(statsBefore, statsAfterEvents);
   const turns = input.activeMonth.turns;
-  const latestAttendanceStrategy = turns.at(-1)?.attendanceStrategy ?? "mixed";
+  const latestAttendanceStrategy =
+    input.activeMonth.completedWeeks.at(-1)?.attendanceStrategy ??
+    turns.at(-1)?.attendanceStrategy ??
+    "mixed";
   const turnResumeAdditions = input.runAfterTurns.resume.slice(input.runBeforeMonth.resume.length);
 
   return {
@@ -243,105 +296,112 @@ function buildMonthlySummary(input: {
       ...input.eventFlags,
     ]),
     cooldowns: input.runAfterTurns.cooldowns,
-    course: aggregateCourse(turns),
+    course: aggregateCourse(input.activeMonth.completedWeeks),
     turns,
   };
 }
 
-export function resolveActionTurn(run: GameRun, plan: ActionTurnPlan): ResolvedTurnResult {
-  const activeMonth = ensureActiveMonth(run);
-  const week = activeMonth.weeklyCalendar[activeMonth.currentWeek - 1];
-  const advancesCalendar = plan.action.action !== "big_meal";
+function applyCourseToTurnSummary(turnSummary: ActionTurnSummary, course: CourseResolution): ActionTurnSummary {
+  const statsAfter = addStats(turnSummary.statsAfter, createCourseStatsDelta(course));
 
-  if (!week) {
-    throw new Error(`Month ${run.currentMonth} has no remaining weekly turns.`);
-  }
-
-  const statsBefore = run.stats;
-  const allowanceDelta = activeMonth.allowanceApplied ? 0 : run.profile.monthlyAllowance;
-  const course = advancesCalendar
-    ? resolveCourseStrategy(plan.attendanceStrategy)
-    : createInstantCourseResolution(plan.attendanceStrategy);
-  const actionResolution = resolveActionPlan(run, {
-    attendanceStrategy: plan.attendanceStrategy,
-    actions: [plan.action],
-  });
-  const statsDelta: DynamicStats = {
-    money: allowanceDelta + actionResolution.moneyDelta + actionResolution.stats.money - course.proxyCost,
-    mood: course.moodDelta + actionResolution.stats.mood,
-    stress: course.stressDelta + actionResolution.stats.stress,
-    fulfillment: actionResolution.stats.fulfillment,
-    social: actionResolution.stats.social,
-    semesterAcademics: course.academicGain + actionResolution.stats.semesterAcademics,
-  };
-  const statsAfter = addStats(statsBefore, statsDelta);
-  const riskAfter = mergeRisk(run.risk, {
-    academicRisk: course.academicRiskDelta + actionResolution.risk.academicRisk,
-    burnout: actionResolution.risk.burnout + Math.max(0, Math.round(course.stressDelta / 4)),
-  });
-  const resolvedAction = actionResolution.resolvedActions[0] ?? {
-    ...plan.action,
-    accepted: false,
-    reason: "turn-resolution-missing",
-  };
-  const turnSummary: ActionTurnSummary = {
-    turn: activeMonth.turns.length + 1,
-    week: week.week,
-    slotLabel: week.label,
-    advancesCalendar,
-    attendanceStrategy: plan.attendanceStrategy,
-    chosenAction: plan.action,
-    resolvedAction,
-    statsBefore,
+  return {
+    ...turnSummary,
     statsAfter,
-    statsDelta,
-    moneyDelta: statsDelta.money,
-    flags: dedupe(actionResolution.flags),
+    statsDelta: diffStats(turnSummary.statsBefore, statsAfter),
+    moneyDelta: statsAfter.money - turnSummary.statsBefore.money,
     notableFacts: dedupe([
-      allowanceDelta > 0 ? `allowance:${allowanceDelta}` : "",
+      ...turnSummary.notableFacts,
       course.note ?? "",
       course.rollCallRiskDelta > 0 ? `roll-call-risk:${course.rollCallRiskDelta}` : "",
       course.usualScoreRiskDelta > 0 ? `usual-score-risk:${course.usualScoreRiskDelta}` : "",
       course.proxyCost > 0 ? `proxy-cost:${course.proxyCost}` : "",
       course.remedyPressure > 0 ? `remedy-pressure:${course.remedyPressure}` : "",
     ].filter(Boolean)),
-    allowanceApplied: allowanceDelta > 0,
     course,
+    weekTimeAfter: 0,
+    weekCompleted: true,
   };
-  const updatedActiveMonth: ActiveMonthState = {
-    ...activeMonth,
+}
+
+function finalizeCurrentWeek(input: {
+  runBeforeMonth: GameRun;
+  run: GameRun;
+  activeMonth: ActiveMonthState;
+  attendanceStrategy: CourseAttendanceStrategy;
+  endedEarly: boolean;
+  attachCourseToLastTurn: boolean;
+}) {
+  const allowanceDelta = input.activeMonth.allowanceApplied ? 0 : input.run.profile.monthlyAllowance;
+  const course = resolveCourseStrategy(input.attendanceStrategy, {
+    skippedClassDays: input.activeMonth.currentWeekState.releasedClassDays,
+  });
+  const statsAfter = addStats(input.run.stats, createCourseStatsDelta(course, allowanceDelta));
+  const riskAfter = mergeRisk(input.run.risk, {
+    academicRisk: course.academicRiskDelta,
+    burnout: Math.max(0, Math.round(course.stressDelta / 4)),
+  });
+  let turns = input.activeMonth.turns;
+  let lastResolvedTurn = input.activeMonth.lastResolvedTurn;
+
+  if (input.attachCourseToLastTurn && turns.length > 0) {
+    const updatedLastTurn = applyCourseToTurnSummary(turns[turns.length - 1], course);
+    turns = [...turns.slice(0, -1), updatedLastTurn];
+    lastResolvedTurn = updatedLastTurn;
+  }
+
+  const completedWeek = {
+    week: input.activeMonth.currentWeekState.week,
+    attendanceStrategy: input.attendanceStrategy,
+    course,
+    releasedClassDays: [...input.activeMonth.currentWeekState.releasedClassDays],
+    endedEarly: input.endedEarly,
+  };
+  const settledMonth: ActiveMonthState = {
+    ...input.activeMonth,
     allowanceApplied: true,
-    currentWeek: activeMonth.currentWeek + (advancesCalendar ? 1 : 0),
-    turns: [...activeMonth.turns, turnSummary],
-    lastResolvedTurn: turnSummary,
+    completedWeeks: [...input.activeMonth.completedWeeks, completedWeek],
+    turns,
+    lastResolvedTurn,
   };
-  const updatedRun: GameRun = {
-    ...run,
+  const runAfterWeek: GameRun = {
+    ...input.run,
     stats: statsAfter,
     risk: riskAfter,
-    cooldowns: updateCooldownsDuringMonth(run, actionResolution.askFamilyUsed),
-    resume: [...run.resume, ...actionResolution.resumeAdditions],
     riskFlags: deriveMonthlyRiskFlags({
-      ...run,
+      ...input.run,
       stats: statsAfter,
       risk: riskAfter,
     }),
-    activeMonth: updatedActiveMonth,
+    activeMonth: settledMonth,
   };
 
-  if (updatedActiveMonth.currentWeek <= updatedActiveMonth.totalWeeks) {
+  if (settledMonth.currentWeek < settledMonth.totalWeeks) {
+    const nextWeek = settledMonth.weeklyCalendar[settledMonth.currentWeek];
+
+    if (!nextWeek) {
+      throw new Error(`Week ${settledMonth.currentWeek + 1} is missing from the calendar.`);
+    }
+
+    const nextActiveMonth: ActiveMonthState = {
+      ...settledMonth,
+      currentWeek: settledMonth.currentWeek + 1,
+      currentWeekState: createWeekTimeState(nextWeek, input.attendanceStrategy),
+    };
+
     return {
-      run: updatedRun,
-      turnSummary,
+      run: {
+        ...runAfterWeek,
+        activeMonth: nextActiveMonth,
+      },
       monthCompleted: false,
     };
   }
 
-  const eventResolution = resolveMonthEvents(updatedRun, run.currentMonth);
+  const eventResolution = resolveMonthEvents(runAfterWeek, input.runBeforeMonth.currentMonth);
   const summary = buildMonthlySummary({
-    runBeforeMonth: run,
-    runAfterTurns: updatedRun,
-    activeMonth: updatedActiveMonth,
+    runBeforeMonth: input.runBeforeMonth,
+    runAfterTurns: runAfterWeek,
+    activeMonth: settledMonth,
     eventIds: eventResolution.eventIds,
     eventFlags: eventResolution.flags,
     eventFacts: eventResolution.notableFacts,
@@ -351,21 +411,21 @@ export function resolveActionTurn(run: GameRun, plan: ActionTurnPlan): ResolvedT
     eventRisk: eventResolution.risk,
   });
   const finalStatsAfter = summary.statsAfter;
-  const finalRiskAfter = mergeRisk(updatedRun.risk, eventResolution.risk);
-  const askFamilyUsedThisMonth = updatedActiveMonth.turns.some(
+  const finalRiskAfter = mergeRisk(runAfterWeek.risk, eventResolution.risk);
+  const askFamilyUsedThisMonth = settledMonth.turns.some(
     (turn) => turn.resolvedAction.action === "ask_family" && turn.resolvedAction.accepted,
   );
-  const finalizedCooldowns = finalizeCooldowns(updatedActiveMonth.cooldownsAtStart, askFamilyUsedThisMonth);
+  const finalizedCooldowns = finalizeCooldowns(settledMonth.cooldownsAtStart, askFamilyUsedThisMonth);
   const monthAdvancedRun: GameRun = {
-    ...updatedRun,
-    ...nextCalendar(run),
+    ...runAfterWeek,
+    ...nextCalendar(input.runBeforeMonth),
     stats: finalStatsAfter,
     risk: finalRiskAfter,
     activeMonth: undefined,
     cooldowns: finalizedCooldowns,
-    resume: [...updatedRun.resume, ...eventResolution.resumeAdditions],
+    resume: [...runAfterWeek.resume, ...eventResolution.resumeAdditions],
     riskFlags: deriveMonthlyRiskFlags({
-      ...updatedRun,
+      ...runAfterWeek,
       stats: finalStatsAfter,
       risk: finalRiskAfter,
     }),
@@ -386,36 +446,212 @@ export function resolveActionTurn(run: GameRun, plan: ActionTurnPlan): ResolvedT
 
   return {
     run: runWithSummary,
-    turnSummary,
     monthCompleted: true,
     monthlySummary: summary,
   };
 }
 
-export function resolveMonthlyTurn(run: GameRun, plan: MonthlyActionPlan): ResolvedMonthResult {
-  const queuedActions = [...(plan.actions.length > 0 ? plan.actions : [DEFAULT_BATCH_ACTION])];
+export function resolveActionTurn(run: GameRun, plan: ActionTurnPlan): ResolvedTurnResult {
+  const activeMonth = ensureActiveMonth(run);
+  const week = activeMonth.weeklyCalendar[activeMonth.currentWeek - 1];
 
+  if (!week) {
+    throw new Error(`Month ${run.currentMonth} has no remaining weekly turns.`);
+  }
+
+  const timeCost = getActionTimeCost(plan.action.action);
+  const weekTimeBefore = activeMonth.currentWeekState.remainingTimeUnits;
+  const allowanceDelta = activeMonth.allowanceApplied ? 0 : run.profile.monthlyAllowance;
+  const initialActionResolution = resolveActionPlan(run, {
+    attendanceStrategy: plan.attendanceStrategy,
+    actions: [plan.action],
+  });
+  const initialResolvedAction = initialActionResolution.resolvedActions[0] ?? {
+    ...plan.action,
+    accepted: false,
+    reason: "turn-resolution-missing",
+  };
+  const rejectedForTime = initialResolvedAction.accepted && timeCost > weekTimeBefore;
+  const actionResolution =
+    rejectedForTime
+      ? createEmptyActionResolution()
+      : initialActionResolution;
+  const resolvedAction = rejectedForTime
+    ? {
+        ...plan.action,
+        accepted: false,
+        reason: "insufficient-week-time",
+      }
+    : initialResolvedAction;
+  const effectiveTimeCost = resolvedAction.accepted ? timeCost : 0;
+  const skipClassRelease =
+    resolvedAction.accepted && plan.action.action === "skip_class"
+      ? releaseSkippedClassDays({
+          week,
+          requestedDays: plan.action.skipClassDays ?? [],
+          releasedClassDays: activeMonth.currentWeekState.releasedClassDays,
+        })
+      : {
+          newlyReleasedDays: [] as string[],
+          releasedClassDays: activeMonth.currentWeekState.releasedClassDays,
+          reclaimedTimeUnits: 0,
+        };
+  const weekTimeAfter = Math.max(0, weekTimeBefore - effectiveTimeCost + skipClassRelease.reclaimedTimeUnits);
+  const statsBefore = run.stats;
+  const statsDelta: DynamicStats = {
+    money: allowanceDelta + actionResolution.moneyDelta + actionResolution.stats.money,
+    mood: actionResolution.stats.mood,
+    stress: actionResolution.stats.stress,
+    fulfillment: actionResolution.stats.fulfillment,
+    social: actionResolution.stats.social,
+    semesterAcademics: actionResolution.stats.semesterAcademics,
+  };
+  const statsAfter = addStats(statsBefore, statsDelta);
+  const riskAfter = mergeRisk(run.risk, actionResolution.risk);
+  const flags = dedupe([
+    ...actionResolution.flags,
+    rejectedForTime ? "insufficient-week-time" : "",
+  ].filter(Boolean));
+  const notableFacts = dedupe([
+    allowanceDelta > 0 ? `allowance:${allowanceDelta}` : "",
+    skipClassRelease.newlyReleasedDays.length > 0
+      ? `skip_class released ${skipClassRelease.newlyReleasedDays.join(", ")} daytime blocks`
+      : "",
+  ].filter(Boolean));
+  const turnSummary: ActionTurnSummary = {
+    turn: activeMonth.turns.length + 1,
+    week: week.week,
+    slotLabel: week.label,
+    advancesCalendar: effectiveTimeCost > 0,
+    attendanceStrategy: plan.attendanceStrategy,
+    chosenAction: plan.action,
+    resolvedAction,
+    statsBefore,
+    statsAfter,
+    statsDelta,
+    moneyDelta: statsDelta.money,
+    flags,
+    notableFacts,
+    allowanceApplied: allowanceDelta > 0,
+    course: createInstantCourseResolution(plan.attendanceStrategy),
+    timeCost: effectiveTimeCost,
+    weekTimeBefore,
+    weekTimeAfter,
+    releasedClassDays: skipClassRelease.releasedClassDays,
+    weekCompleted: false,
+  };
+  const updatedActiveMonth: ActiveMonthState = {
+    ...activeMonth,
+    allowanceApplied: true,
+    turns: [...activeMonth.turns, turnSummary],
+    lastResolvedTurn: turnSummary,
+    currentWeekState: {
+      ...activeMonth.currentWeekState,
+      attendanceStrategy: plan.attendanceStrategy,
+      totalTimeUnits: activeMonth.currentWeekState.totalTimeUnits + skipClassRelease.reclaimedTimeUnits,
+      remainingTimeUnits: weekTimeAfter,
+      releasedClassDays: skipClassRelease.releasedClassDays,
+    },
+  };
+  const updatedRun: GameRun = {
+    ...run,
+    stats: statsAfter,
+    risk: riskAfter,
+    cooldowns: updateCooldownsDuringMonth(run, actionResolution.askFamilyUsed),
+    resume: [...run.resume, ...actionResolution.resumeAdditions],
+    riskFlags: deriveMonthlyRiskFlags({
+      ...run,
+      stats: statsAfter,
+      risk: riskAfter,
+    }),
+    activeMonth: updatedActiveMonth,
+  };
+
+  if (weekTimeAfter > 0) {
+    return {
+      run: updatedRun,
+      turnSummary,
+      monthCompleted: false,
+    };
+  }
+
+  const finalized = finalizeCurrentWeek({
+    runBeforeMonth: run,
+    run: updatedRun,
+    activeMonth: updatedActiveMonth,
+    attendanceStrategy: plan.attendanceStrategy,
+    endedEarly: false,
+    attachCourseToLastTurn: true,
+  });
+  const finalizedTurnSummary =
+    finalized.run.activeMonth?.lastResolvedTurn ??
+    finalized.monthlySummary?.turns.at(-1) ??
+    turnSummary;
+
+  return {
+    run: finalized.run,
+    turnSummary: finalizedTurnSummary,
+    monthCompleted: finalized.monthCompleted,
+    monthlySummary: finalized.monthlySummary,
+  };
+}
+
+export function resolveWeekEnd(
+  run: GameRun,
+  attendanceStrategy: CourseAttendanceStrategy,
+): {
+  run: GameRun;
+  monthCompleted: boolean;
+  monthlySummary?: StructuredMonthlySummary;
+} {
+  const activeMonth = ensureActiveMonth(run);
+
+  return finalizeCurrentWeek({
+    runBeforeMonth: run,
+    run: {
+      ...run,
+      activeMonth,
+    },
+    activeMonth: {
+      ...activeMonth,
+      currentWeekState: {
+        ...activeMonth.currentWeekState,
+        attendanceStrategy,
+      },
+    },
+    attendanceStrategy,
+    endedEarly: activeMonth.currentWeekState.remainingTimeUnits > 0,
+    attachCourseToLastTurn: false,
+  });
+}
+
+export function resolveMonthlyTurn(run: GameRun, plan: MonthlyActionPlan) {
+  const queuedActions = [...plan.actions];
   let nextRun = run;
   let monthlySummary: StructuredMonthlySummary | undefined;
   let cursor = 0;
 
   while (!monthlySummary) {
-    const action = queuedActions[cursor] ?? DEFAULT_BATCH_ACTION;
-    const result = resolveActionTurn(nextRun, {
-      attendanceStrategy: plan.attendanceStrategy,
-      action,
-    });
+    const action = queuedActions[cursor];
 
-    nextRun = result.run;
-    monthlySummary = result.monthlySummary;
-    cursor += 1;
+    if (action) {
+      const result = resolveActionTurn(nextRun, {
+        attendanceStrategy: plan.attendanceStrategy,
+        action,
+      });
 
-    if (!result.turnSummary.advancesCalendar && cursor >= queuedActions.length) {
-      queuedActions.push(DEFAULT_BATCH_ACTION);
+      nextRun = result.run;
+      monthlySummary = result.monthlySummary;
+      cursor += 1;
+    } else {
+      const result = resolveWeekEnd(nextRun, plan.attendanceStrategy);
+
+      nextRun = result.run;
+      monthlySummary = result.monthlySummary;
     }
 
-    if (cursor > WEEKS_PER_MONTH * 3) {
-      throw new Error("Monthly resolution exceeded the expected weekly turn count.");
+    if (cursor > WEEKS_PER_MONTH * 12) {
+      throw new Error("Monthly resolution exceeded the expected number of action steps.");
     }
   }
 

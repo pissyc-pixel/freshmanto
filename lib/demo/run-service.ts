@@ -4,6 +4,7 @@ import {
   evaluateGraduationOutcome,
   resolveActionTurn,
   resolveMonthlyTurn,
+  resolveWeekEnd,
   settleSemester,
 } from "@/core/game-engine";
 import type { AiReportRequest, AiReportResult } from "@/types/ai";
@@ -104,6 +105,19 @@ export type AdvanceDemoMonthResult = {
   endingReport?: AiReportResult;
 };
 
+export type EndDemoWeekResult = {
+  run: GameRun;
+  playedYear: number;
+  playedMonth: number;
+  playedWeek: number;
+  monthCompleted: boolean;
+  monthlySummary?: StructuredMonthlySummary;
+  monthlyReport?: AiReportResult;
+  semesterSettlement?: SemesterSettlement;
+  endingSummary?: StructuredEndingSummary;
+  endingReport?: AiReportResult;
+};
+
 type ReportGenerator = (input: AiReportRequest) => Promise<AiReportResult>;
 
 function createRunLog(run: GameRun) {
@@ -132,13 +146,33 @@ function createTurnLog(input: {
     year: input.year,
     month: input.month,
     logType: "action" as const,
-    message: "weekly turn resolved",
+    message: "action step resolved",
     metadata: {
       week: input.turnSummary.week,
       advancesCalendar: input.turnSummary.advancesCalendar,
       attendanceStrategy: input.turnSummary.attendanceStrategy,
       action: input.turnSummary.resolvedAction.action,
       flags: input.turnSummary.flags,
+    },
+  };
+}
+
+function createWeekEndLog(input: {
+  runId: string;
+  year: number;
+  month: number;
+  week: number;
+  attendanceStrategy: ActionTurnSummary["attendanceStrategy"];
+}) {
+  return {
+    runId: input.runId,
+    year: input.year,
+    month: input.month,
+    logType: "action" as const,
+    message: "week ended early",
+    metadata: {
+      week: input.week,
+      attendanceStrategy: input.attendanceStrategy,
     },
   };
 }
@@ -433,6 +467,79 @@ export async function advanceDemoTurn(input: {
   };
 }
 
+export async function endDemoWeek(input: {
+  repository: DemoRepository;
+  runId: string;
+  attendanceStrategy: ActionTurnPlan["attendanceStrategy"];
+  generateReport: ReportGenerator;
+}): Promise<EndDemoWeekResult> {
+  const existing = await input.repository.getRun(input.runId);
+
+  if (!existing) {
+    throw new Error(`Run ${input.runId} was not found.`);
+  }
+
+  const baseRun = existing.current_state_json;
+  const playedYear = baseRun.currentYear;
+  const playedMonth = baseRun.currentMonth;
+  const playedWeek = baseRun.activeMonth?.currentWeek ?? 1;
+  const weekResult = resolveWeekEnd(baseRun, input.attendanceStrategy);
+  let nextRun = weekResult.run;
+  let monthlyReport: AiReportResult | undefined;
+  let semesterSettlement: SemesterSettlement | undefined;
+  let endingSummary: StructuredEndingSummary | undefined;
+  let endingReport: AiReportResult | undefined;
+
+  await input.repository.writeEventLogs([
+    createWeekEndLog({
+      runId: input.runId,
+      year: playedYear,
+      month: playedMonth,
+      week: playedWeek,
+      attendanceStrategy: input.attendanceStrategy,
+    }),
+  ]);
+
+  if (weekResult.monthCompleted && weekResult.monthlySummary) {
+    const monthArtifacts = await persistMonthArtifacts({
+      repository: input.repository,
+      runId: input.runId,
+      playedYear,
+      playedMonth,
+      nextRun,
+      monthlySummary: weekResult.monthlySummary,
+      generateReport: input.generateReport,
+    });
+
+    nextRun = monthArtifacts.nextRun;
+    monthlyReport = monthArtifacts.monthlyReport;
+    semesterSettlement = monthArtifacts.semesterSettlement;
+    endingSummary = monthArtifacts.endingSummary;
+    endingReport = monthArtifacts.endingReport;
+  }
+
+  await input.repository.updateRun(input.runId, {
+    status: nextRun.status,
+    currentYear: nextRun.currentYear,
+    currentMonth: nextRun.currentMonth,
+    profile: nextRun.profile,
+    currentState: nextRun,
+  });
+
+  return {
+    run: nextRun,
+    playedYear,
+    playedMonth,
+    playedWeek,
+    monthCompleted: weekResult.monthCompleted,
+    monthlySummary: weekResult.monthlySummary,
+    monthlyReport,
+    semesterSettlement,
+    endingSummary,
+    endingReport,
+  };
+}
+
 export async function advanceDemoMonth(input: {
   repository: DemoRepository;
   runId: string;
@@ -459,14 +566,18 @@ export async function advanceDemoMonth(input: {
     generateReport: input.generateReport,
   });
 
-  await input.repository.writeEventLogs([
-    createTurnLog({
-      runId: input.runId,
-      year: playedYear,
-      month: playedMonth,
-      turnSummary: monthlyResult.summary.turns.at(-1) ?? monthlyResult.summary.turns[0],
-    }),
-  ]);
+  const lastTurn = monthlyResult.summary.turns.at(-1) ?? monthlyResult.summary.turns[0];
+
+  if (lastTurn) {
+    await input.repository.writeEventLogs([
+      createTurnLog({
+        runId: input.runId,
+        year: playedYear,
+        month: playedMonth,
+        turnSummary: lastTurn,
+      }),
+    ]);
+  }
 
   await input.repository.updateRun(input.runId, {
     status: monthArtifacts.nextRun.status,

@@ -35,7 +35,8 @@ export type ActionType =
   | "big_meal"
   | "student_activity"
   | "remedy"
-  | "ask_family";
+  | "ask_family"
+  | "skip_class";
 
 export type ActionTime = "day" | "night";
 
@@ -130,6 +131,7 @@ export type ScheduledWeekday = {
   label: string;
   dayType: TimeBlockKind;
   availableTimes: ActionTime[];
+  courseLockedDaytime?: boolean;
 };
 
 export type ScheduledWeek = {
@@ -141,6 +143,7 @@ export type ScheduledWeek = {
 export type PlannedAction = {
   action: ActionType;
   time: ActionTime;
+  skipClassDays?: Weekday[];
 };
 
 export type ResolvedAction = PlannedAction & {
@@ -156,6 +159,14 @@ export type MonthlyActionPlan = {
 export type ActionTurnPlan = {
   attendanceStrategy: CourseAttendanceStrategy;
   action: PlannedAction;
+};
+
+export type ActiveWeekState = {
+  week: number;
+  totalTimeUnits: number;
+  remainingTimeUnits: number;
+  releasedClassDays: Weekday[];
+  attendanceStrategy: CourseAttendanceStrategy;
 };
 
 export type CourseResolution = {
@@ -205,6 +216,11 @@ export type ActionTurnSummary = {
   notableFacts: string[];
   allowanceApplied: boolean;
   course: CourseResolution;
+  timeCost?: number;
+  weekTimeBefore?: number;
+  weekTimeAfter?: number;
+  releasedClassDays?: Weekday[];
+  weekCompleted?: boolean;
 };
 
 export type ActiveMonthState = {
@@ -215,6 +231,14 @@ export type ActiveMonthState = {
   allowanceApplied: boolean;
   cooldownsAtStart: CooldownState;
   weeklyCalendar: ScheduledWeek[];
+  currentWeekState: ActiveWeekState;
+  completedWeeks: Array<{
+    week: number;
+    attendanceStrategy: CourseAttendanceStrategy;
+    course: CourseResolution;
+    releasedClassDays: Weekday[];
+    endedEarly: boolean;
+  }>;
   statsAtStart: DynamicStats;
   turns: ActionTurnSummary[];
   lastResolvedTurn?: ActionTurnSummary;

@@ -1,6 +1,6 @@
-import type { CourseAttendanceStrategy, CourseResolution } from "@/types/game";
+import type { CourseAttendanceStrategy, CourseResolution, Weekday } from "@/types/game";
 
-const COURSE_RULES: Record<CourseAttendanceStrategy, CourseResolution> = {
+const BASE_COURSE_RULES: Record<CourseAttendanceStrategy, CourseResolution> = {
   serious: {
     strategy: "serious",
     attendanceCounted: true,
@@ -13,7 +13,6 @@ const COURSE_RULES: Record<CourseAttendanceStrategy, CourseResolution> = {
     academicGain: 5,
     moodDelta: -1,
     stressDelta: 2,
-    note: "认真上课，课堂收益最稳定，也能压低后续风险。",
   },
   mixed: {
     strategy: "mixed",
@@ -27,7 +26,6 @@ const COURSE_RULES: Record<CourseAttendanceStrategy, CourseResolution> = {
     academicGain: 3,
     moodDelta: 0,
     stressDelta: 1,
-    note: "正常跟课，推进平稳，但仍会留下少量平时分压力。",
   },
   skip_sometimes: {
     strategy: "skip_sometimes",
@@ -41,7 +39,6 @@ const COURSE_RULES: Record<CourseAttendanceStrategy, CourseResolution> = {
     academicGain: 1,
     moodDelta: 1,
     stressDelta: -1,
-    note: "偶尔翘课不会立刻扣学业值，但会抬高点名和平时分风险。",
   },
   skip_often: {
     strategy: "skip_often",
@@ -55,7 +52,6 @@ const COURSE_RULES: Record<CourseAttendanceStrategy, CourseResolution> = {
     academicGain: 0,
     moodDelta: 2,
     stressDelta: -2,
-    note: "经常翘课会把点名、平时分和补救成本一起推高，期末很容易爆雷。",
   },
   proxy: {
     strategy: "proxy",
@@ -69,7 +65,6 @@ const COURSE_RULES: Record<CourseAttendanceStrategy, CourseResolution> = {
     academicGain: 1,
     moodDelta: 0,
     stressDelta: 1,
-    note: "代签到能暂时躲过点名，但要花钱，也会提高平时分和后续补救成本。",
   },
   phone: {
     strategy: "phone",
@@ -83,10 +78,80 @@ const COURSE_RULES: Record<CourseAttendanceStrategy, CourseResolution> = {
     academicGain: 2,
     moodDelta: 0,
     stressDelta: 0,
-    note: "人到但心不在，通常不会立刻吃点名惩罚，但平时分和信息损失会慢慢累积。",
   },
 };
 
-export function resolveCourseStrategy(strategy: CourseAttendanceStrategy): CourseResolution {
-  return COURSE_RULES[strategy];
+const SKIP_CLASS_RISK_RULES: Record<
+  CourseAttendanceStrategy,
+  {
+    rollCallRiskDelta: number;
+    usualScoreRiskDelta: number;
+    proxyCost: number;
+    remedyPressure: number;
+    academicRiskDelta: number;
+  }
+> = {
+  serious: {
+    rollCallRiskDelta: 2,
+    usualScoreRiskDelta: 1,
+    proxyCost: 0,
+    remedyPressure: 1,
+    academicRiskDelta: 2,
+  },
+  mixed: {
+    rollCallRiskDelta: 3,
+    usualScoreRiskDelta: 2,
+    proxyCost: 0,
+    remedyPressure: 1,
+    academicRiskDelta: 3,
+  },
+  skip_sometimes: {
+    rollCallRiskDelta: 4,
+    usualScoreRiskDelta: 3,
+    proxyCost: 0,
+    remedyPressure: 2,
+    academicRiskDelta: 4,
+  },
+  skip_often: {
+    rollCallRiskDelta: 6,
+    usualScoreRiskDelta: 4,
+    proxyCost: 0,
+    remedyPressure: 3,
+    academicRiskDelta: 6,
+  },
+  proxy: {
+    rollCallRiskDelta: 1,
+    usualScoreRiskDelta: 2,
+    proxyCost: 40,
+    remedyPressure: 2,
+    academicRiskDelta: 3,
+  },
+  phone: {
+    rollCallRiskDelta: 2,
+    usualScoreRiskDelta: 2,
+    proxyCost: 0,
+    remedyPressure: 1,
+    academicRiskDelta: 2,
+  },
+};
+
+export function resolveCourseStrategy(
+  strategy: CourseAttendanceStrategy,
+  input?: {
+    skippedClassDays?: Weekday[];
+  },
+): CourseResolution {
+  const base = BASE_COURSE_RULES[strategy];
+  const skippedCount = [...new Set(input?.skippedClassDays ?? [])].length;
+  const skipRule = SKIP_CLASS_RISK_RULES[strategy];
+
+  return {
+    ...base,
+    rollCallRiskDelta: base.rollCallRiskDelta + skippedCount * skipRule.rollCallRiskDelta,
+    usualScoreRiskDelta: base.usualScoreRiskDelta + skippedCount * skipRule.usualScoreRiskDelta,
+    proxyCost: base.proxyCost + skippedCount * skipRule.proxyCost,
+    remedyPressure: base.remedyPressure + skippedCount * skipRule.remedyPressure,
+    academicRiskDelta: base.academicRiskDelta + skippedCount * skipRule.academicRiskDelta,
+    note: skippedCount > 0 ? `Skipped ${skippedCount} daytime class blocks this week.` : undefined,
+  };
 }
