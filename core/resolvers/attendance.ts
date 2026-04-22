@@ -8,7 +8,7 @@ const COURSE_RULES: Record<CourseAttendanceStrategy, CourseResolution> = {
     academicRiskDelta: -2,
     academicGain: 18,
     moodDelta: -1,
-    note: "认真听课，学业收益最高。",
+    note: "认真上课，学业收益最高。",
   },
   mixed: {
     strategy: "mixed",
@@ -17,7 +17,7 @@ const COURSE_RULES: Record<CourseAttendanceStrategy, CourseResolution> = {
     academicRiskDelta: 1,
     academicGain: 12,
     moodDelta: 0,
-    note: "基本跟课，收益稳定。",
+    note: "基本跟课，推进稳定。",
   },
   skip_sometimes: {
     strategy: "skip_sometimes",
@@ -26,7 +26,7 @@ const COURSE_RULES: Record<CourseAttendanceStrategy, CourseResolution> = {
     academicRiskDelta: 6,
     academicGain: 7,
     moodDelta: 1,
-    note: "偶尔翘课，容易遗漏课堂重点。",
+    note: "偶尔翘课，容易漏掉课堂重点。",
   },
   skip_often: {
     strategy: "skip_often",
@@ -44,7 +44,7 @@ const COURSE_RULES: Record<CourseAttendanceStrategy, CourseResolution> = {
     academicRiskDelta: 14,
     academicGain: 1,
     moodDelta: 0,
-    note: "代课或代签到能糊弄出勤，但学业风险明显走高。",
+    note: "代课或代签到能糊弄出勤，但学业风险明显上升。",
   },
   phone: {
     strategy: "phone",
@@ -53,10 +53,11 @@ const COURSE_RULES: Record<CourseAttendanceStrategy, CourseResolution> = {
     academicRiskDelta: 5,
     academicGain: 9,
     moodDelta: 0,
-    note: "刷手机仍算出勤，不直接吃点名惩罚，但会错过信息和机会。",
+    note: "上课刷手机算出勤，不直接吃点名惩罚，但会错过信息和机会。",
   },
 };
 
 export function resolveCourseStrategy(strategy: CourseAttendanceStrategy): CourseResolution {
   return COURSE_RULES[strategy];
 }
+

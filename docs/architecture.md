@@ -2,7 +2,7 @@
 
 ## 目标
 
-本地先跑通最小闭环 Demo，同时保持清晰分层，方便在后续阶段继续扩展。当前架构优先保证：
+当前版本先跑通本地最小闭环 Demo，同时保持清晰分层，方便继续扩展。当前架构优先保证：
 
 - 核心规则全部由代码判定
 - AI 只负责月记和结局报告
@@ -20,9 +20,10 @@
 
 职责：
 
-- 管理 Supabase client 与服务端访问封装
-- 提供 `runs`、`monthly_states`、`game_event_logs`、`ai_reports`、`resume_items` 的读写能力
-- 为排查问题保存结构化快照、关键日志、AI 输入摘要与 AI 输出
+- 管理 Supabase client 与最小 repository
+- 管理 `runs`、`monthly_states`、`game_event_logs`、`ai_reports`、`resume_items`
+- 负责 schema bootstrap 与 schema cache 刷新
+- 保存状态快照、关键日志、AI 输入摘要与 AI 输出
 
 禁止：
 
@@ -62,7 +63,7 @@
 
 - 组织页面路由
 - 展示开局信息、状态面板、行动入口、月结算、月记、履历、结局
-- 调用规则层和数据层接口
+- 通过 server actions 触发整合层服务
 
 禁止：
 
@@ -88,13 +89,40 @@
 - AI 发明未发生的重要事实
 - prompt 中承载毕业判定、事件成功率、课程风险等规则
 
+### 5. 整合层
+
+目录：
+
+- `lib/demo`
+- `app/actions.ts`
+
+职责：
+
+- 把规则层、数据层、AI 层接成一条真实演示链路
+- 负责 create run、advance month、保存快照、写日志、写 AI 报告
+- 保证页面不需要直接拼装跨层流程
+
+禁止：
+
+- 把规则实现挪回页面
+- 绕过结构化摘要直接让 AI“自由发挥”
+
+## 当前真实闭环
+
+1. 开局页通过 server action 创建 run
+2. 整合层调用规则生成器，写入 `runs`
+3. 主游戏页读取真实 run 与数据库日志
+4. 提交月度计划后，整合层调用月推进、保存 `monthly_states`
+5. AI 层使用规则摘要生成月记，并写入 `ai_reports`
+6. 履历与日志落入 `resume_items`、`game_event_logs`
+7. 结局页读取规则层预估或正式 ending report
+
 ## 并行开发边界
 
-为了支持主 agent 与辅助 agent 并行开发，按以下方式分配文件所有权：
+阶段 2 并行开发的文件所有权如下：
 
-- 数据层辅助 agent：`lib/supabase`、`db`、数据访问相关 `types`
-- 规则层辅助 agent：`core/game-engine`、`core/generators`、`core/resolvers`、`data`、规则相关 `types`
-- UI + AI 辅助 agent：`app`、`components`、`lib/ai`、`core/prompts`、展示相关 `types`
+- 数据层辅助 agent：`lib/supabase`、`db`、`types/db.ts`
+- 规则层辅助 agent：`core/game-engine`、`core/generators`、`core/resolvers`、`data`、`types/game.ts`
+- UI + AI 辅助 agent：`app`、`components`、`lib/ai`、`core/prompts`、`types/ai.ts`
 
-主 agent 负责最后整合、接口对齐、联调和文档更新。
-
+主 agent 在阶段 3 负责把这些模块整合成真实闭环，并补最终验证与文档更新。

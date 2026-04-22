@@ -24,3 +24,4 @@ export function NavBar() {
     </nav>
   );
 }
+

@@ -1,19 +1,25 @@
-import type { DemoTimeBlock } from "@/app/demo-content";
+import type { TimeBlockKind } from "@/types/game";
 
-type TimeBlockStripProps = {
-  blocks: DemoTimeBlock[];
+export type TimeBlockView = {
+  label: string;
+  kind: TimeBlockKind;
+  detail: string;
 };
 
-const kindStyles: Record<DemoTimeBlock["kind"], string> = {
+type TimeBlockStripProps = {
+  blocks: TimeBlockView[];
+};
+
+const kindStyles: Record<TimeBlockView["kind"], string> = {
   free: "bg-emerald-100 text-emerald-900",
   half_free: "bg-amber-100 text-amber-900",
   busy_day: "bg-stone-800 text-stone-50"
 };
 
-const kindLabels: Record<DemoTimeBlock["kind"], string> = {
-  free: "Free",
-  half_free: "Half free",
-  busy_day: "Busy day"
+const kindLabels: Record<TimeBlockView["kind"], string> = {
+  free: "完全空闲",
+  half_free: "半空闲",
+  busy_day: "白天全忙"
 };
 
 export function TimeBlockStrip({ blocks }: TimeBlockStripProps) {
@@ -33,3 +39,4 @@ export function TimeBlockStrip({ blocks }: TimeBlockStripProps) {
     </div>
   );
 }
+

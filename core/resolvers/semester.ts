@@ -113,7 +113,7 @@ export function evaluateGraduationOutcome(run: GameRun): StructuredEndingSummary
   const outcome = determineOutcome(run);
 
   return {
-    finalYear: run.currentYear,
+    finalYear: Math.min(run.currentYear, 4),
     outcome,
     longTermAcademicAverage:
       run.semesters.length > 0 ? calculateAverage(run.semesters) : Math.max(65, 60 + run.profile.luck / 5),

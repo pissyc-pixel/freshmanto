@@ -1,16 +1,21 @@
-import type { DemoHistoryEntry } from "@/app/demo-content";
-
-type HistoryTimelineProps = {
-  entries: DemoHistoryEntry[];
+export type HistoryEntry = {
+  monthLabel: string;
+  title: string;
+  summary: string;
+  tone: "up" | "flat" | "down";
 };
 
-const toneStyles: Record<DemoHistoryEntry["tone"], string> = {
+type HistoryTimelineProps = {
+  entries: HistoryEntry[];
+};
+
+const toneStyles: Record<HistoryEntry["tone"], string> = {
   up: "bg-emerald-100 text-emerald-900",
   flat: "bg-stone-200 text-stone-800",
   down: "bg-rose-100 text-rose-900"
 };
 
-const toneLabels: Record<DemoHistoryEntry["tone"], string> = {
+const toneLabels: Record<HistoryEntry["tone"], string> = {
   up: "走高",
   flat: "平稳",
   down: "承压"

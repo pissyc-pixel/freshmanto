@@ -1,61 +1,71 @@
 import Link from "next/link";
+import { startNewRunAction } from "@/app/actions";
 import { AppShell } from "@/components/app-shell";
+import { ActionOptionList } from "@/components/action-option-list";
 import { FactList } from "@/components/fact-list";
 import { SectionCard } from "@/components/section-card";
+import { actionOptions } from "@/lib/demo/options";
 
-const launchHighlights = [
-  "随机开局、行动结算、事件触发和毕业判定全部由规则层负责。",
-  "UI 页面只展示结构化结果，并为后续数据层接入预留 props 和接口。",
-  "AI 只消费结构化摘要来生成月记与结局报告，不参与任何规则判定。"
+const guardrails = [
+  "随机开局、月推进、课程策略、事件结算和毕业风险全部由规则层计算。",
+  "AI 只负责把结构化摘要转成月记和结局报告，不参与任何判定。",
+  "页面只展示状态、时间块、履历和日志，不在组件里塞规则逻辑。"
 ];
 
-const demoFlow = [
-  "开局页提供演示入口和模块边界说明。",
-  "主游戏页展示当前属性、时间块和行动入口。",
-  "月结算页展示本月变化与 AI 月记调用预览。",
-  "月记、履历、结局页负责查看归档文本和长期结果。"
+const flow = [
+  "点击“开新档”创建一局真实 run，并写入数据库。",
+  "在主游戏页查看随机开局、状态、时间分布与行动表单。",
+  "提交月度计划后进入月结算页，生成并保存 AI 月记。",
+  "可以继续查看履历、日志、月记归档和当前结局预览。"
 ];
 
 export default function StartPage() {
   return (
     <AppShell
       eyebrow="大学生模拟器 v0"
-      title="面向联调的 Demo UI 与 AI 表达层"
-      description="这个版本聚焦可演示的页面骨架与 AI 转写封装：先把展示流跑通，再把规则层和数据层按接口接进来。"
+      title="先把本地闭环跑通，再继续扩展四年人生。"
+      description="这个版本优先验证最小可运行 Demo：开新档、随机开局、月度行动、月结算、AI 月记、履历与基础结局预览。"
       actions={
         <>
-          <Link
-            href="/game"
-            className="rounded-full bg-amber-600 px-5 py-3 font-semibold text-white transition hover:bg-amber-700"
-          >
-            进入主游戏页
-          </Link>
+          <form action={startNewRunAction}>
+            <button
+              type="submit"
+              className="rounded-full bg-amber-600 px-5 py-3 font-semibold text-white transition hover:bg-amber-700"
+            >
+              开新档
+            </button>
+          </form>
           <Link
             href="/docs"
             className="rounded-full border border-amber-900/15 bg-white/60 px-5 py-3 font-semibold text-stone-800 transition hover:bg-white/90"
           >
-            查看文档索引
+            查看架构说明
           </Link>
         </>
       }
     >
-      <section className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
-        <SectionCard title="Demo 范围" description="这组页面只负责展示与串联，不写规则、不落完整数据层。">
-          <FactList items={launchHighlights} />
+      <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+        <SectionCard
+          title="当前 Demo 的硬边界"
+          description="这一版只做本地闭环，不追求玩法数量，但会把边界和日志打清楚。"
+        >
+          <FactList items={guardrails} />
         </SectionCard>
         <SectionCard
-          title="演示流程"
-          description="当前页面以静态示例数据驱动，后续可以直接替换成规则层输出和数据库读取结果。"
+          title="你现在能跑的流程"
+          description="阶段 3 已经把页面、规则层、数据层和 AI 表达层接到了一条真实演示链路里。"
         >
-          <ol className="space-y-3 text-sm leading-6 text-stone-700">
-            {demoFlow.map((item, index) => (
-              <li key={item} className="rounded-2xl border border-[var(--border)] bg-white/70 px-4 py-3">
-                {index + 1}. {item}
-              </li>
-            ))}
-          </ol>
+          <FactList items={flow} />
         </SectionCard>
       </section>
+
+      <SectionCard
+        title="v0 行动池"
+        description="这里只展示可用行动本身；真正是否合法、收益如何、是否触发补救或风险，都由规则层决定。"
+      >
+        <ActionOptionList items={actionOptions} />
+      </SectionCard>
     </AppShell>
   );
 }
+

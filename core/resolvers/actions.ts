@@ -142,7 +142,7 @@ export function resolveActionPlan(run: GameRun, plan: MonthlyActionPlan): Action
         stats.social += 4;
         stats.fulfillment += 4;
         resumeAdditions.push(
-          createResumeItem(run, "校园活动参与", "参加讲座、社团或学生活动。", "campus_activity"),
+          createResumeItem(run, "校园活动参与", "参加讲座、社团或学生事务活动。", "campus_activity"),
         );
         break;
       case "remedy":
@@ -168,3 +168,4 @@ export function resolveActionPlan(run: GameRun, plan: MonthlyActionPlan): Action
     askFamilyUsed,
   };
 }
+

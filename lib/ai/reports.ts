@@ -25,14 +25,14 @@ export function renderMonthlyJournalFallback(input: MonthlyJournalPromptInput): 
     kind: "monthly_journal",
     usedFallback: true,
     markdown: [
-      `# Year ${year} Month ${month} Journal`,
+      `# 第 ${year} 学年 第 ${month} 月月记`,
       "",
-      `This month focused on ${summary.actions.join(", ")} with an attendance strategy of ${summary.attendanceStrategy}.`,
-      `Month-end stats landed at money ${summary.statsAfter.money}, mood ${summary.statsAfter.mood}, stress ${summary.statsAfter.stress}, and academics ${summary.statsAfter.semesterAcademics}.`,
-      `Most notable facts: ${summary.notableFacts.join(" ")}`,
+      `这个月我主要把精力放在：${summary.actions.join("、")}。课程策略选择的是「${summary.attendanceStrategy}」。`,
+      `月末状态是：金钱 ${summary.statsAfter.money}，心情 ${summary.statsAfter.mood}，压力 ${summary.statsAfter.stress}，当学期学业值 ${summary.statsAfter.semesterAcademics}。`,
+      `本月事实摘要：${summary.notableFacts.join(" ")}`,
       summary.resumeAdditions.length > 0
-        ? `New resume items: ${summary.resumeAdditions.map((item) => item.title).join(", ")}.`
-        : "No new resume items were added this month."
+        ? `新增履历：${summary.resumeAdditions.map((item) => item.title).join("、")}。`
+        : "这个月没有新增履历条目。"
     ].join("\n")
   };
 }
@@ -44,12 +44,12 @@ export function renderEndingReportFallback(input: EndingReportPromptInput): AiRe
     kind: "ending_report",
     usedFallback: true,
     markdown: [
-      "# Graduation Report",
+      "# 毕业报告",
       "",
-      `Rule-layer outcome: **${summary.outcome}** in year ${summary.finalYear} with a long-term academic average of ${summary.longTermAcademicAverage}.`,
-      `Resume highlights: ${summary.resumeHighlights.map((item) => item.title).join(", ")}.`,
-      `Ending facts: ${summary.notableFacts.join(" ")}`,
-      "This report rewrites existing facts only and does not perform any rule judgment."
+      `规则层判定的最终结果是：**${summary.outcome}**。结束学年为第 ${summary.finalYear} 学年，长期学业均值为 ${summary.longTermAcademicAverage}。`,
+      `履历亮点：${summary.resumeHighlights.map((item) => item.title).join("、") || "暂无特别亮点"}。`,
+      `关键事实：${summary.notableFacts.join(" ")}`,
+      "这份报告只整理既有事实，不参与规则判定。"
     ].join("\n")
   };
 }
@@ -62,10 +62,21 @@ function extractTextFromResponse(response: unknown): string | undefined {
   const candidate = response as {
     output_text?: unknown;
     choices?: Array<{ message?: { content?: unknown } }>;
+    output?: Array<{
+      content?: Array<{ type?: string; text?: string }>;
+    }>;
   };
 
   if (typeof candidate.output_text === "string" && candidate.output_text.trim()) {
     return candidate.output_text.trim();
+  }
+
+  const fromOutput = candidate.output
+    ?.flatMap((item) => item.content ?? [])
+    .find((item) => item.type === "output_text" && typeof item.text === "string");
+
+  if (fromOutput?.text?.trim()) {
+    return fromOutput.text.trim();
   }
 
   const firstChoice = candidate.choices?.[0]?.message?.content;
@@ -123,3 +134,4 @@ export function getAiPresentationDebugInfo(input: AiReportRequest) {
     prompt: getPromptPayload(input)
   };
 }
+
