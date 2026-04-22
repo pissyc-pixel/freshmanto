@@ -9,6 +9,8 @@ import {
   settleSemester,
 } from "@/core/game-engine";
 import { evaluateSemesterFeedback } from "@/core/resolvers";
+import { getMonthlyEventWeight } from "@/core/resolvers/events";
+import { getWeeklyAllowance, getWeeklyLivingExpense } from "@/data/events";
 import type {
   CourseAttendanceStrategy,
   GameRun,
@@ -138,7 +140,7 @@ describe("monthly schedule", () => {
 });
 
 describe("monthly resolution", () => {
-  it("pays allowance every month and enforces ask-family cooldown", () => {
+  it("enforces ask-family cooldown across months", () => {
     const run = createInitialGameRun({
       id: "allowance-run",
       randomValues: [0.45, 0.45, 0.55, 0.45, 0.62, 0.3, 0.3, 0.3],
@@ -160,7 +162,6 @@ describe("monthly resolution", () => {
       ]),
     );
 
-    expect(firstMonth.summary.moneyDelta).toBeGreaterThanOrEqual(run.profile.monthlyAllowance);
     expect(firstMonth.summary.cooldowns.askFamilyMonths).toBe(1);
     expect(secondMonth.summary.flags).toContain("ask-family-on-cooldown");
     expect(secondMonth.run.stats.stress).toBeGreaterThanOrEqual(firstMonth.run.stats.stress);
@@ -215,7 +216,7 @@ describe("monthly resolution", () => {
     expect(result.summary.notableFacts.some((fact) => fact.includes("event:"))).toBe(true);
   });
 
-  it("applies fixed living expenses and supports a big meal recovery action", () => {
+  it("settles weekly allowance and weekly living costs only on advancing turns while keeping big meal free of time", () => {
     const run = withMonth(
       createInitialGameRun({
         id: "big-meal-run",
@@ -223,17 +224,43 @@ describe("monthly resolution", () => {
       }),
       3,
     );
+    const weeklyAllowance = getWeeklyAllowance(run);
+    const weeklyExpense = getWeeklyLivingExpense(run);
 
-    const result = resolveMonthlyTurn(
-      run,
-      createDecision("mixed", [createBigMealAction()]),
-    );
+    const mealBeforeWeek = resolveActionTurn(run, {
+      attendanceStrategy: "mixed",
+      action: createBigMealAction(),
+    });
+    const firstWeekStudy = resolveActionTurn(mealBeforeWeek.run, {
+      attendanceStrategy: "mixed",
+      action: { action: "study", time: "day" },
+    });
+    const mealBetweenWeeks = resolveActionTurn(firstWeekStudy.run, {
+      attendanceStrategy: "mixed",
+      action: createBigMealAction(),
+    });
+    const secondWeekStudy = resolveActionTurn(mealBetweenWeeks.run, {
+      attendanceStrategy: "mixed",
+      action: { action: "study", time: "day" },
+    });
 
-    expect(result.summary.eventIds).toContain("monthly-living-expense");
-    expect(result.summary.resolvedActions.some((item) => item.action === "big_meal" && item.accepted)).toBe(true);
-    expect(result.summary.statsDelta.mood).toBeGreaterThan(0);
-    expect(result.summary.statsDelta.stress).toBeLessThan(0);
-    expect(result.summary.moneyDelta).toBeLessThan(run.profile.monthlyAllowance);
+    expect(mealBeforeWeek.turnSummary.advancesCalendar).toBe(false);
+    expect(mealBeforeWeek.turnSummary.moneyDelta).toBe(-180);
+    expect(mealBeforeWeek.run.activeMonth?.currentWeek).toBe(1);
+    expect(mealBeforeWeek.turnSummary.statsDelta.mood).toBe(8);
+    expect(mealBeforeWeek.turnSummary.statsDelta.stress).toBe(-6);
+
+    expect(firstWeekStudy.turnSummary.advancesCalendar).toBe(true);
+    expect(firstWeekStudy.turnSummary.moneyDelta).toBe(weeklyAllowance - weeklyExpense);
+    expect(firstWeekStudy.run.activeMonth?.currentWeek).toBe(2);
+
+    expect(mealBetweenWeeks.turnSummary.advancesCalendar).toBe(false);
+    expect(mealBetweenWeeks.turnSummary.moneyDelta).toBe(-180);
+    expect(mealBetweenWeeks.run.activeMonth?.currentWeek).toBe(2);
+
+    expect(secondWeekStudy.turnSummary.advancesCalendar).toBe(true);
+    expect(secondWeekStudy.turnSummary.moneyDelta).toBe(weeklyAllowance - weeklyExpense);
+    expect(secondWeekStudy.run.activeMonth?.currentWeek).toBe(3);
   });
 
   it("reduces study gains on repeated months and when the player is overstressed", () => {
@@ -293,11 +320,26 @@ describe("monthly resolution", () => {
     );
   });
 
-  it("triggers state-driven scholarship and economic pressure events", () => {
+  it("changes event weights with stress, social, academics, and money state", () => {
     const baseRun = createInitialGameRun({
-      id: "state-event-run",
+      id: "state-event-weight-run",
       randomValues: [0.14, 0.23, 0.4, 0.51, 0.62, 0.18, 0.29, 0.33],
     });
+    const stressedRun: GameRun = {
+      ...withMonth(baseRun, 6),
+      stats: {
+        ...baseRun.stats,
+        stress: 88,
+        mood: 18,
+      },
+    };
+    const socialRun: GameRun = {
+      ...withMonth(baseRun, 6),
+      stats: {
+        ...baseRun.stats,
+        social: 78,
+      },
+    };
     const scholarshipRun: GameRun = {
       ...withMonth(baseRun, 6),
       monthlySummaries: [
@@ -317,12 +359,36 @@ describe("monthly resolution", () => {
       },
     };
 
-    const scholarshipResult = resolveMonthlyTurn(scholarshipRun, createDecision("mixed", []));
-    const lowMoneyResult = resolveMonthlyTurn(lowMoneyRun, createDecision("mixed", []));
+    expect(getMonthlyEventWeight(stressedRun, 6, "burnout-slump")).toBeGreaterThan(
+      getMonthlyEventWeight(baseRun, 6, "burnout-slump"),
+    );
+    expect(getMonthlyEventWeight(socialRun, 6, "social-mutual-aid")).toBeGreaterThan(
+      getMonthlyEventWeight(baseRun, 6, "social-mutual-aid"),
+    );
+    expect(getMonthlyEventWeight(scholarshipRun, 6, "academic-scholarship")).toBeGreaterThan(
+      getMonthlyEventWeight(baseRun, 6, "academic-scholarship"),
+    );
+    expect(getMonthlyEventWeight(lowMoneyRun, 5, "economic-pressure")).toBeGreaterThan(
+      getMonthlyEventWeight(baseRun, 5, "economic-pressure"),
+    );
+  });
 
-    expect(scholarshipResult.summary.eventIds).toContain("academic-scholarship");
-    expect(lowMoneyResult.summary.eventIds).toContain("economic-pressure");
-    expect(lowMoneyResult.summary.flags).toContain("economic-pressure");
+  it("adds a fallback monthly event when no state-linked event is selected", () => {
+    const run = withMonth(
+      createInitialGameRun({
+        id: "fallback-event-run",
+        randomValues: [0.22, 0.27, 0.39, 0.41, 0.63, 0.18, 0.34, 0.29],
+      }),
+      8,
+    );
+
+    const result = resolveMonthlyTurn(
+      run,
+      createDecision("mixed", [{ action: "relax", time: "night" }]),
+    );
+
+    expect(result.summary.eventIds.length).toBeGreaterThan(0);
+    expect(result.summary.eventIds).toContain("monthly-routine-reset");
   });
 
   it("penalizes overloaded players with refusal events and rejected productive actions", () => {

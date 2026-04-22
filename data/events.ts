@@ -1,4 +1,4 @@
-import type { DynamicStats, EventSeverity, GameRun, ResumeCategory, RiskState } from "@/types/game";
+import type { ActionType, DynamicStats, EventSeverity, GameRun, ResumeCategory, RiskState } from "@/types/game";
 
 export type EventRuleCondition =
   | "always"
@@ -10,8 +10,12 @@ export type EventRuleCondition =
   | "mood_low"
   | "academic_streak_high";
 
+export type EventPhase = "monthly" | "action";
+export type EventPolarity = "positive" | "negative" | "neutral";
+
 type ComputedNumber = number | ((run: GameRun) => number);
 type ComputedText = string | ((run: GameRun) => string);
+type ComputedWeight = number | ((run: GameRun) => number);
 
 type EventResumeReward = {
   category: ResumeCategory;
@@ -24,10 +28,15 @@ export type EventRuleTemplate = {
   id: string;
   title: string;
   severity: EventSeverity;
+  phase: EventPhase;
+  polarity: EventPolarity;
   triggerMonths: number[];
+  actionTypes?: ActionType[];
   conditions: EventRuleCondition[];
+  baseWeight: ComputedWeight;
   chance?: number;
   maxOccurrences?: number;
+  fallback?: boolean;
   summary: string;
   supportsRemedy: boolean;
   effect: {
@@ -48,6 +57,14 @@ const LIVING_EXPENSE_BY_CITY = {
   tier_3: 780,
 } as const;
 
+const WEEKLY_BACKGROUND_SPEND = {
+  struggling: 20,
+  ordinary: 40,
+  stable: 80,
+  "well-connected": 120,
+  affluent: 170,
+} as const;
+
 const SCHOLARSHIP_BY_SCHOOL = {
   qingbei: 1500,
   nankai_tianda: 1200,
@@ -57,8 +74,26 @@ const SCHOLARSHIP_BY_SCHOOL = {
   second_tier: 650,
 } as const;
 
+function roundToNearestTen(value: number): number {
+  return Math.round(value / 10) * 10;
+}
+
 export function getMonthlyLivingExpense(run: GameRun): number {
   return LIVING_EXPENSE_BY_CITY[run.profile.cityTier];
+}
+
+export function getWeeklyAllowance(run: GameRun): number {
+  return Math.round(run.profile.monthlyAllowance / 4);
+}
+
+export function getWeeklyLivingExpense(run: GameRun): number {
+  return roundToNearestTen(
+    getMonthlyLivingExpense(run) / 4 + WEEKLY_BACKGROUND_SPEND[run.profile.familyBackground],
+  );
+}
+
+export function getMoneyPressureLine(run: GameRun): number {
+  return Math.max(360, roundToNearestTen(getWeeklyLivingExpense(run) * 2.5));
 }
 
 function scholarshipAmount(run: GameRun): number {
@@ -67,62 +102,58 @@ function scholarshipAmount(run: GameRun): number {
 
 export const starterEventTemplates: EventRuleTemplate[] = [
   {
-    id: "monthly-living-expense",
-    title: "固定生活支出",
-    severity: "important",
-    triggerMonths: ALL_MONTHS,
-    conditions: ["always"],
-    summary: "每个月都会固定消耗住宿、餐饮、通勤与日常生活支出。",
-    supportsRemedy: false,
-    effect: {
-      money: (run) => -getMonthlyLivingExpense(run),
-      notableFact: (run) => `event: monthly-living-expense:${getMonthlyLivingExpense(run)}`,
-    },
-  },
-  {
     id: "freshman-orientation",
-    title: "新生适应周",
+    title: "Freshman Orientation",
     severity: "routine",
+    phase: "monthly",
+    polarity: "positive",
     triggerMonths: [1],
     conditions: ["always"],
+    baseWeight: 8,
     maxOccurrences: 1,
-    summary: "开学初的导览和班级破冰，能稍微提升校园融入感。",
+    summary: "A first-month orientation gives a small push to campus belonging.",
     supportsRemedy: false,
     effect: {
       stats: {
         mood: 3,
         social: 4,
       },
-      notableFact: "event: freshman-orientation",
+      notableFact: "event:freshman-orientation",
     },
   },
   {
     id: "midterm-pressure",
-    title: "期中压力堆积",
+    title: "Midterm Pressure",
     severity: "important",
+    phase: "monthly",
+    polarity: "negative",
     triggerMonths: [4, 10],
     conditions: ["academic_risk_high"],
-    summary: "课堂信息缺失和拖延会在期中阶段集中爆发。",
+    baseWeight: 7,
+    summary: "Missed material piles up near midterms and makes recovery harder.",
     supportsRemedy: true,
     effect: {
       stats: {
-        stress: 5,
+        stress: 6,
       },
       risk: {
         academicRisk: 4,
       },
       flags: ["midterm-pressure"],
-      notableFact: "event: midterm-pressure",
+      notableFact: "event:midterm-pressure",
     },
   },
   {
     id: "academic-scholarship",
-    title: "奖学金 / 学业认可",
+    title: "Academic Scholarship",
     severity: "important",
+    phase: "monthly",
+    polarity: "positive",
     triggerMonths: ALL_MONTHS,
     conditions: ["academic_streak_high"],
-    maxOccurrences: 1,
-    summary: "最近几个月学业表现持续稳定，学院发来奖学金或专项奖励。",
+    baseWeight: 8,
+    maxOccurrences: 2,
+    summary: "Strong academic momentum can turn into scholarship or school-level recognition.",
     supportsRemedy: false,
     effect: {
       money: scholarshipAmount,
@@ -131,23 +162,54 @@ export const starterEventTemplates: EventRuleTemplate[] = [
         stress: -3,
         fulfillment: 3,
       },
-      notableFact: "event: academic-scholarship",
+      notableFact: "event:academic-scholarship",
       addResume: {
         category: "special_experience",
-        title: "获得学业奖励",
-        summary: "因阶段性学业表现稳定，获得奖学金或院级认可。",
+        title: "Received an academic scholarship",
+        summary: "Academic momentum translated into scholarship or official recognition.",
         tags: ["scholarship", "academic"],
       },
     },
   },
   {
-    id: "social-mutual-aid",
-    title: "朋友帮忙签到 / 带资料",
+    id: "teacher-attention",
+    title: "Teacher Attention",
     severity: "routine",
+    phase: "monthly",
+    polarity: "positive",
+    triggerMonths: ALL_MONTHS,
+    conditions: ["academic_streak_high"],
+    baseWeight: 6,
+    maxOccurrences: 2,
+    summary: "Consistent work gets noticed and opens a little more guidance or opportunity.",
+    supportsRemedy: true,
+    effect: {
+      stats: {
+        mood: 3,
+        fulfillment: 4,
+      },
+      risk: {
+        academicRisk: -3,
+      },
+      notableFact: "event:teacher-attention",
+      addResume: {
+        category: "special_experience",
+        title: "Received faculty recognition",
+        summary: "A teacher noticed consistent work and offered more guidance or opportunities.",
+        tags: ["faculty", "academic"],
+      },
+    },
+  },
+  {
+    id: "social-mutual-aid",
+    title: "Social Mutual Aid",
+    severity: "routine",
+    phase: "monthly",
+    polarity: "positive",
     triggerMonths: ALL_MONTHS,
     conditions: ["social_high"],
-    chance: 0.65,
-    summary: "社交关系好的时候，同学更愿意顺手帮忙签到、带资料或提醒作业。",
+    baseWeight: 6,
+    summary: "Good social ties increase the odds of classmates sharing resources and reminders.",
     supportsRemedy: true,
     effect: {
       stats: {
@@ -157,16 +219,19 @@ export const starterEventTemplates: EventRuleTemplate[] = [
       risk: {
         academicRisk: -2,
       },
-      notableFact: "event: social-mutual-aid",
+      notableFact: "event:social-mutual-aid",
     },
   },
   {
     id: "economic-pressure",
-    title: "经济压力上头",
+    title: "Economic Pressure",
     severity: "critical",
+    phase: "monthly",
+    polarity: "negative",
     triggerMonths: ALL_MONTHS,
     conditions: ["money_low"],
-    summary: "手头太紧会明显挤压情绪和精力，做事也会更焦躁。",
+    baseWeight: 9,
+    summary: "A thin wallet starts distorting mood, bandwidth, and day-to-day choices.",
     supportsRemedy: true,
     effect: {
       stats: {
@@ -178,16 +243,19 @@ export const starterEventTemplates: EventRuleTemplate[] = [
         burnout: 2,
       },
       flags: ["economic-pressure"],
-      notableFact: "event: economic-pressure",
+      notableFact: "event:economic-pressure",
     },
   },
   {
     id: "burnout-slump",
-    title: "摆烂低潮",
+    title: "Burnout Slump",
     severity: "critical",
+    phase: "monthly",
+    polarity: "negative",
     triggerMonths: ALL_MONTHS,
     conditions: ["mood_low", "stress_high"],
-    summary: "心情很差又压力爆表时，容易什么都不想做，学习和工作意愿都会下降。",
+    baseWeight: 10,
+    summary: "High stress and low mood combine into a rough slump that drags everything down.",
     supportsRemedy: true,
     effect: {
       stats: {
@@ -199,7 +267,123 @@ export const starterEventTemplates: EventRuleTemplate[] = [
         burnout: 4,
       },
       flags: ["burnout-slump"],
-      notableFact: "event: burnout-slump",
+      notableFact: "event:burnout-slump",
+    },
+  },
+  {
+    id: "monthly-routine-reset",
+    title: "Routine Reset",
+    severity: "routine",
+    phase: "monthly",
+    polarity: "neutral",
+    triggerMonths: ALL_MONTHS,
+    conditions: ["always"],
+    baseWeight: 2,
+    fallback: true,
+    summary: "Even a quiet month leaves a small trace in routine and self-perception.",
+    supportsRemedy: false,
+    effect: {
+      stats: {
+        mood: 1,
+        fulfillment: 1,
+      },
+      notableFact: "event:monthly-routine-reset",
+    },
+  },
+];
+
+export const actionEventTemplates: EventRuleTemplate[] = [
+  {
+    id: "stress-spillover",
+    title: "Stress Spillover",
+    severity: "important",
+    phase: "action",
+    polarity: "negative",
+    triggerMonths: ALL_MONTHS,
+    actionTypes: ["study", "job_prep", "part_time", "student_activity", "remedy"],
+    conditions: ["stress_high"],
+    baseWeight: 7,
+    summary: "Carrying too much stress makes even normal actions spill into extra strain.",
+    supportsRemedy: true,
+    effect: {
+      stats: {
+        mood: -2,
+        stress: 3,
+      },
+      risk: {
+        burnout: 1,
+      },
+      flags: ["instant-event:stress-spillover"],
+      notableFact: "event:stress-spillover",
+    },
+  },
+  {
+    id: "study-group-help",
+    title: "Study Group Help",
+    severity: "routine",
+    phase: "action",
+    polarity: "positive",
+    triggerMonths: ALL_MONTHS,
+    actionTypes: ["study", "job_prep", "social", "student_activity", "remedy"],
+    conditions: ["social_high"],
+    baseWeight: 6,
+    summary: "Strong social ties sometimes turn into practical help right after an action.",
+    supportsRemedy: true,
+    effect: {
+      stats: {
+        mood: 1,
+        stress: -2,
+      },
+      risk: {
+        academicRisk: -2,
+      },
+      flags: ["instant-event:study-group-help"],
+      notableFact: "event:study-group-help",
+    },
+  },
+  {
+    id: "teacher-nudge",
+    title: "Teacher Nudge",
+    severity: "routine",
+    phase: "action",
+    polarity: "positive",
+    triggerMonths: ALL_MONTHS,
+    actionTypes: ["study", "remedy"],
+    conditions: ["academic_streak_high"],
+    baseWeight: 5,
+    summary: "Strong study momentum can trigger timely encouragement or direction from a teacher.",
+    supportsRemedy: true,
+    effect: {
+      stats: {
+        mood: 2,
+        fulfillment: 2,
+      },
+      risk: {
+        academicRisk: -1,
+      },
+      flags: ["instant-event:teacher-nudge"],
+      notableFact: "event:teacher-nudge",
+    },
+  },
+  {
+    id: "cash-crunch",
+    title: "Cash Crunch",
+    severity: "important",
+    phase: "action",
+    polarity: "negative",
+    triggerMonths: ALL_MONTHS,
+    actionTypes: ["study", "job_prep", "part_time", "social", "relax", "student_activity", "remedy"],
+    conditions: ["money_low"],
+    baseWeight: 8,
+    summary: "Low cash makes follow-through harder and adds distraction after ordinary choices.",
+    supportsRemedy: true,
+    effect: {
+      stats: {
+        mood: -2,
+        stress: 3,
+      },
+      flags: ["instant-event:cash-crunch"],
+      notableFact: "event:cash-crunch",
     },
   },
 ];

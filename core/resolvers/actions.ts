@@ -1,3 +1,5 @@
+import { getWeeklyAllowance, getWeeklyLivingExpense } from "@/data/events";
+import { resolveActionLinkedEvent } from "@/core/resolvers/events";
 import type {
   ActionType,
   DynamicStats,
@@ -29,6 +31,24 @@ function emptyStatsDelta(): DynamicStats {
     fulfillment: 0,
     social: 0,
     semesterAcademics: 0,
+  };
+}
+
+function addStats(base: DynamicStats, delta: DynamicStats): DynamicStats {
+  return {
+    money: base.money + delta.money,
+    mood: Math.min(100, Math.max(0, base.mood + delta.mood)),
+    stress: Math.min(100, Math.max(0, base.stress + delta.stress)),
+    fulfillment: Math.min(100, Math.max(0, base.fulfillment + delta.fulfillment)),
+    social: Math.min(100, Math.max(0, base.social + delta.social)),
+    semesterAcademics: Math.min(100, Math.max(0, base.semesterAcademics + delta.semesterAcademics)),
+  };
+}
+
+function addRisk(base: RiskState, delta: RiskState): RiskState {
+  return {
+    academicRisk: Math.max(0, base.academicRisk + delta.academicRisk),
+    burnout: Math.max(0, base.burnout + delta.burnout),
   };
 }
 
@@ -81,19 +101,23 @@ function countStudyTurnsThisMonth(run: GameRun): number {
 function productivityMultiplier(run: GameRun): number {
   let multiplier = 1;
 
-  if (run.stats.stress >= 85) {
+  if (run.stats.stress >= 90) {
+    multiplier *= 0.4;
+  } else if (run.stats.stress >= 80) {
+    multiplier *= 0.52;
+  } else if (run.stats.stress >= 65) {
+    multiplier *= 0.72;
+  }
+
+  if (run.stats.mood <= 10) {
     multiplier *= 0.55;
-  } else if (run.stats.stress >= 70) {
-    multiplier *= 0.75;
+  } else if (run.stats.mood <= 25) {
+    multiplier *= 0.72;
+  } else if (run.stats.mood <= 40) {
+    multiplier *= 0.86;
   }
 
-  if (run.stats.mood <= 15) {
-    multiplier *= 0.7;
-  } else if (run.stats.mood <= 35) {
-    multiplier *= 0.85;
-  }
-
-  return Math.max(0.35, Number(multiplier.toFixed(2)));
+  return Math.max(0.2, Number(multiplier.toFixed(2)));
 }
 
 function studyStreakMultiplier(run: GameRun, studyCountThisMonth: number): number {
@@ -103,12 +127,15 @@ function studyStreakMultiplier(run: GameRun, studyCountThisMonth: number): numbe
     return 1;
   }
   if (streak === 1) {
-    return 0.82;
+    return 0.74;
   }
   if (streak === 2) {
-    return 0.68;
+    return 0.58;
   }
-  return 0.55;
+  if (streak === 3) {
+    return 0.46;
+  }
+  return 0.34;
 }
 
 function refusalReason(run: GameRun, action: SupportedAction): string | null {
@@ -127,6 +154,30 @@ function isProductiveAction(action: SupportedAction): boolean {
   return action === "study" || action === "job_prep" || action === "part_time" || action === "remedy";
 }
 
+function shouldApplyWeeklySettlement(run: GameRun, action: SupportedAction): boolean {
+  if (action === "big_meal") {
+    return false;
+  }
+
+  const activeMonth = run.activeMonth;
+  if (!activeMonth) {
+    return true;
+  }
+
+  return !activeMonth.turns.some((turn) => turn.week === activeMonth.currentWeek && turn.advancesCalendar);
+}
+
+function projectRun(run: GameRun, statsDelta: DynamicStats, moneyDelta: number, riskDelta: RiskState): GameRun {
+  return {
+    ...run,
+    stats: addStats(run.stats, {
+      ...statsDelta,
+      money: statsDelta.money + moneyDelta,
+    }),
+    risk: addRisk(run.risk, riskDelta),
+  };
+}
+
 export function resolveActionPlan(run: GameRun, plan: MonthlyActionPlan): ActionResolution {
   const stats = emptyStatsDelta();
   const risk: RiskState = {
@@ -139,9 +190,32 @@ export function resolveActionPlan(run: GameRun, plan: MonthlyActionPlan): Action
   let moneyDelta = 0;
   let askFamilyUsed = false;
   let studyCountThisMonth = 0;
+  let projectedRun = run;
+  let monthlyAllowanceCorrected = projectedRun.activeMonth?.allowanceApplied ?? false;
+  let weeklySettlementHandled = false;
 
   for (const requestedAction of plan.actions) {
     const action = requestedAction.action as SupportedAction;
+
+    if (!monthlyAllowanceCorrected) {
+      moneyDelta -= projectedRun.profile.monthlyAllowance;
+      monthlyAllowanceCorrected = true;
+      projectedRun = projectRun(projectedRun, emptyStatsDelta(), -projectedRun.profile.monthlyAllowance, {
+        academicRisk: 0,
+        burnout: 0,
+      });
+    }
+
+    if (!weeklySettlementHandled && shouldApplyWeeklySettlement(projectedRun, action)) {
+      const weeklyBudgetDelta = getWeeklyAllowance(projectedRun) - getWeeklyLivingExpense(projectedRun);
+
+      moneyDelta += weeklyBudgetDelta;
+      weeklySettlementHandled = true;
+      projectedRun = projectRun(projectedRun, emptyStatsDelta(), weeklyBudgetDelta, {
+        academicRisk: 0,
+        burnout: 0,
+      });
+    }
 
     if (action === "part_time" && requestedAction.time === "night") {
       resolvedActions.push({
@@ -154,7 +228,7 @@ export function resolveActionPlan(run: GameRun, plan: MonthlyActionPlan): Action
     }
 
     if (action === "ask_family") {
-      if (run.cooldowns.askFamilyMonths > 0) {
+      if (projectedRun.cooldowns.askFamilyMonths > 0) {
         resolvedActions.push({
           ...requestedAction,
           accepted: false,
@@ -162,10 +236,18 @@ export function resolveActionPlan(run: GameRun, plan: MonthlyActionPlan): Action
         });
         flags.push("ask-family-on-cooldown");
         stats.stress += 2;
+        projectedRun = projectRun(projectedRun, {
+          ...emptyStatsDelta(),
+          stress: 2,
+        }, 0, {
+          academicRisk: 0,
+          burnout: 0,
+        });
         continue;
       }
 
-      const support = familySupportAmount(run.profile.familyBackground);
+      const support = familySupportAmount(projectedRun.profile.familyBackground);
+
       moneyDelta += support;
       stats.stress += 12;
       stats.mood -= 2;
@@ -174,10 +256,18 @@ export function resolveActionPlan(run: GameRun, plan: MonthlyActionPlan): Action
         ...requestedAction,
         accepted: true,
       });
+      projectedRun = projectRun(projectedRun, {
+        ...emptyStatsDelta(),
+        stress: 12,
+        mood: -2,
+      }, support, {
+        academicRisk: 0,
+        burnout: 0,
+      });
       continue;
     }
 
-    const stateRefusalReason = refusalReason(run, action);
+    const stateRefusalReason = refusalReason(projectedRun, action);
     if (stateRefusalReason) {
       resolvedActions.push({
         ...requestedAction,
@@ -186,10 +276,17 @@ export function resolveActionPlan(run: GameRun, plan: MonthlyActionPlan): Action
       });
       flags.push(stateRefusalReason);
       stats.stress += 1;
+      projectedRun = projectRun(projectedRun, {
+        ...emptyStatsDelta(),
+        stress: 1,
+      }, 0, {
+        academicRisk: 0,
+        burnout: 0,
+      });
       continue;
     }
 
-    const efficiency = productivityMultiplier(run);
+    const efficiency = productivityMultiplier(projectedRun);
     resolvedActions.push({
       ...requestedAction,
       accepted: true,
@@ -199,73 +296,113 @@ export function resolveActionPlan(run: GameRun, plan: MonthlyActionPlan): Action
       flags.push("stress-efficiency-penalty");
     }
 
+    const actionStatsDelta = emptyStatsDelta();
+    const actionRiskDelta: RiskState = {
+      academicRisk: 0,
+      burnout: 0,
+    };
+    let actionMoneyDelta = 0;
+
     switch (action) {
       case "study": {
-        const studyMultiplier = Number((efficiency * studyStreakMultiplier(run, studyCountThisMonth)).toFixed(2));
+        const studyMultiplier = Number((efficiency * studyStreakMultiplier(projectedRun, studyCountThisMonth)).toFixed(2));
         studyCountThisMonth += 1;
 
         if (studyMultiplier < 1) {
           flags.push("study-diminishing-returns");
         }
 
-        stats.semesterAcademics += Math.max(2, Math.round(8 * studyMultiplier));
-        stats.stress += 5;
-        stats.mood -= 1;
-        stats.fulfillment += Math.max(1, Math.round(2 * studyMultiplier));
-        risk.academicRisk -= Math.max(1, Math.round(2 * studyMultiplier));
+        if (studyMultiplier <= 0.55) {
+          flags.push("study-efficiency-collapsed");
+        }
+
+        actionStatsDelta.semesterAcademics += Math.max(1, Math.round(6 * studyMultiplier));
+        actionStatsDelta.stress += 6;
+        actionStatsDelta.mood -= studyMultiplier <= 0.5 ? 2 : 1;
+        actionStatsDelta.fulfillment += Math.max(1, Math.round(2 * Math.max(0.6, studyMultiplier)));
+        actionRiskDelta.academicRisk -= Math.max(1, Math.round(2 * Math.max(0.55, studyMultiplier)));
         break;
       }
       case "job_prep":
-        stats.stress += 3;
-        stats.fulfillment += Math.max(1, Math.round(3 * efficiency));
-        stats.money -= 40;
+        actionStatsDelta.stress += 4;
+        actionStatsDelta.fulfillment += Math.max(1, Math.round(2 * efficiency));
+        actionStatsDelta.money -= 60;
         resumeAdditions.push(
-          createResumeItem(run, "简历投递准备", "开始整理方向、修改简历并尝试投递岗位。", "job_progress"),
+          createResumeItem(run, "Resume Sprint", "Started tightening the resume and testing job directions.", "job_progress"),
         );
         break;
       case "part_time":
-        moneyDelta += roundToNearestTen(420 * efficiency);
-        stats.stress += 4;
-        stats.fulfillment += Math.max(1, Math.round(2 * efficiency));
+        actionMoneyDelta += roundToNearestTen(360 * efficiency);
+        actionStatsDelta.stress += 5;
+        actionStatsDelta.fulfillment += Math.max(1, Math.round(2 * efficiency));
         if (efficiency < 0.7) {
-          stats.mood -= 1;
+          actionStatsDelta.mood -= 1;
         }
         break;
       case "social":
-        stats.money -= 120;
-        stats.mood += 4;
-        stats.social += 6;
-        stats.stress -= 1;
+        actionStatsDelta.money -= 120;
+        actionStatsDelta.mood += 4;
+        actionStatsDelta.social += 6;
+        actionStatsDelta.stress -= 1;
         break;
       case "relax":
-        stats.money -= 80;
-        stats.mood += 6;
-        stats.stress -= 5;
+        actionStatsDelta.money -= 80;
+        actionStatsDelta.mood += 6;
+        actionStatsDelta.stress -= 5;
         break;
       case "big_meal":
-        stats.money -= 180;
-        stats.mood += 8;
-        stats.stress -= 6;
-        stats.fulfillment += 1;
+        actionStatsDelta.money -= 180;
+        actionStatsDelta.mood += 8;
+        actionStatsDelta.stress -= 6;
         break;
       case "student_activity":
-        stats.money -= 30;
-        stats.mood += 2;
-        stats.social += 4;
-        stats.fulfillment += Math.max(2, Math.round(4 * Math.max(0.75, efficiency)));
+        actionStatsDelta.money -= 30;
+        actionStatsDelta.mood += 2;
+        actionStatsDelta.social += 4;
+        actionStatsDelta.fulfillment += Math.max(2, Math.round(3 * Math.max(0.75, efficiency)));
         resumeAdditions.push(
-          createResumeItem(run, "校园活动参与", "参加讲座、社团或学生事务活动。", "campus_activity"),
+          createResumeItem(run, "Campus Activity", "Joined a lecture, club, or student activity with visible participation.", "campus_activity"),
         );
         break;
       case "remedy":
-        stats.money -= 60;
-        stats.stress -= 6;
-        stats.semesterAcademics += Math.max(3, Math.round(5 * Math.max(0.75, efficiency)));
-        risk.academicRisk -= Math.max(4, Math.round(7 * Math.max(0.75, efficiency)));
+        actionStatsDelta.money -= 60;
+        actionStatsDelta.stress -= 6;
+        actionStatsDelta.semesterAcademics += Math.max(2, Math.round(4 * Math.max(0.65, efficiency)));
+        actionRiskDelta.academicRisk -= Math.max(3, Math.round(6 * Math.max(0.65, efficiency)));
         break;
       default:
         break;
     }
+
+    stats.money += actionStatsDelta.money;
+    stats.mood += actionStatsDelta.mood;
+    stats.stress += actionStatsDelta.stress;
+    stats.fulfillment += actionStatsDelta.fulfillment;
+    stats.social += actionStatsDelta.social;
+    stats.semesterAcademics += actionStatsDelta.semesterAcademics;
+    risk.academicRisk += actionRiskDelta.academicRisk;
+    risk.burnout += actionRiskDelta.burnout;
+    moneyDelta += actionMoneyDelta;
+
+    projectedRun = projectRun(projectedRun, actionStatsDelta, actionMoneyDelta, actionRiskDelta);
+
+    const actionEvent = resolveActionLinkedEvent(projectedRun, action);
+    if (actionEvent.eventId) {
+      flags.push(actionEvent.eventId, ...actionEvent.flags);
+    }
+
+    stats.money += actionEvent.stats.money;
+    stats.mood += actionEvent.stats.mood;
+    stats.stress += actionEvent.stats.stress;
+    stats.fulfillment += actionEvent.stats.fulfillment;
+    stats.social += actionEvent.stats.social;
+    stats.semesterAcademics += actionEvent.stats.semesterAcademics;
+    risk.academicRisk += actionEvent.risk.academicRisk;
+    risk.burnout += actionEvent.risk.burnout;
+    moneyDelta += actionEvent.moneyDelta;
+    resumeAdditions.push(...actionEvent.resumeAdditions);
+
+    projectedRun = projectRun(projectedRun, actionEvent.stats, actionEvent.moneyDelta, actionEvent.risk);
   }
 
   risk.burnout += Math.max(0, Math.round(stats.stress / 4));
