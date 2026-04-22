@@ -16,15 +16,18 @@ export function ReportPreview({
       <article className="rounded-2xl border border-[var(--border)] bg-stone-950 p-5 text-stone-100">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-300">{contractLabel}</p>
         <h3 className="mt-2 text-lg font-semibold">{title}</h3>
-        <pre className="mt-4 overflow-x-auto text-xs leading-6 text-stone-200">
+        <p className="mt-3 text-sm leading-6 text-stone-300">
+          AI 只能读取这一侧的结构化摘要来组织语言，不能新增事实，也不能参与规则判定。
+        </p>
+        <pre className="mt-4 overflow-x-auto rounded-2xl bg-stone-900/80 p-4 text-xs leading-6 text-stone-200">
           {JSON.stringify(promptInput, null, 2)}
         </pre>
       </article>
       <article className="rounded-2xl border border-[var(--border)] bg-white/80 p-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">AI 输出预览</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">玩家可见正文</p>
+        <h3 className="mt-2 text-lg font-semibold text-stone-900">{title}</h3>
         <div className="mt-4 whitespace-pre-wrap text-sm leading-7 text-stone-700">{markdown}</div>
       </article>
     </div>
   );
 }
-

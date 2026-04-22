@@ -21,11 +21,11 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
       <AppShell
         eyebrow="月记"
         title="还没有月记归档。"
-        description="月记页只展示已经写入数据库的 AI 报告。"
+        description="月记页只展示已经保存到数据库里的 AI 月记与其结构化输入。"
       >
-        <SectionCard title="暂无月记" description="先在主游戏页完成至少 1 次月结算。">
+        <SectionCard title="暂无月记" description="先在主游戏页完成至少一次月结算。">
           <p className="text-sm leading-6 text-stone-600">
-            月记一定来自规则层结构化摘要，页面不会凭空生成演示文本。
+            月记只能来自规则层的结构化摘要，这里不会凭空生成演示文本。
           </p>
         </SectionCard>
       </AppShell>
@@ -37,13 +37,15 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
   return (
     <AppShell
       eyebrow="月记"
-      title="AI 月记归档"
-      description="这里保留月记的结构化输入和最终输出，方便检查表达层是否严格受规则层约束。"
+      title="月记归档"
+      description="这里保留每个月的结构化输入和最终月记，方便确认叙事是否忠实地贴着规则层事实。"
     >
       <div className="space-y-6">
         {monthlyReports.length === 0 ? (
           <SectionCard title="暂无月记" description="这局还没有完成过月结算。">
-            <p className="text-sm leading-6 text-stone-600">提交一次月度计划后，这里会自动出现第一篇月记。</p>
+            <p className="text-sm leading-6 text-stone-600">
+              提交一次月度计划后，这里会自动出现第一篇月记。
+            </p>
           </SectionCard>
         ) : (
           monthlyReports
@@ -53,7 +55,7 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
               <SectionCard
                 key={report.id}
                 title={`${formatMonthLabel(report.year, report.month ?? 1)} 月记`}
-                description="每篇月记都和保存时的结构化摘要绑定，便于追踪。"
+                description="每篇月记都和保存时的结构化摘要绑定，便于追踪表达层是否越界。"
               >
                 <ReportPreview
                   title={`${formatMonthLabel(report.year, report.month ?? 1)} 月记`}
@@ -68,4 +70,3 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
     </AppShell>
   );
 }
-
