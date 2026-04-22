@@ -2,17 +2,20 @@ import { randomUUID } from "node:crypto";
 import {
   createInitialGameRun,
   evaluateGraduationOutcome,
+  resolveActionTurn,
   resolveMonthlyTurn,
-  settleSemester
+  settleSemester,
 } from "@/core/game-engine";
 import type { AiReportRequest, AiReportResult } from "@/types/ai";
 import type {
+  ActionTurnPlan,
+  ActionTurnSummary,
   GameRun,
   MonthlyActionPlan,
   ResumeItem,
   SemesterSettlement,
   StructuredEndingSummary,
-  StructuredMonthlySummary
+  StructuredMonthlySummary,
 } from "@/types/game";
 
 type JsonValue = string | number | boolean | null | string[];
@@ -76,6 +79,20 @@ export type DemoRepository = {
   }>): Promise<unknown>;
 };
 
+export type AdvanceDemoTurnResult = {
+  run: GameRun;
+  playedYear: number;
+  playedMonth: number;
+  playedWeek: number;
+  turnSummary: ActionTurnSummary;
+  monthCompleted: boolean;
+  monthlySummary?: StructuredMonthlySummary;
+  monthlyReport?: AiReportResult;
+  semesterSettlement?: SemesterSettlement;
+  endingSummary?: StructuredEndingSummary;
+  endingReport?: AiReportResult;
+};
+
 export type AdvanceDemoMonthResult = {
   run: GameRun;
   playedYear: number;
@@ -99,8 +116,29 @@ function createRunLog(run: GameRun) {
     metadata: {
       schoolTier: run.profile.schoolTier,
       cityTier: run.profile.cityTier,
-      monthlyAllowance: run.profile.monthlyAllowance
-    }
+      monthlyAllowance: run.profile.monthlyAllowance,
+    },
+  };
+}
+
+function createTurnLog(input: {
+  runId: string;
+  year: number;
+  month: number;
+  turnSummary: ActionTurnSummary;
+}) {
+  return {
+    runId: input.runId,
+    year: input.year,
+    month: input.month,
+    logType: "action" as const,
+    message: "weekly turn resolved",
+    metadata: {
+      week: input.turnSummary.week,
+      attendanceStrategy: input.turnSummary.attendanceStrategy,
+      action: input.turnSummary.resolvedAction.action,
+      flags: input.turnSummary.flags,
+    },
   };
 }
 
@@ -130,8 +168,8 @@ function createMonthlyLogs(input: {
     metadata: {
       attendanceStrategy: input.summary.attendanceStrategy,
       actions: input.summary.actions,
-      flags: input.summary.flags
-    }
+      flags: input.summary.flags,
+    },
   });
 
   if (input.summary.eventIds.length > 0) {
@@ -142,8 +180,8 @@ function createMonthlyLogs(input: {
       logType: "event",
       message: "events triggered",
       metadata: {
-        eventIds: input.summary.eventIds
-      }
+        eventIds: input.summary.eventIds,
+      },
     });
   }
 
@@ -155,8 +193,8 @@ function createMonthlyLogs(input: {
     message: "monthly settlement saved",
     metadata: {
       feedback: input.summary.academicFeedback,
-      moneyDelta: input.summary.moneyDelta
-    }
+      moneyDelta: input.summary.moneyDelta,
+    },
   });
 
   if (input.semesterSettlement) {
@@ -169,8 +207,8 @@ function createMonthlyLogs(input: {
       metadata: {
         semester: input.semesterSettlement.semester,
         feedback: input.semesterSettlement.feedback,
-        passed: input.semesterSettlement.passed
-      }
+        passed: input.semesterSettlement.passed,
+      },
     });
   }
 
@@ -182,8 +220,8 @@ function createMonthlyLogs(input: {
       logType: "settlement",
       message: "ending summary saved",
       metadata: {
-        outcome: input.endingSummary.outcome
-      }
+        outcome: input.endingSummary.outcome,
+      },
     });
   }
 
@@ -200,9 +238,103 @@ function mapResumeItems(run: GameRun, month: number, items: ResumeItem[]) {
     summary: item.summary,
     sourceItemId: item.id,
     metadata: {
-      tags: item.tags
-    }
+      tags: item.tags,
+    },
   }));
+}
+
+async function persistMonthArtifacts(input: {
+  repository: DemoRepository;
+  runId: string;
+  playedYear: number;
+  playedMonth: number;
+  nextRun: GameRun;
+  monthlySummary: StructuredMonthlySummary;
+  generateReport: ReportGenerator;
+}) {
+  let settledRun = input.nextRun;
+  let semesterSettlement: SemesterSettlement | undefined;
+
+  if (input.playedMonth % 6 === 0) {
+    const settlement = settleSemester(settledRun);
+    settledRun = settlement.run;
+    semesterSettlement = settlement.summary;
+  }
+
+  const monthlyReport = await input.generateReport({
+    kind: "monthly_journal",
+    runId: input.runId,
+    year: input.playedYear,
+    month: input.playedMonth,
+    summary: input.monthlySummary,
+  });
+
+  await input.repository.saveMonthlyState({
+    runId: input.runId,
+    year: input.playedYear,
+    month: input.playedMonth,
+    snapshot: input.monthlySummary,
+  });
+  await input.repository.saveAiReport({
+    runId: input.runId,
+    year: input.playedYear,
+    month: input.playedMonth,
+    reportType: "monthly_journal",
+    inputSummary: input.monthlySummary,
+    outputMarkdown: monthlyReport.markdown,
+    model: monthlyReport.model ?? null,
+  });
+
+  if (input.monthlySummary.resumeAdditions.length > 0) {
+    await input.repository.saveResumeItems(
+      mapResumeItems(settledRun, input.playedMonth, input.monthlySummary.resumeAdditions),
+    );
+  }
+
+  let endingSummary: StructuredEndingSummary | undefined;
+  let endingReport: AiReportResult | undefined;
+
+  if (input.playedYear === 4 && input.playedMonth === 12) {
+    endingSummary = evaluateGraduationOutcome(settledRun);
+    endingReport = await input.generateReport({
+      kind: "ending_report",
+      runId: input.runId,
+      summary: endingSummary,
+    });
+    settledRun = {
+      ...settledRun,
+      status: "completed",
+    };
+
+    await input.repository.saveAiReport({
+      runId: input.runId,
+      year: input.playedYear,
+      month: null,
+      reportType: "ending_report",
+      inputSummary: endingSummary,
+      outputMarkdown: endingReport.markdown,
+      model: endingReport.model ?? null,
+    });
+  }
+
+  await input.repository.writeEventLogs(
+    createMonthlyLogs({
+      runId: input.runId,
+      year: input.playedYear,
+      month: input.playedMonth,
+      summary: input.monthlySummary,
+      semesterSettlement,
+      endingSummary,
+    }),
+  );
+
+  return {
+    nextRun: settledRun,
+    monthlyReport,
+    semesterSettlement,
+    endingSummary,
+    endingReport,
+  };
 }
 
 export async function createDemoRun(input: {
@@ -212,7 +344,7 @@ export async function createDemoRun(input: {
 }) {
   const run = createInitialGameRun({
     id: input.runId ?? randomUUID(),
-    randomValues: input.randomValues
+    randomValues: input.randomValues,
   });
 
   await input.repository.createRun({
@@ -220,11 +352,84 @@ export async function createDemoRun(input: {
     currentYear: run.currentYear,
     currentMonth: run.currentMonth,
     profile: run.profile,
-    currentState: run
+    currentState: run,
   });
   await input.repository.writeEventLogs([createRunLog(run)]);
 
   return { run };
+}
+
+export async function advanceDemoTurn(input: {
+  repository: DemoRepository;
+  runId: string;
+  plan: ActionTurnPlan;
+  generateReport: ReportGenerator;
+}): Promise<AdvanceDemoTurnResult> {
+  const existing = await input.repository.getRun(input.runId);
+
+  if (!existing) {
+    throw new Error(`Run ${input.runId} was not found.`);
+  }
+
+  const baseRun = existing.current_state_json;
+  const playedYear = baseRun.currentYear;
+  const playedMonth = baseRun.currentMonth;
+  const playedWeek = baseRun.activeMonth?.currentWeek ?? 1;
+  const turnResult = resolveActionTurn(baseRun, input.plan);
+  let nextRun = turnResult.run;
+  let monthlyReport: AiReportResult | undefined;
+  let semesterSettlement: SemesterSettlement | undefined;
+  let endingSummary: StructuredEndingSummary | undefined;
+  let endingReport: AiReportResult | undefined;
+
+  await input.repository.writeEventLogs([
+    createTurnLog({
+      runId: input.runId,
+      year: playedYear,
+      month: playedMonth,
+      turnSummary: turnResult.turnSummary,
+    }),
+  ]);
+
+  if (turnResult.monthCompleted && turnResult.monthlySummary) {
+    const monthArtifacts = await persistMonthArtifacts({
+      repository: input.repository,
+      runId: input.runId,
+      playedYear,
+      playedMonth,
+      nextRun,
+      monthlySummary: turnResult.monthlySummary,
+      generateReport: input.generateReport,
+    });
+
+    nextRun = monthArtifacts.nextRun;
+    monthlyReport = monthArtifacts.monthlyReport;
+    semesterSettlement = monthArtifacts.semesterSettlement;
+    endingSummary = monthArtifacts.endingSummary;
+    endingReport = monthArtifacts.endingReport;
+  }
+
+  await input.repository.updateRun(input.runId, {
+    status: nextRun.status,
+    currentYear: nextRun.currentYear,
+    currentMonth: nextRun.currentMonth,
+    profile: nextRun.profile,
+    currentState: nextRun,
+  });
+
+  return {
+    run: nextRun,
+    playedYear,
+    playedMonth,
+    playedWeek,
+    turnSummary: turnResult.turnSummary,
+    monthCompleted: turnResult.monthCompleted,
+    monthlySummary: turnResult.monthlySummary,
+    monthlyReport,
+    semesterSettlement,
+    endingSummary,
+    endingReport,
+  };
 }
 
 export async function advanceDemoMonth(input: {
@@ -243,98 +448,41 @@ export async function advanceDemoMonth(input: {
   const playedYear = baseRun.currentYear;
   const playedMonth = baseRun.currentMonth;
   const monthlyResult = resolveMonthlyTurn(baseRun, input.plan);
-  let nextRun = monthlyResult.run;
-  let semesterSettlement: SemesterSettlement | undefined;
-
-  if (playedMonth % 6 === 0) {
-    const settlement = settleSemester(nextRun);
-    nextRun = settlement.run;
-    semesterSettlement = settlement.summary;
-  }
-
-  const monthlyReport = await input.generateReport({
-    kind: "monthly_journal",
+  const monthArtifacts = await persistMonthArtifacts({
+    repository: input.repository,
     runId: input.runId,
-    year: playedYear,
-    month: playedMonth,
-    summary: monthlyResult.summary
+    playedYear,
+    playedMonth,
+    nextRun: monthlyResult.run,
+    monthlySummary: monthlyResult.summary,
+    generateReport: input.generateReport,
   });
 
-  await input.repository.saveMonthlyState({
-    runId: input.runId,
-    year: playedYear,
-    month: playedMonth,
-    snapshot: monthlyResult.summary
-  });
-  await input.repository.saveAiReport({
-    runId: input.runId,
-    year: playedYear,
-    month: playedMonth,
-    reportType: "monthly_journal",
-    inputSummary: monthlyResult.summary,
-    outputMarkdown: monthlyReport.markdown,
-    model: monthlyReport.model ?? null
-  });
-
-  if (monthlyResult.summary.resumeAdditions.length > 0) {
-    await input.repository.saveResumeItems(
-      mapResumeItems(baseRun, playedMonth, monthlyResult.summary.resumeAdditions)
-    );
-  }
-
-  let endingSummary: StructuredEndingSummary | undefined;
-  let endingReport: AiReportResult | undefined;
-
-  if (playedYear === 4 && playedMonth === 12) {
-    endingSummary = evaluateGraduationOutcome(nextRun);
-    endingReport = await input.generateReport({
-      kind: "ending_report",
-      runId: input.runId,
-      summary: endingSummary
-    });
-    nextRun = {
-      ...nextRun,
-      status: "completed"
-    };
-
-    await input.repository.saveAiReport({
-      runId: input.runId,
-      year: playedYear,
-      month: null,
-      reportType: "ending_report",
-      inputSummary: endingSummary,
-      outputMarkdown: endingReport.markdown,
-      model: endingReport.model ?? null
-    });
-  }
-
-  await input.repository.writeEventLogs(
-    createMonthlyLogs({
+  await input.repository.writeEventLogs([
+    createTurnLog({
       runId: input.runId,
       year: playedYear,
       month: playedMonth,
-      summary: monthlyResult.summary,
-      semesterSettlement,
-      endingSummary
-    })
-  );
+      turnSummary: monthlyResult.summary.turns.at(-1) ?? monthlyResult.summary.turns[0],
+    }),
+  ]);
+
   await input.repository.updateRun(input.runId, {
-    status: nextRun.status,
-    currentYear: nextRun.currentYear,
-    currentMonth: nextRun.currentMonth,
-    profile: nextRun.profile,
-    currentState: nextRun
+    status: monthArtifacts.nextRun.status,
+    currentYear: monthArtifacts.nextRun.currentYear,
+    currentMonth: monthArtifacts.nextRun.currentMonth,
+    profile: monthArtifacts.nextRun.profile,
+    currentState: monthArtifacts.nextRun,
   });
 
   return {
-    run: nextRun,
+    run: monthArtifacts.nextRun,
     playedYear,
     playedMonth,
     monthlySummary: monthlyResult.summary,
-    monthlyReport,
-    semesterSettlement,
-    endingSummary,
-    endingReport
+    monthlyReport: monthArtifacts.monthlyReport,
+    semesterSettlement: monthArtifacts.semesterSettlement,
+    endingSummary: monthArtifacts.endingSummary,
+    endingReport: monthArtifacts.endingReport,
   };
 }
-

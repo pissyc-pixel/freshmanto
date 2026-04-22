@@ -2,8 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { advanceServerDemoMonth, createServerDemoRun } from "@/lib/demo/server";
-import type { ActionTime, ActionType, CourseAttendanceStrategy, MonthlyActionPlan } from "@/types/game";
+import { advanceServerDemoTurn, createServerDemoRun } from "@/lib/demo/server";
+import type { ActionTime, ActionType, CourseAttendanceStrategy } from "@/types/game";
 
 const attendanceSchema = z.enum([
   "serious",
@@ -32,24 +32,14 @@ function readString(formData: FormData, key: string) {
   return typeof value === "string" ? value : "";
 }
 
-function parseActions(formData: FormData) {
-  const actions: MonthlyActionPlan["actions"] = [];
+function parseActionTurn(formData: FormData) {
+  const action = actionSchema.parse(readString(formData, "action")) as ActionType;
+  const time = timeSchema.parse(readString(formData, "time") || "night") as ActionTime;
 
-  for (const slot of [1, 2, 3] as const) {
-    const actionValue = readString(formData, `action-${slot}`);
-    const timeValue = readString(formData, `time-${slot}`);
-
-    if (!actionValue) {
-      continue;
-    }
-
-    const action = actionSchema.parse(actionValue) as ActionType;
-    const time = timeSchema.parse(timeValue || "day") as ActionTime;
-
-    actions.push({ action, time });
-  }
-
-  return actions;
+  return {
+    action,
+    time,
+  };
 }
 
 export async function startNewRunAction() {
@@ -57,23 +47,20 @@ export async function startNewRunAction() {
   redirect(`/game?runId=${result.run.id}`);
 }
 
-export async function submitMonthlyPlanAction(formData: FormData) {
+export async function submitActionTurnAction(formData: FormData) {
   const runId = z.string().min(1).parse(readString(formData, "runId"));
   const attendanceStrategy = attendanceSchema.parse(
-    readString(formData, "attendanceStrategy")
+    readString(formData, "attendanceStrategy"),
   ) as CourseAttendanceStrategy;
-  const actions = parseActions(formData);
-
-  if (actions.length === 0) {
-    throw new Error("At least one action is required to settle the month.");
-  }
-
-  const result = await advanceServerDemoMonth(runId, {
+  const action = parseActionTurn(formData);
+  const result = await advanceServerDemoTurn(runId, {
     attendanceStrategy,
-    actions
+    action,
   });
 
-  redirect(
-    `/settlement?runId=${runId}&year=${result.playedYear}&month=${result.playedMonth}`
-  );
+  if (result.monthCompleted) {
+    redirect(`/settlement?runId=${runId}&year=${result.playedYear}&month=${result.playedMonth}`);
+  }
+
+  redirect(`/game?runId=${runId}`);
 }

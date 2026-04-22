@@ -1,9 +1,9 @@
 import { ensureDemoSchema } from "@/db/ensure-schema";
 import { generateAiReport } from "@/lib/ai/reports";
 import { createServerSupabaseRepository } from "@/lib/supabase";
-import { advanceDemoMonth, createDemoRun } from "@/lib/demo/run-service";
+import { advanceDemoMonth, advanceDemoTurn, createDemoRun } from "@/lib/demo/run-service";
 import { evaluateGraduationOutcome } from "@/core/game-engine";
-import type { MonthlyActionPlan } from "@/types/game";
+import type { ActionTurnPlan, MonthlyActionPlan } from "@/types/game";
 
 export async function createServerDemoRun() {
   await ensureDemoSchema();
@@ -21,6 +21,18 @@ export async function advanceServerDemoMonth(runId: string, plan: MonthlyActionP
     runId,
     plan,
     generateReport: generateAiReport
+  });
+}
+
+export async function advanceServerDemoTurn(runId: string, plan: ActionTurnPlan) {
+  await ensureDemoSchema();
+  const repository = createServerSupabaseRepository();
+
+  return advanceDemoTurn({
+    repository,
+    runId,
+    plan,
+    generateReport: generateAiReport,
   });
 }
 
@@ -68,4 +80,3 @@ export async function getServerEndingPreview(runId: string) {
     savedEndingReport
   };
 }
-

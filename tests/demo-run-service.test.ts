@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createInitialGameRun } from "@/core/game-engine";
+import { createInitialGameRun, createWeeklyCalendar, resolveActionTurn } from "@/core/game-engine";
 import type {
   AIReportRecord,
   GameEventLogRecord,
@@ -9,8 +9,14 @@ import type {
   RunRecord
 } from "@/types/db";
 import type { AiReportRequest, AiReportResult } from "@/types/ai";
-import type { GameRun, MonthlyActionPlan, StructuredEndingSummary, StructuredMonthlySummary } from "@/types/game";
-import { advanceDemoMonth, createDemoRun } from "@/lib/demo/run-service";
+import type {
+  ActionTurnPlan,
+  GameRun,
+  MonthlyActionPlan,
+  StructuredEndingSummary,
+  StructuredMonthlySummary,
+} from "@/types/game";
+import { advanceDemoMonth, advanceDemoTurn, createDemoRun } from "@/lib/demo/run-service";
 
 type InMemoryStore = {
   run: RunRecord | null;
@@ -182,6 +188,40 @@ async function fakeAiReport(input: AiReportRequest): Promise<AiReportResult> {
 }
 
 describe("demo run service", () => {
+  it("builds a 4-week calendar where weekdays stay busy, Tuesday/Thursday are half-free, and weekends are free", () => {
+    const calendar = createWeeklyCalendar(1);
+
+    expect(calendar).toHaveLength(4);
+    expect(calendar.every((week) => week.days.length === 7)).toBe(true);
+    expect(
+      calendar.every((week) =>
+        week.days.map((day) => day.weekday).join(",") === "mon,tue,wed,thu,fri,sat,sun",
+      ),
+    ).toBe(true);
+    expect(
+      calendar.every(
+        (week) =>
+          week.days.find((day) => day.weekday === "tue")?.dayType === "half_free" &&
+          week.days.find((day) => day.weekday === "thu")?.dayType === "half_free",
+      ),
+    ).toBe(true);
+    expect(
+      calendar.every(
+        (week) =>
+          week.days.find((day) => day.weekday === "sat")?.dayType === "free" &&
+          week.days.find((day) => day.weekday === "sun")?.dayType === "free",
+      ),
+    ).toBe(true);
+    expect(
+      calendar.every(
+        (week) =>
+          week.days.find((day) => day.weekday === "mon")?.dayType === "busy_day" &&
+          week.days.find((day) => day.weekday === "wed")?.dayType === "busy_day" &&
+          week.days.find((day) => day.weekday === "fri")?.dayType === "busy_day",
+      ),
+    ).toBe(true);
+  });
+
   it("creates a new run and persists the initial state", async () => {
     const store = createStore();
 
@@ -193,6 +233,63 @@ describe("demo run service", () => {
     expect(result.run.id).toBeTruthy();
     expect(store.run?.current_state_json.id).toBe(result.run.id);
     expect(store.logs[0]?.message).toContain("run created");
+  });
+
+  it("advances one weekly turn immediately without finalizing the whole month", async () => {
+    const store = createStore();
+    const run = createInitialGameRun({
+      id: "run-turn",
+      randomValues: [0.2, 0.6, 0.4, 0.5, 0.3, 0.1, 0.7, 0.2]
+    });
+    store.run = {
+      id: run.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      status: "active",
+      current_year: run.currentYear,
+      current_month: run.currentMonth,
+      profile_json: run.profile,
+      current_state_json: run
+    };
+
+    const plan: ActionTurnPlan = {
+      attendanceStrategy: "mixed",
+      action: { action: "study", time: "night" }
+    };
+
+    const result = await advanceDemoTurn({
+      repository: createRepository(store),
+      runId: run.id,
+      plan,
+      generateReport: fakeAiReport
+    });
+
+    expect(result.monthCompleted).toBe(false);
+    expect(result.turnSummary.week).toBe(1);
+    expect(result.run.currentMonth).toBe(1);
+    expect(result.run.activeMonth?.currentWeek).toBe(2);
+    expect(result.run.activeMonth?.turns).toHaveLength(1);
+    expect(store.monthlyStates).toHaveLength(0);
+    expect(store.aiReports).toHaveLength(0);
+    expect(store.logs.some((log) => log.message === "weekly turn resolved")).toBe(true);
+  });
+
+  it("tracks skipping and proxy choices through risk and cost instead of direct academic penalties", () => {
+    const run = createInitialGameRun({
+      id: "attendance-chain",
+      randomValues: [0.42, 0.33, 0.51, 0.64, 0.58, 0.45, 0.7, 0.2]
+    });
+
+    const result = resolveActionTurn(run, {
+      attendanceStrategy: "proxy",
+      action: { action: "job_prep", time: "night" }
+    });
+
+    expect(result.turnSummary.course.directRollCallPenalty).toBe(0);
+    expect(result.turnSummary.course.rollCallRiskDelta).toBeGreaterThan(0);
+    expect(result.turnSummary.course.usualScoreRiskDelta).toBeGreaterThan(0);
+    expect(result.turnSummary.course.proxyCost).toBeGreaterThan(0);
+    expect(result.turnSummary.moneyDelta).toBeLessThan(run.profile.monthlyAllowance);
   });
 
   it("advances one month, stores the summary, logs, report, and updated run state", async () => {
@@ -233,6 +330,50 @@ describe("demo run service", () => {
     expect(store.aiReports[0]?.report_type).toBe("monthly_journal");
     expect(store.logs.length).toBeGreaterThanOrEqual(2);
     expect(store.run?.current_state_json.currentMonth).toBe(2);
+  });
+
+  it("finalizes the month only after the fourth weekly turn and then writes the monthly artifacts", async () => {
+    const store = createStore();
+    const run = createInitialGameRun({
+      id: "run-four-weeks",
+      randomValues: [0.2, 0.6, 0.4, 0.5, 0.3, 0.1, 0.7, 0.2]
+    });
+    store.run = {
+      id: run.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      status: "active",
+      current_year: run.currentYear,
+      current_month: run.currentMonth,
+      profile_json: run.profile,
+      current_state_json: run
+    };
+
+    const repository = createRepository(store);
+    let latestRun = run;
+    let finalResult:
+      | Awaited<ReturnType<typeof advanceDemoTurn>>
+      | undefined;
+
+    for (let week = 1; week <= 4; week += 1) {
+      finalResult = await advanceDemoTurn({
+        repository,
+        runId: latestRun.id,
+        plan: {
+          attendanceStrategy: week < 4 ? "mixed" : "serious",
+          action: { action: week % 2 === 0 ? "study" : "social", time: "night" }
+        },
+        generateReport: fakeAiReport
+      });
+      latestRun = finalResult.run;
+    }
+
+    expect(finalResult?.monthCompleted).toBe(true);
+    expect(finalResult?.monthlySummary?.turns).toHaveLength(4);
+    expect(finalResult?.run.currentMonth).toBe(2);
+    expect(finalResult?.run.activeMonth).toBeUndefined();
+    expect(store.monthlyStates).toHaveLength(1);
+    expect(store.aiReports[0]?.report_type).toBe("monthly_journal");
   });
 
   it("marks the run completed and saves an ending report after year 4 month 12", async () => {

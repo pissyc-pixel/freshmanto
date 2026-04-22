@@ -40,6 +40,8 @@ export type ActionTime = "day" | "night";
 
 export type TimeBlockKind = "free" | "half_free" | "busy_day";
 
+export type Weekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+
 export type ResumeCategory =
   | "internship"
   | "project"
@@ -119,6 +121,19 @@ export type ScheduledDay = {
   availableTimes: ActionTime[];
 };
 
+export type ScheduledWeekday = {
+  weekday: Weekday;
+  label: string;
+  dayType: TimeBlockKind;
+  availableTimes: ActionTime[];
+};
+
+export type ScheduledWeek = {
+  week: number;
+  label: string;
+  days: ScheduledWeekday[];
+};
+
 export type PlannedAction = {
   action: ActionType;
   time: ActionTime;
@@ -134,13 +149,23 @@ export type MonthlyActionPlan = {
   actions: PlannedAction[];
 };
 
+export type ActionTurnPlan = {
+  attendanceStrategy: CourseAttendanceStrategy;
+  action: PlannedAction;
+};
+
 export type CourseResolution = {
   strategy: CourseAttendanceStrategy;
   attendanceCounted: boolean;
   directRollCallPenalty: number;
+  rollCallRiskDelta: number;
+  usualScoreRiskDelta: number;
+  proxyCost: number;
+  remedyPressure: number;
   academicRiskDelta: number;
   academicGain: number;
   moodDelta: number;
+  stressDelta: number;
   note?: string;
 };
 
@@ -160,11 +185,42 @@ export type SemesterRecord = {
   passed: boolean;
 };
 
+export type ActionTurnSummary = {
+  turn: number;
+  week: number;
+  slotLabel: string;
+  attendanceStrategy: CourseAttendanceStrategy;
+  chosenAction: PlannedAction;
+  resolvedAction: ResolvedAction;
+  statsBefore: DynamicStats;
+  statsAfter: DynamicStats;
+  statsDelta: DynamicStats;
+  moneyDelta: number;
+  flags: string[];
+  notableFacts: string[];
+  allowanceApplied: boolean;
+  course: CourseResolution;
+};
+
+export type ActiveMonthState = {
+  year: number;
+  month: number;
+  currentWeek: number;
+  totalWeeks: number;
+  allowanceApplied: boolean;
+  cooldownsAtStart: CooldownState;
+  weeklyCalendar: ScheduledWeek[];
+  statsAtStart: DynamicStats;
+  turns: ActionTurnSummary[];
+  lastResolvedTurn?: ActionTurnSummary;
+};
+
 export type StructuredMonthlySummary = {
   month: number;
   actions: ActionType[];
   attendanceStrategy: CourseAttendanceStrategy;
   schedule: ScheduledDay[];
+  weeklyCalendar: ScheduledWeek[];
   statsBefore: DynamicStats;
   statsAfter: DynamicStats;
   statsDelta: DynamicStats;
@@ -177,6 +233,7 @@ export type StructuredMonthlySummary = {
   flags: string[];
   cooldowns: CooldownState;
   course: CourseResolution;
+  turns: ActionTurnSummary[];
 };
 
 export type SemesterSettlement = {
@@ -210,6 +267,7 @@ export type GameRun = {
   cooldowns: CooldownState;
   risk: RiskState;
   riskFlags: string[];
+  activeMonth?: ActiveMonthState;
 };
 
 export type InitialGameRunOptions = {
@@ -225,4 +283,11 @@ export type ResolvedMonthResult = {
 export type SemesterSettlementResult = {
   run: GameRun;
   summary: SemesterSettlement;
+};
+
+export type ResolvedTurnResult = {
+  run: GameRun;
+  turnSummary: ActionTurnSummary;
+  monthCompleted: boolean;
+  monthlySummary?: StructuredMonthlySummary;
 };
