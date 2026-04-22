@@ -339,6 +339,27 @@ describe("monthly resolution", () => {
     expect(nextRun.stats.money).toBeLessThan(pressuredRun.stats.money);
   });
 
+  it("still settles weekly allowance and living costs when the player ends a week after only zero-time actions", () => {
+    const run = withMonth(
+      createInitialGameRun({
+        id: "zero-time-week-end-run",
+        randomValues: [0.31, 0.24, 0.4, 0.52, 0.68, 0.19, 0.28, 0.41],
+      }),
+      4,
+    );
+    const weeklyBudgetDelta = getWeeklyAllowance(run) - getWeeklyLivingExpense(run);
+
+    const mealTurn = resolveActionTurn(run, {
+      attendanceStrategy: "mixed",
+      action: createBigMealAction(),
+    });
+    const endedWeek = resolveWeekEnd(mealTurn.run, "mixed");
+
+    expect(mealTurn.turnSummary.advancesCalendar).toBe(false);
+    expect(endedWeek.run.activeMonth?.currentWeek).toBe(2);
+    expect(endedWeek.run.stats.money).toBe(run.stats.money - 180 + weeklyBudgetDelta);
+  });
+
   it("reduces study gains across repeated weekly turns in the same month", () => {
     const run = withMonth(
       createInitialGameRun({

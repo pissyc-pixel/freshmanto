@@ -13,6 +13,7 @@ import {
   buildPlayerFacingMonthlyLog,
   formatAttendanceStrategy,
   formatMonthLabel,
+  formatReleasedClassDayList,
   formatStatLabel,
 } from "@/lib/demo/options";
 import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
@@ -139,7 +140,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
             <p>
               已释放的课程白天：
               {currentWeekState.releasedClassDays.length > 0
-                ? ` ${schedule.find((week) => week.isCurrent)?.timeSummary?.replace("这周已经腾出来的上课白天：", "")}`
+                ? ` ${formatReleasedClassDayList(currentWeekState.releasedClassDays)}`
                 : " 暂无"}
             </p>
             <p>

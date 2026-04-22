@@ -2,6 +2,7 @@ import { submitActionTurnAction } from "@/app/actions";
 import {
   actionTimeOptions,
   attendanceStrategyOptions,
+  formatReleasedClassDayList,
 } from "@/lib/demo/options";
 import { actionOptions, skipClassDayOptions } from "@/components/action-plan-form-options";
 import type { CourseAttendanceStrategy, Weekday } from "@/types/game";
@@ -37,7 +38,7 @@ export function ActionPlanForm({
         </p>
         <p className="mt-2 text-xs text-stone-500">
           已释放的白天课程日：
-          {releasedClassDays.length > 0 ? ` ${releasedClassDays.join(", ")}` : " 暂无"}
+          {releasedClassDays.length > 0 ? ` ${formatReleasedClassDayList(releasedClassDays)}` : " 暂无"}
         </p>
       </div>
 

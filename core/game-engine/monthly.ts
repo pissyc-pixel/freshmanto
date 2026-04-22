@@ -2,6 +2,7 @@ import { createInitialGameRun } from "@/core/generators";
 import { resolveActionPlan } from "@/core/resolvers/actions";
 import { resolveCourseStrategy } from "@/core/resolvers/attendance";
 import { resolveMonthEvents } from "@/core/resolvers/events";
+import { getWeeklyAllowance, getWeeklyLivingExpense } from "@/data/events";
 import {
   createMonthlySchedule,
   createWeekTimeState,
@@ -331,11 +332,16 @@ function finalizeCurrentWeek(input: {
   endedEarly: boolean;
   attachCourseToLastTurn: boolean;
 }) {
-  const allowanceDelta = input.activeMonth.allowanceApplied ? 0 : input.run.profile.monthlyAllowance;
+  const weeklySettlementHandled = input.activeMonth.turns.some(
+    (turn) => turn.week === input.activeMonth.currentWeek && turn.advancesCalendar,
+  );
+  const weeklyBudgetDelta = weeklySettlementHandled
+    ? 0
+    : getWeeklyAllowance(input.run) - getWeeklyLivingExpense(input.run);
   const course = resolveCourseStrategy(input.attendanceStrategy, {
     skippedClassDays: input.activeMonth.currentWeekState.releasedClassDays,
   });
-  const statsAfter = addStats(input.run.stats, createCourseStatsDelta(course, allowanceDelta));
+  const statsAfter = addStats(input.run.stats, createCourseStatsDelta(course, weeklyBudgetDelta));
   const riskAfter = mergeRisk(input.run.risk, {
     academicRisk: course.academicRiskDelta,
     burnout: Math.max(0, Math.round(course.stressDelta / 4)),

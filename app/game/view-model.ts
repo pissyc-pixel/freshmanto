@@ -1,28 +1,18 @@
 import { createWeekTimeState } from "@/core/resolvers/schedule";
 import {
+  formatReleasedClassDayList,
   formatPlayerFacingFact,
   formatPlayerFacingFlag,
+  formatTimeBlockKind,
 } from "@/lib/demo/options";
-import { formatTimeBlockKind } from "@/lib/demo/options";
 import type {
   ActionTurnSummary,
   ActiveMonthState,
   ActiveWeekState,
   ScheduledWeek,
-  Weekday,
 } from "@/types/game";
 
-const weekdayClassDayLabels: Record<Weekday, string> = {
-  mon: "周一白天",
-  tue: "周二白天",
-  wed: "周三白天",
-  thu: "周四白天",
-  fri: "周五白天",
-  sat: "周六白天",
-  sun: "周日白天",
-};
-
-const weekdayLabels: Record<Weekday, string> = {
+const weekdayLabels = {
   mon: "周一",
   tue: "周二",
   wed: "周三",
@@ -31,10 +21,6 @@ const weekdayLabels: Record<Weekday, string> = {
   sat: "周六",
   sun: "周日",
 };
-
-function formatReleasedClassDays(days: Weekday[]): string {
-  return days.map((day) => weekdayClassDayLabels[day]).join("、");
-}
 
 function uniqueLines(lines: string[]): string[] {
   return [...new Set(lines.filter((line) => line.trim().length > 0))];
@@ -70,7 +56,7 @@ export function buildWeeklyScheduleBlocks(input: {
     timeSummary:
       week.week === input.currentWeek
         ? input.currentWeekState.releasedClassDays.length > 0
-          ? `这周已经腾出来的上课白天：${formatReleasedClassDays(input.currentWeekState.releasedClassDays)}`
+          ? `这周已经腾出来的上课白天：${formatReleasedClassDayList(input.currentWeekState.releasedClassDays)}`
           : "这周还没有额外腾出来的上课白天"
         : undefined,
     days: week.days.map((day) => {
@@ -103,7 +89,7 @@ export function buildCurrentActionFeedback(input: {
 
   const eventLines = uniqueLines([
     turn.releasedClassDays && turn.releasedClassDays.length > 0
-      ? `这周已经腾出来的白天：${formatReleasedClassDays(turn.releasedClassDays)}。`
+      ? `上一轮腾出来的白天：${formatReleasedClassDayList(turn.releasedClassDays)}。`
       : "",
     !turn.advancesCalendar ? "这一步没有消耗正式行动时间。" : "",
     ...turn.notableFacts.map(formatPlayerFacingFact),

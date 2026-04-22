@@ -37,24 +37,6 @@ function emptyStatsDelta(): DynamicStats {
   };
 }
 
-function addStats(base: DynamicStats, delta: DynamicStats): DynamicStats {
-  return {
-    money: base.money + delta.money,
-    mood: Math.min(100, Math.max(0, base.mood + delta.mood)),
-    stress: Math.min(100, Math.max(0, base.stress + delta.stress)),
-    fulfillment: Math.min(100, Math.max(0, base.fulfillment + delta.fulfillment)),
-    social: Math.min(100, Math.max(0, base.social + delta.social)),
-    semesterAcademics: Math.min(100, Math.max(0, base.semesterAcademics + delta.semesterAcademics)),
-  };
-}
-
-function addRisk(base: RiskState, delta: RiskState): RiskState {
-  return {
-    academicRisk: Math.max(0, base.academicRisk + delta.academicRisk),
-    burnout: Math.max(0, base.burnout + delta.burnout),
-  };
-}
-
 function countEventOccurrences(run: GameRun, eventId: string): number {
   return run.monthlySummaries.reduce(
     (count, summary) => count + summary.eventIds.filter((id) => id === eventId).length,

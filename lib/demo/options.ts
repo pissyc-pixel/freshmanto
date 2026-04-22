@@ -13,6 +13,7 @@ import type {
   StructuredMonthlySummary,
   Talent,
   TimeBlockKind,
+  Weekday,
 } from "@/types/game";
 
 export const attendanceStrategyOptions: Array<{
@@ -127,7 +128,7 @@ const systemLogTypeLabels = {
   settlement: "结算留档",
 } as const;
 
-const weekdayClassDayLabels = {
+const weekdayClassDayLabels: Record<Weekday, string> = {
   mon: "周一白天",
   tue: "周二白天",
   wed: "周三白天",
@@ -187,13 +188,17 @@ function formatWeekLabel(week: number): string {
   return `第${week}周`;
 }
 
+function mapWeekdaysToClassDays(days: Weekday[]): string {
+  return days.map((day) => weekdayClassDayLabels[day]).join("、");
+}
+
 function formatClassDayList(rawDays: string): string {
-  return rawDays
+  const weekdays = rawDays
     .split(",")
     .map((day) => day.trim())
-    .filter((day): day is keyof typeof weekdayClassDayLabels => day in weekdayClassDayLabels)
-    .map((day) => weekdayClassDayLabels[day])
-    .join("、");
+    .filter((day): day is Weekday => day in weekdayClassDayLabels);
+
+  return mapWeekdaysToClassDays(weekdays);
 }
 
 function describeRejectionReason(reason?: string): string {
@@ -407,6 +412,10 @@ export function formatGraduationOutcome(value: GraduationOutcome): string {
 
 export function formatTimeBlockKind(value: TimeBlockKind): string {
   return timeBlockLabels[value];
+}
+
+export function formatReleasedClassDayList(days: Weekday[]): string {
+  return mapWeekdaysToClassDays(days);
 }
 
 export function formatStatLabel(key: keyof DynamicStats): string {

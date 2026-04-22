@@ -110,7 +110,7 @@ describe("game page view-model helpers", () => {
 
     expect(feedback.nextStepHint).toContain("本周还剩 11 / 13 个半天");
     expect(feedback.nextStepHint).toContain("还能继续安排正式行动");
-    expect(feedback.eventLines).toContain("这周已经腾出来的白天：周一白天、周三白天。");
+    expect(feedback.eventLines).toContain("上一轮腾出来的白天：周一白天、周三白天。");
     expect(feedback.eventLines).toContain("这一步没有消耗正式行动时间。");
     expect(feedback.eventLines.join(" ")).not.toContain("mon");
     expect(feedback.eventLines.join(" ")).not.toContain("wed");

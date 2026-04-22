@@ -204,7 +204,17 @@ describe("demo run service", () => {
     const calendar = createWeeklyCalendar(1);
 
     expect(calendar).toHaveLength(4);
+    expect(calendar[0]?.label).toBe("第 1 周");
     expect(calendar.every((week) => week.days.length === 7)).toBe(true);
+    expect(calendar[0]?.days.map((day) => day.label)).toEqual([
+      "周一",
+      "周二",
+      "周三",
+      "周四",
+      "周五",
+      "周六",
+      "周日",
+    ]);
     expect(
       calendar.every((week) =>
         week.days.map((day) => day.weekday).join(",") === "mon,tue,wed,thu,fri,sat,sun",
@@ -278,6 +288,7 @@ describe("demo run service", () => {
 
     expect(result.monthCompleted).toBe(false);
     expect(result.turnSummary.week).toBe(1);
+    expect(result.turnSummary.slotLabel).toBe("第 1 周");
     expect(result.run.currentMonth).toBe(1);
     expect(result.run.activeMonth?.currentWeek).toBe(1);
     expect(result.run.activeMonth?.turns).toHaveLength(1);

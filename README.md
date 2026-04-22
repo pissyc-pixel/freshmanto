@@ -114,7 +114,7 @@ npm run lint
 npm run build
 ```
 
-本轮主 agent 整合完成后，`npm test` 与 `npm run build` 已通过；`npm run lint` 当前无 error，但仍有 2 条待清理 warning。
+本轮主 agent 整合与审查修补完成后，这三条命令都已通过。
 
 ## 已知限制
 

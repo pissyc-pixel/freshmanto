@@ -45,13 +45,13 @@ const MONTH_PATTERN: TimeBlockKind[] = [
 const WEEKDAY_ORDER: Weekday[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 
 const WEEKDAY_LABELS: Record<Weekday, string> = {
-  mon: "Mon",
-  tue: "Tue",
-  wed: "Wed",
-  thu: "Thu",
-  fri: "Fri",
-  sat: "Sat",
-  sun: "Sun",
+  mon: "周一",
+  tue: "周二",
+  wed: "周三",
+  thu: "周四",
+  fri: "周五",
+  sat: "周六",
+  sun: "周日",
 };
 
 const COURSE_LOCKED_DAYTIME_WEEKDAYS: Weekday[] = ["mon", "wed", "fri"];
@@ -112,7 +112,7 @@ export function createWeeklyCalendar(month: number): ScheduledWeek[] {
 
   return Array.from({ length: 4 }, (_, index) => ({
     week: index + 1,
-    label: `Week ${index + 1}`,
+    label: `第 ${index + 1} 周`,
     days: WEEKDAY_ORDER.map((weekday) => createScheduledWeekday(weekday)),
   }));
 }
