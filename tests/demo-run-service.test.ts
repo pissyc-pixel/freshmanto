@@ -332,6 +332,140 @@ describe("demo run service", () => {
     expect(store.monthlyStates).toHaveLength(0);
   });
 
+  it("allows multiple time-cost actions in the same week until the pool is exhausted, then auto-settles into the next week", async () => {
+    const store = createStore();
+    const run = createInitialGameRun({
+      id: "run-week-chain",
+      randomValues: [0.2, 0.6, 0.4, 0.5, 0.3, 0.1, 0.7, 0.2]
+    });
+    store.run = {
+      id: run.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      status: "active",
+      current_year: run.currentYear,
+      current_month: run.currentMonth,
+      profile_json: run.profile,
+      current_state_json: run
+    };
+
+    const repository = createRepository(store);
+    const weeklyPlans: ActionTurnPlan[] = [
+      { attendanceStrategy: "mixed", action: { action: "job_prep", time: "day" } },
+      { attendanceStrategy: "mixed", action: { action: "job_prep", time: "day" } },
+      { attendanceStrategy: "mixed", action: { action: "job_prep", time: "day" } },
+      { attendanceStrategy: "mixed", action: { action: "job_prep", time: "day" } },
+      { attendanceStrategy: "mixed", action: { action: "job_prep", time: "day" } },
+      { attendanceStrategy: "mixed", action: { action: "study", time: "night" } }
+    ];
+    let latestResult:
+      | Awaited<ReturnType<typeof advanceDemoTurn>>
+      | undefined;
+
+    for (const [index, plan] of weeklyPlans.entries()) {
+      latestResult = await advanceDemoTurn({
+        repository,
+        runId: run.id,
+        plan,
+        generateReport: fakeAiReport
+      });
+
+      if (index < weeklyPlans.length - 1) {
+        expect(latestResult.monthCompleted).toBe(false);
+        expect(latestResult.playedWeek).toBe(1);
+        expect(latestResult.run.activeMonth?.currentWeek).toBe(1);
+      }
+    }
+
+    expect(latestResult?.monthCompleted).toBe(false);
+    expect(latestResult?.turnSummary.week).toBe(1);
+    expect(latestResult?.turnSummary.weekCompleted).toBe(true);
+    expect(latestResult?.run.activeMonth?.currentWeek).toBe(2);
+    expect(latestResult?.run.activeMonth?.completedWeeks[0]).toMatchObject({
+      week: 1,
+      attendanceStrategy: "mixed",
+      endedEarly: false,
+    });
+    expect(readCurrentWeekState(latestResult?.run as GameRun)).toMatchObject({
+      totalTimeUnits: 11,
+      remainingTimeUnits: 11,
+      releasedClassDays: [],
+    });
+    expect(store.monthlyStates).toHaveLength(0);
+    expect(store.aiReports).toHaveLength(0);
+  });
+
+  it("keeps the run in the same week after multiple actions until the player manually ends that week", async () => {
+    const store = createStore();
+    const run = createInitialGameRun({
+      id: "run-manual-week-end",
+      randomValues: [0.2, 0.6, 0.4, 0.5, 0.3, 0.1, 0.7, 0.2]
+    });
+    store.run = {
+      id: run.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      status: "active",
+      current_year: run.currentYear,
+      current_month: run.currentMonth,
+      profile_json: run.profile,
+      current_state_json: run
+    };
+
+    const repository = createRepository(store);
+
+    const firstAction = await advanceDemoTurn({
+      repository,
+      runId: run.id,
+      plan: {
+        attendanceStrategy: "mixed",
+        action: { action: "study", time: "night" }
+      },
+      generateReport: fakeAiReport
+    });
+    const secondAction = await advanceDemoTurn({
+      repository,
+      runId: run.id,
+      plan: {
+        attendanceStrategy: "mixed",
+        action: { action: "social", time: "night" }
+      },
+      generateReport: fakeAiReport
+    });
+
+    expect(firstAction.run.activeMonth?.currentWeek).toBe(1);
+    expect(secondAction.run.activeMonth?.currentWeek).toBe(1);
+    expect(secondAction.run.activeMonth?.turns).toHaveLength(2);
+    expect(readCurrentWeekState(secondAction.run)).toMatchObject({
+      totalTimeUnits: 11,
+      remainingTimeUnits: 9,
+      releasedClassDays: [],
+    });
+
+    const weekEndResult = await endDemoWeek({
+      repository,
+      runId: run.id,
+      attendanceStrategy: "mixed",
+      generateReport: fakeAiReport,
+    });
+
+    expect(weekEndResult.monthCompleted).toBe(false);
+    expect(weekEndResult.playedWeek).toBe(1);
+    expect(weekEndResult.run.activeMonth?.currentWeek).toBe(2);
+    expect(weekEndResult.run.activeMonth?.completedWeeks[0]).toMatchObject({
+      week: 1,
+      attendanceStrategy: "mixed",
+      endedEarly: true,
+    });
+    expect(readCurrentWeekState(weekEndResult.run)).toMatchObject({
+      totalTimeUnits: 11,
+      remainingTimeUnits: 11,
+      releasedClassDays: [],
+    });
+    expect(store.monthlyStates).toHaveLength(0);
+    expect(store.aiReports).toHaveLength(0);
+  });
+
   it("lets skip_class release locked class time without directly changing academics on the action step", async () => {
     const store = createStore();
     const run = createInitialGameRun({
@@ -372,6 +506,89 @@ describe("demo run service", () => {
       remainingTimeUnits: 13,
       releasedClassDays: ["mon", "wed"],
     });
+  });
+
+  it("treats skip_class days as optional and lets released daytime blocks be used by later actions in the same week", async () => {
+    const store = createStore();
+    const run = createInitialGameRun({
+      id: "run-optional-skip-days",
+      randomValues: [0.2, 0.6, 0.4, 0.5, 0.3, 0.1, 0.7, 0.2]
+    });
+    store.run = {
+      id: run.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      status: "active",
+      current_year: run.currentYear,
+      current_month: run.currentMonth,
+      profile_json: run.profile,
+      current_state_json: run
+    };
+
+    const repository = createRepository(store);
+    const skipNothing = await advanceDemoTurn({
+      repository,
+      runId: run.id,
+      plan: {
+        attendanceStrategy: "mixed",
+        action: {
+          action: "skip_class",
+          time: "day",
+          skipClassDays: [],
+        },
+      },
+      generateReport: fakeAiReport
+    });
+
+    expect(skipNothing.monthCompleted).toBe(false);
+    expect(skipNothing.turnSummary.statsDelta.semesterAcademics).toBe(0);
+    expect(readCurrentWeekState(skipNothing.run)).toMatchObject({
+      totalTimeUnits: 11,
+      remainingTimeUnits: 11,
+      releasedClassDays: [],
+    });
+
+    const skipLockedDays = await advanceDemoTurn({
+      repository,
+      runId: run.id,
+      plan: {
+        attendanceStrategy: "mixed",
+        action: {
+          action: "skip_class",
+          time: "day",
+          skipClassDays: ["mon", "wed"],
+        },
+      },
+      generateReport: fakeAiReport
+    });
+
+    expect(skipLockedDays.monthCompleted).toBe(false);
+    expect(skipLockedDays.turnSummary.statsDelta.semesterAcademics).toBe(0);
+    expect(readCurrentWeekState(skipLockedDays.run)).toMatchObject({
+      totalTimeUnits: 13,
+      remainingTimeUnits: 13,
+      releasedClassDays: ["mon", "wed"],
+    });
+
+    const followUpAction = await advanceDemoTurn({
+      repository,
+      runId: run.id,
+      plan: {
+        attendanceStrategy: "mixed",
+        action: { action: "job_prep", time: "day" }
+      },
+      generateReport: fakeAiReport
+    });
+
+    expect(followUpAction.monthCompleted).toBe(false);
+    expect(followUpAction.playedWeek).toBe(1);
+    expect(followUpAction.run.activeMonth?.currentWeek).toBe(1);
+    expect(readCurrentWeekState(followUpAction.run)).toMatchObject({
+      totalTimeUnits: 13,
+      remainingTimeUnits: 11,
+      releasedClassDays: ["mon", "wed"],
+    });
+    expect(followUpAction.run.stats.semesterAcademics).toBe(run.stats.semesterAcademics);
   });
 
   it("tracks skipping and proxy choices through risk and cost at week settlement instead of direct academic penalties", () => {
