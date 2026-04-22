@@ -33,9 +33,12 @@ export type ActionType =
   | "social"
   | "relax"
   | "student_activity"
-  | "remedy";
+  | "remedy"
+  | "ask_family";
 
-export type TimeBlockKind = "free" | "half_free" | "busy_day" | "busy_night";
+export type ActionTime = "day" | "night";
+
+export type TimeBlockKind = "free" | "half_free" | "busy_day";
 
 export type ResumeCategory =
   | "internship"
@@ -49,6 +52,13 @@ export type EventSeverity = "routine" | "important" | "critical";
 export type GraduationOutcome = "graduate" | "delayed" | "cannot_graduate" | "drop_out";
 
 export type SemesterFeedback = "excellent" | "stable" | "strained" | "warning" | "critical";
+
+export type EventTriggerCondition =
+  | "always"
+  | "money_low"
+  | "stress_high"
+  | "academic_risk_high"
+  | "social_low";
 
 export type StarterProfile = {
   talents: Talent[];
@@ -78,25 +88,102 @@ export type ResumeItem = {
   tags: string[];
 };
 
+export type EventEffect = {
+  stats?: Partial<DynamicStats>;
+  money?: number;
+  academicRisk?: number;
+  addResume?: {
+    category: ResumeCategory;
+    title: string;
+    summary: string;
+    tags: string[];
+  };
+  flags?: string[];
+  notableFact?: string;
+};
+
 export type EventTemplate = {
   id: string;
   title: string;
   severity: EventSeverity;
-  triggerMonth?: number;
+  triggerMonths: number[];
+  condition: EventTriggerCondition;
   summary: string;
   supportsRemedy: boolean;
+  effect: EventEffect;
+};
+
+export type ScheduledDay = {
+  day: number;
+  dayType: TimeBlockKind;
+  availableTimes: ActionTime[];
+};
+
+export type PlannedAction = {
+  action: ActionType;
+  time: ActionTime;
+};
+
+export type ResolvedAction = PlannedAction & {
+  accepted: boolean;
+  reason?: string;
+};
+
+export type MonthlyActionPlan = {
+  attendanceStrategy: CourseAttendanceStrategy;
+  actions: PlannedAction[];
+};
+
+export type CourseResolution = {
+  strategy: CourseAttendanceStrategy;
+  attendanceCounted: boolean;
+  directRollCallPenalty: number;
+  academicRiskDelta: number;
+  academicGain: number;
+  moodDelta: number;
+  note?: string;
+};
+
+export type CooldownState = {
+  askFamilyMonths: number;
+};
+
+export type RiskState = {
+  academicRisk: number;
+  burnout: number;
+};
+
+export type SemesterRecord = {
+  semester: number;
+  academicScore: number;
+  feedback: SemesterFeedback;
+  passed: boolean;
 };
 
 export type StructuredMonthlySummary = {
   month: number;
   actions: ActionType[];
   attendanceStrategy: CourseAttendanceStrategy;
+  schedule: ScheduledDay[];
   statsBefore: DynamicStats;
   statsAfter: DynamicStats;
+  statsDelta: DynamicStats;
+  moneyDelta: number;
   academicFeedback: SemesterFeedback;
   eventIds: string[];
   resumeAdditions: ResumeItem[];
   notableFacts: string[];
+  resolvedActions: ResolvedAction[];
+  flags: string[];
+  cooldowns: CooldownState;
+  course: CourseResolution;
+};
+
+export type SemesterSettlement = {
+  semester: number;
+  academicScore: number;
+  feedback: SemesterFeedback;
+  passed: boolean;
 };
 
 export type StructuredEndingSummary = {
@@ -112,10 +199,30 @@ export type GameRun = {
   status: "active" | "completed";
   currentYear: number;
   currentMonth: number;
+  currentSemester: number;
   profile: StarterProfile;
   stats: DynamicStats;
   semesterAverage: number;
   resume: ResumeItem[];
   logLineIds: string[];
+  monthlySummaries: StructuredMonthlySummary[];
+  semesters: SemesterRecord[];
+  cooldowns: CooldownState;
+  risk: RiskState;
+  riskFlags: string[];
 };
 
+export type InitialGameRunOptions = {
+  id?: string;
+  randomValues?: number[];
+};
+
+export type ResolvedMonthResult = {
+  run: GameRun;
+  summary: StructuredMonthlySummary;
+};
+
+export type SemesterSettlementResult = {
+  run: GameRun;
+  summary: SemesterSettlement;
+};
