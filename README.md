@@ -1,6 +1,6 @@
-# 大学生模拟器 v0.2 本地 Demo
+# 大学生模拟器 v0.2 朋友内测版 Demo
 
-这是一个以“大学四年时间管理”为主题的本地可运行 Demo。当前版本重点不是继续堆功能，而是把第一轮“能跑”的工程闭环，修成更接近“能玩”的生活模拟体验。
+这是一个以“大学四年时间管理”为主题的 Next.js Demo。当前版本重点不是正式公测，而是让本地闭环和 VPS 朋友内测都能稳定跑起来。
 
 当前实现坚持以下边界：
 
@@ -91,6 +91,8 @@
 
 如果没有可用的 AI 配置，系统会自动退回到本地 fallback 月记 / 结局报告，不会阻塞 Demo 试玩。
 
+完整环境变量说明见 [`docs/environment.md`](docs/environment.md)。仓库提供了 `.env.example`，只包含占位符，不包含真实 secret。
+
 ## 本地运行
 
 ```bash
@@ -115,6 +117,27 @@ npm run build
 ```
 
 本轮主 agent 整合与审查修补完成后，这三条命令都已通过。
+
+## VPS 朋友内测部署
+
+推荐使用 PM2 + Nginx + Next.js 生产模式：
+
+```bash
+npm ci
+npm run build
+pm2 start ecosystem.config.js --env production
+```
+
+Nginx 反向代理示例在 [`deploy/nginx/freshmanto-beta.conf.example`](deploy/nginx/freshmanto-beta.conf.example)。
+
+详细部署步骤见 [`docs/deployment.md`](docs/deployment.md)，包括：
+
+- VPS 依赖安装
+- 生产环境变量区分
+- PM2 启动和重启
+- Nginx 反向代理
+- HTTPS 配置建议
+- 更新部署流程
 
 ## 已知限制
 

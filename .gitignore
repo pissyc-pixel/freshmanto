@@ -6,8 +6,11 @@ coverage
 *.log
 .DS_Store
 Thumbs.db
+.env
+.env.production
+.env.development
 .env.local
 .env*.local
+!.env.example
 .worktrees
 worktrees
-
