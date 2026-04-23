@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { startNewRunAction } from "@/app/actions";
 import { createWeeklyCalendar } from "@/core/game-engine";
 import { ActionResultCard } from "@/components/action-result-card";
 import { AppShell } from "@/components/app-shell";
@@ -116,6 +117,14 @@ export default async function GamePage({ searchParams }: GamePageProps) {
           >
             查看履历与日志
           </Link>
+          <form action={startNewRunAction}>
+            <button
+              type="submit"
+              className="rounded-full border border-red-900/15 bg-red-50/80 px-5 py-3 font-semibold text-red-900 transition hover:bg-red-100"
+            >
+              重开新档
+            </button>
+          </form>
         </>
       }
     >

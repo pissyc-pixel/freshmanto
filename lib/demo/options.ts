@@ -23,9 +23,6 @@ export const attendanceStrategyOptions: Array<{
 }> = [
   { value: "serious", label: "认真上课", description: "课堂收益最稳，但留给自己的缓冲最少。" },
   { value: "mixed", label: "正常混课", description: "兼顾课程和生活，适合作为默认策略。" },
-  { value: "skip_sometimes", label: "偶尔翘课", description: "能喘口气，但点名和平时分风险会慢慢积累。" },
-  { value: "skip_often", label: "经常翘课", description: "风险滚得很快，属于高风险玩法。" },
-  { value: "proxy", label: "代课 / 代签到", description: "花钱保出勤，但后续补救成本会更高。" },
   { value: "phone", label: "上课刷手机", description: "算出勤，但会错过课堂信息，学业隐患会变多。" },
 ];
 

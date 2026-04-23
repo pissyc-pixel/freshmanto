@@ -155,7 +155,7 @@ function isProductiveAction(action: SupportedAction): boolean {
 }
 
 function shouldApplyWeeklySettlement(run: GameRun, action: SupportedAction): boolean {
-  if (action === "big_meal") {
+  if (action === "big_meal" || action === "ask_family" || action === "skip_class") {
     return false;
   }
 

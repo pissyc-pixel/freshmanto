@@ -21,9 +21,6 @@ export type CityTier = "tier_1" | "tier_2" | "tier_3";
 export type CourseAttendanceStrategy =
   | "serious"
   | "mixed"
-  | "skip_sometimes"
-  | "skip_often"
-  | "proxy"
   | "phone";
 
 export type ActionType =

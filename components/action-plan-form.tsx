@@ -44,7 +44,7 @@ export function ActionPlanForm({
 
       <div className="space-y-3">
         <label className="text-sm font-semibold text-stone-800" htmlFor="attendanceStrategy">
-          本周课程策略
+          本周上课状态
         </label>
         <select
           id="attendanceStrategy"
@@ -89,7 +89,7 @@ export function ActionPlanForm({
 
         <div className="mt-4 rounded-2xl border border-dashed border-[var(--border)] bg-stone-50/80 p-4">
           <p className="text-sm font-semibold text-stone-900">
-            `skip_class` 只在选择该动作时生效
+            翘课只在选择独立行为时生效
           </p>
           <p className="mt-2 text-sm leading-6 text-stone-600">
             这一步不会直接扣学业值，只会把本周还被课程锁住的白天整块释放出来，并把代价转成点名风险、
@@ -117,8 +117,7 @@ export function ActionPlanForm({
 
       <div className="rounded-2xl border border-dashed border-[var(--border)] bg-white/60 px-4 py-3 text-sm leading-6 text-stone-600">
         周一 / 三 / 五默认只有夜间，周二 / 四有白天 + 夜间，周六 / 日是完整双时段。
-        `job_prep` 和 `part_time` 会消耗 2 个半天；`big_meal`、`ask_family`、`skip_class`
-        都是 0 时间动作。
+        实习准备和兼职会消耗 2 个半天；吃大餐、向家里要钱、翘课都是 0 时间动作。
       </div>
 
       <div className="flex flex-wrap gap-3">

@@ -12,9 +12,6 @@ import type { ActionTime, ActionType, CourseAttendanceStrategy } from "@/types/g
 const attendanceSchema = z.enum([
   "serious",
   "mixed",
-  "skip_sometimes",
-  "skip_often",
-  "proxy",
   "phone"
 ]);
 

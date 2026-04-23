@@ -14,8 +14,9 @@ const guardrails = [
 
 const flow = [
   "点击“开新档”创建一局真实 run，并写入数据库。",
-  "在主游戏页查看随机开局、状态、时间分布与行动表单。",
-  "提交月度计划后进入月结算页，生成并保存 AI 月记。",
+  "在主游戏页查看随机开局、当前状态、本周时间池与行动表单。",
+  "每次只结算一个动作，看到反馈后可以继续安排、提前结束本周或重开新档。",
+  "四周结束后进入月结算页，生成并保存 AI 月记。",
   "可以继续查看履历、日志、月记归档和当前结局预览。"
 ];
 
@@ -44,6 +45,19 @@ export default function StartPage() {
         </>
       }
     >
+      <SectionCard
+        title="朋友内测版说明"
+        description="这不是正式公测版本，适合通过域名邀请朋友试玩并收集反馈。"
+      >
+        <FactList
+          items={[
+            "当前重点是验证“周内时间池 + 即时反馈 + 月末日记”的玩法闭环。",
+            "数据会写入测试库；试玩时可以随时开新档，不需要保留长期存档。",
+            "如果 AI 服务不可用，系统会自动使用本地 fallback 月记，不影响继续试玩。"
+          ]}
+        />
+      </SectionCard>
+
       <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <SectionCard
           title="当前 Demo 的硬边界"
@@ -68,4 +82,3 @@ export default function StartPage() {
     </AppShell>
   );
 }
-

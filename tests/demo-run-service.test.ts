@@ -602,20 +602,22 @@ describe("demo run service", () => {
     expect(followUpAction.run.stats.semesterAcademics).toBe(run.stats.semesterAcademics);
   });
 
-  it("tracks skipping and proxy choices through risk and cost at week settlement instead of direct academic penalties", () => {
+  it("tracks independent class skipping through risk and proxy cost at week settlement instead of direct academic penalties", () => {
     const run = createInitialGameRun({
       id: "attendance-chain",
       randomValues: [0.42, 0.33, 0.51, 0.64, 0.58, 0.45, 0.7, 0.2]
     });
 
     const actionResult = resolveActionTurn(run, {
-      attendanceStrategy: "proxy",
-      action: { action: "job_prep", time: "night" }
+      attendanceStrategy: "mixed",
+      action: { action: "skip_class", time: "day", skipClassDays: ["mon"] }
     });
-    const result = resolveWeekEnd(actionResult.run, "proxy");
+    const result = resolveWeekEnd(actionResult.run, "mixed");
 
     expect(actionResult.turnSummary.course.directRollCallPenalty).toBe(0);
     expect(actionResult.turnSummary.statsDelta.semesterAcademics).toBe(0);
+    expect(actionResult.turnSummary.statsDelta.money).toBe(0);
+    expect(actionResult.turnSummary.releasedClassDays).toEqual(["mon"]);
     expect(result.run.activeMonth?.currentWeek).toBe(2);
     expect(result.run.stats.money).toBeLessThan(run.stats.money + run.profile.monthlyAllowance);
     expect(result.run.risk.academicRisk).toBeGreaterThan(run.risk.academicRisk);

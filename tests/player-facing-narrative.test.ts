@@ -11,6 +11,7 @@ import { LogFeed } from "@/components/log-feed";
 import { ReportPreview } from "@/components/report-preview";
 import { buildEndingReportPrompt } from "@/core/prompts/ending-report";
 import { buildMonthlyJournalPrompt } from "@/core/prompts/monthly-journal";
+import { attendanceStrategyOptions } from "@/lib/demo/options";
 import {
   renderEndingReportFallback,
   renderMonthlyJournalFallback,
@@ -233,6 +234,16 @@ describe("player-facing narrative helpers", () => {
     ]);
   });
 
+  it("keeps truancy out of weekly attendance strategy options", () => {
+    expect(attendanceStrategyOptions.map((item) => item.value)).toEqual([
+      "serious",
+      "mixed",
+      "phone",
+    ]);
+    expect(attendanceStrategyOptions.map((item) => item.label).join("、")).not.toContain("翘课");
+    expect(actionOptions.find((item) => item.value === "skip_class")?.label).toContain("不去上课");
+  });
+
   it("renders a player-readable action result card with time impact and next-step guidance", () => {
     const markup = renderToStaticMarkup(
       createElement(ActionResultCard, {
@@ -255,6 +266,40 @@ describe("player-facing narrative helpers", () => {
     expect(markup).toContain("学业 0");
     expect(markup).toContain("这周时间还没推进，你还能继续安排本周的正式行动");
     expect(markup).not.toContain("系统");
+  });
+
+  it("renders action-specific humane outcome sentences", () => {
+    const bigMealMarkup = renderToStaticMarkup(
+      createElement(ActionResultCard, {
+        turn: monthlyInput.summary.turns[1],
+        nextStepHint: "这周时间还没推进，你还能继续安排正式行动。",
+      }),
+    );
+    const skipClassMarkup = renderToStaticMarkup(
+      createElement(ActionResultCard, {
+        turn: {
+          ...monthlyInput.summary.turns[1],
+          chosenAction: { action: "skip_class", time: "day", skipClassDays: ["mon"] },
+          resolvedAction: { action: "skip_class", time: "day", accepted: true, skipClassDays: ["mon"] },
+          statsDelta: {
+            money: 0,
+            mood: 2,
+            stress: -1,
+            fulfillment: 0,
+            social: 0,
+            semesterAcademics: 0,
+          },
+          releasedClassDays: ["mon"],
+          notableFacts: ["skip_class released mon daytime blocks"],
+        },
+        nextStepHint: "你刚腾出了白天，可以继续安排这一周的行动。",
+      }),
+    );
+
+    expect(bigMealMarkup).toContain("这顿大餐有点奢侈");
+    expect(bigMealMarkup).toContain("吃完确实舒服多了");
+    expect(skipClassMarkup).toContain("短时间轻松了");
+    expect(skipClassMarkup).toContain("埋下了一点隐患");
   });
 
   it("renders player log feed copy in natural Chinese", () => {

@@ -32,8 +32,27 @@ function buildOutcomeSentence(turn: ActionTurnSummary): string {
     return `这一步原本想做「${actionLabel}」，但最后没有做成。课程这边还是按「${attendanceLabel}」往前走，这一轮更像是临时停了一下。`;
   }
 
-  if (!turn.advancesCalendar) {
-    return `这次做的是「${actionLabel}」这种即时安排，状态已经立刻变化，但本周时间还没往前走，所以你还能继续安排正式行动。`;
+  switch (turn.resolvedAction.action) {
+    case "study":
+      return `你这两天啃了不少书，虽然有点累，但心里踏实了一点。课程这边走的是「${attendanceLabel}」，这一步已经占用了本周时间。`;
+    case "job_prep":
+      return `你把时间花在简历、投递和面试准备上，短期不一定立刻见效，但履历这条线往前挪了一步。`;
+    case "part_time":
+      return `你挤出时间去赚了一笔辛苦钱，钱包缓了一点，身体和压力也跟着吃了点苦。`;
+    case "social":
+      return `你把一些时间留给了人和关系，可能没那么“高效”，但校园生活也因此没那么孤零零。`;
+    case "relax":
+      return `你给自己放了个小假，事情没有凭空消失，但绷太紧的那根弦终于松了一点。`;
+    case "big_meal":
+      return `这顿大餐有点奢侈，不过吃完确实舒服多了。钱少了一截，但压力也跟着松了一口气，而且没有占掉本周时间。`;
+    case "student_activity":
+      return `你去参加了点校园活动，像是把自己从课表和宿舍之间拽出来透了口气，也给履历留下了一点痕迹。`;
+    case "remedy":
+      return `你开始处理之前堆下来的麻烦，过程不轻松，但至少风险没有继续放任它滚大。`;
+    case "ask_family":
+      return `你还是向家里开了口，手头确实宽了一点，可那种不好意思和压力也一起留下来了。`;
+    case "skip_class":
+      return `你逃掉了这节课，短时间轻松了，也腾出了一块白天时间，但点名和平时分那里已经埋下了一点隐患。`;
   }
 
   return `这次把「${actionLabel}」正式落在了本周里，课程这边走的是「${attendanceLabel}」，这一轮已经结算进本月进度。`;
