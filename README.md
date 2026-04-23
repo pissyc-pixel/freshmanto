@@ -139,6 +139,8 @@ Nginx 反向代理示例在 [`deploy/nginx/freshmanto-beta.conf.example`](deploy
 - HTTPS 配置建议
 - 更新部署流程
 
+部署后可以访问 `/api/health` 做最小健康检查。该端点只返回配置是否存在的布尔值，不返回任何 secret。
+
 ## 已知限制
 
 - 当前“按次行动”是按周推进，不是细到每天或每个半天。
