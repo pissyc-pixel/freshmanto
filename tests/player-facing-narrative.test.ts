@@ -13,6 +13,10 @@ import { ReportPreview } from "@/components/report-preview";
 import { buildEndingReportPrompt } from "@/core/prompts/ending-report";
 import { buildMonthlyJournalPrompt } from "@/core/prompts/monthly-journal";
 import {
+  actionEventTemplates,
+  starterEventTemplates,
+} from "@/data/events";
+import {
   attendanceStrategyOptions,
   formatActionType,
   formatPlayerFacingFact,
@@ -26,6 +30,8 @@ import type {
   EndingReportPromptInput,
   MonthlyJournalPromptInput,
 } from "@/types/ai";
+
+const eventTemplates = [...starterEventTemplates, ...actionEventTemplates];
 
 const monthlyInput: MonthlyJournalPromptInput = {
   kind: "monthly_journal",
@@ -273,6 +279,39 @@ describe("player-facing narrative helpers", () => {
       expect(formatted).not.toBe(fact);
       expect(formatted).not.toContain(fact);
       expect(formatted).not.toContain("event:");
+    }
+  });
+
+  it.each(
+    eventTemplates
+      .map((template) => ({
+        eventId: template.id,
+        fact: template.effect.notableFact,
+      }))
+      .filter(
+        (entry): entry is { eventId: string; fact: string } =>
+          typeof entry.fact === "string" && entry.fact.startsWith("event:"),
+      ),
+  )("formats event notable fact for $eventId without leaking the raw fact", ({ fact }) => {
+    const formatted = formatPlayerFacingFact(fact);
+
+    expect(formatted).not.toBe(fact);
+    expect(formatted).not.toContain("event:");
+  });
+
+  it.each(
+    eventTemplates.flatMap((template) =>
+      (template.effect.flags ?? []).map((flag) => ({
+        eventId: template.id,
+        flag,
+      })),
+    ),
+  )("formats event flag for $eventId without leaking the raw flag", ({ flag }) => {
+    const formatted = formatPlayerFacingFlag(flag);
+
+    expect(formatted).not.toBe(flag);
+    if (flag.includes(":")) {
+      expect(formatted).not.toContain(flag);
     }
   });
 
