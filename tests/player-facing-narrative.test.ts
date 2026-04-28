@@ -11,7 +11,12 @@ import { LogFeed } from "@/components/log-feed";
 import { ReportPreview } from "@/components/report-preview";
 import { buildEndingReportPrompt } from "@/core/prompts/ending-report";
 import { buildMonthlyJournalPrompt } from "@/core/prompts/monthly-journal";
-import { attendanceStrategyOptions } from "@/lib/demo/options";
+import {
+  attendanceStrategyOptions,
+  formatActionType,
+  formatPlayerFacingFact,
+  formatPlayerFacingFlag,
+} from "@/lib/demo/options";
 import {
   renderEndingReportFallback,
   renderMonthlyJournalFallback,
@@ -220,6 +225,50 @@ const endingInput: EndingReportPromptInput = {
 };
 
 describe("player-facing narrative helpers", () => {
+  it("formats skip class as natural Chinese instead of an internal action key", () => {
+    const label = formatActionType("skip_class");
+
+    expect(label).toContain("不去上课");
+    expect(label).not.toBe("skip_class");
+    expect(label).not.toContain("skip_class");
+  });
+
+  it("formats action event flags as natural Chinese without leaking internal keys", () => {
+    const flags = [
+      "instant-event:cash-crunch",
+      "instant-event:stress-spillover",
+      "instant-event:study-group-help",
+      "instant-event:teacher-nudge",
+      "insufficient-week-time",
+    ];
+
+    for (const flag of flags) {
+      const formatted = formatPlayerFacingFlag(flag);
+
+      expect(formatted).not.toBe(flag);
+      expect(formatted).not.toContain(flag);
+      expect(formatted).not.toContain("instant-event");
+      expect(formatted).not.toContain("insufficient-week-time");
+    }
+  });
+
+  it("formats action event notable facts as player-facing Chinese", () => {
+    const facts = [
+      "event:cash-crunch",
+      "event:stress-spillover",
+      "event:study-group-help",
+      "event:teacher-nudge",
+    ];
+
+    for (const fact of facts) {
+      const formatted = formatPlayerFacingFact(fact);
+
+      expect(formatted).not.toBe(fact);
+      expect(formatted).not.toContain(fact);
+      expect(formatted).not.toContain("event:");
+    }
+  });
+
   it("renders action planning options in natural Chinese", () => {
     expect(actionOptions.find((item) => item.value === "study")).toMatchObject({
       label: "复习 / 学习",

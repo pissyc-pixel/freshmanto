@@ -40,6 +40,7 @@ export const actionOptions: Array<{
   { value: "student_activity", label: "学生活动 / 讲座 / 社团", description: "更有生活感，也有机会留下履历痕迹。" },
   { value: "remedy", label: "补救 / 应急处理", description: "优先止损，把已经堆起来的风险往回拉。" },
   { value: "ask_family", label: "向家里要钱", description: "来钱快，但会带来明显压力，而且有冷却。" },
+  { value: "skip_class", label: "这周不去上课", description: "腾出这周被白天课程锁住的行动位，但后续点名和平时分风险会提高。" },
 ];
 
 export const actionTimeOptions: Array<{
@@ -141,6 +142,7 @@ const rejectionReasonLabels: Record<string, string> = {
   "state-refused-study": "状态太差了，根本坐不下来学习",
   "state-refused-work": "状态扛不住，连工作和投递都提不起劲",
   "turn-resolution-missing": "这一步没有被完整结算出来",
+  "insufficient-week-time": "这周剩下的可用时间不够，这一步只能先放下。",
 };
 
 const flagLabels: Record<string, string> = {
@@ -153,6 +155,11 @@ const flagLabels: Record<string, string> = {
   "burnout-slump": "压力和低落堆在一起，整个人都有点摆烂下去的趋势。",
   "state-refused-study": "有时候不是不想努力，是状态已经差到学不进去。",
   "state-refused-work": "这阵子连找工作和赚钱的心气都被压住了。",
+  "instant-event:cash-crunch": "手头太紧，刚做完这一步就更明显地感到钱带来的分心和压力。",
+  "instant-event:stress-spillover": "压力已经溢出来了，连正常行动都会额外消耗一点心气。",
+  "instant-event:study-group-help": "身边同学顺手拉了一把，资料和节奏都被接上了一点。",
+  "instant-event:teacher-nudge": "前面攒下的学习势头被老师看见了，这次得到了一点及时提醒和肯定。",
+  "insufficient-week-time": "这周剩下的可用时间不够，这一步只能先放下。",
 };
 
 const eventNarratives: Record<string, string> = {
@@ -163,6 +170,10 @@ const eventNarratives: Record<string, string> = {
   "social-mutual-aid": "社交值高的时候，身边的人真的会在签到和资料上拉你一把。",
   "economic-pressure": "钱一紧，焦虑感就会从生活边角慢慢渗进来。",
   "burnout-slump": "心情和压力一起失控的时候，人会先开始不想面对任何事。",
+  "stress-spillover": "压力已经溢出来了，做完这一步之后反而又多了一点疲惫和烦躁。",
+  "study-group-help": "之前攒下的人际关系在这一步派上了用场，有人帮你把资料和节奏接了回来。",
+  "teacher-nudge": "学习势头被老师注意到了，一句提醒或者肯定让你更知道接下来往哪儿用力。",
+  "cash-crunch": "手头太紧让这一步变得更费劲，钱的压力又从旁边挤了进来。",
 };
 
 export type PlayerFacingMonthlyLog = {
