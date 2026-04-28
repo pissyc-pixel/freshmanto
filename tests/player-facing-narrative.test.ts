@@ -1,4 +1,5 @@
 import { createElement } from "react";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
@@ -225,6 +226,12 @@ const endingInput: EndingReportPromptInput = {
 };
 
 describe("player-facing narrative helpers", () => {
+  it("keeps raw internal action keys out of game page player copy", () => {
+    const pageSource = readFileSync("app/game/page.tsx", "utf-8");
+
+    expect(pageSource).not.toContain("skip_class 会");
+  });
+
   it("formats skip class as natural Chinese instead of an internal action key", () => {
     const label = formatActionType("skip_class");
 

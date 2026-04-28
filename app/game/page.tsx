@@ -162,7 +162,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
 
         <SectionCard
           title="本月周历"
-          description="默认时间窗口来自课程安排，skip_class 会把仍被课占住的白天即时释放。"
+          description="默认时间窗口来自课程安排，“这周不去上课”会把仍被课占住的白天即时释放。"
         >
           <TimeBlockStrip blocks={schedule} />
         </SectionCard>
