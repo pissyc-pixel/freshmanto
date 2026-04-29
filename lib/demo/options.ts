@@ -148,6 +148,7 @@ const rejectionReasonLabels: Record<string, string> = {
 const flagLabels: Record<string, string> = {
   "study-diminishing-returns": "这段时间连续学习太多，边际收益已经明显往下掉了。",
   "stress-efficiency-penalty": "压力和心情在拖后腿，这个月很多行动都没有平时顺手。",
+  "study-efficiency-collapsed": "压力和状态已经把学习效率压得很低了，这一步几乎没真正学进去。",
   "ask-family-on-cooldown": "刚向家里开过口，这个月再伸手只会更有压力。",
   "invalid-night-part-time": "想靠夜里兼职补钱行不通，时间窗口不允许。",
   "midterm-pressure": "之前积下来的学业风险在这个月集中冒头了。",

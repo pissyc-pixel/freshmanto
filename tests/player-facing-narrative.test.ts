@@ -265,6 +265,13 @@ describe("player-facing narrative helpers", () => {
     }
   });
 
+  it("formats collapsed study efficiency as player-facing Chinese instead of leaking the raw flag", () => {
+    const formatted = formatPlayerFacingFlag("study-efficiency-collapsed");
+
+    expect(formatted).not.toBe("study-efficiency-collapsed");
+    expect(formatted).not.toContain("study-efficiency-collapsed");
+  });
+
   it("formats action event notable facts as player-facing Chinese", () => {
     const facts = [
       "event:cash-crunch",
