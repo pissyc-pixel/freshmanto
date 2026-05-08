@@ -17,11 +17,13 @@ import { StatsGrid } from "@/components/stats-grid";
 import { TimeBlockStrip } from "@/components/time-block-strip";
 import { WeeklySettlementCard } from "@/components/weekly-settlement-card";
 import { createWeeklyCalendar } from "@/core/game-engine";
-import { ensureProgressionState, summarizeDirectionSignals } from "@/core/resolvers/progression";
 import {
-  formatMonthLabel,
-  formatStatLabel,
-} from "@/lib/demo/options";
+  buildDirectionPerception,
+  buildPublicExamExplanation,
+  ensureProgressionState,
+  summarizeDirectionSignals,
+} from "@/core/resolvers/progression";
+import { formatMonthLabel, formatStatLabel } from "@/lib/demo/options";
 import { buildGrowthJournalEntry } from "@/lib/demo/monthly-digest";
 import { getServerDemoBundle } from "@/lib/demo/server";
 import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
@@ -40,6 +42,17 @@ function buildStatItems(stats: DynamicStats) {
   }));
 }
 
+function formatDirectionStage(stage: "undecided" | "forming" | "clear") {
+  switch (stage) {
+    case "clear":
+      return "方向已经更清楚了";
+    case "forming":
+      return "方向正在成形";
+    default:
+      return "还在慢慢定下来";
+  }
+}
+
 export default async function GamePage({ searchParams }: GamePageProps) {
   const params = await searchParams;
   const runId = readSearchParam(params.runId);
@@ -50,7 +63,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
       <AppShell
         eyebrow="主游戏"
         title="先开一局新的大学生活"
-        description="这里会承载每周课程态度、逐日安排、统一周结算，以及月底的成长日志和月记。"
+        description="这里会承载每周课程态度、逐日排周历、统一周结算，以及月底的成长日志和月记。"
         actions={
           <Link
             href="/"
@@ -62,7 +75,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
       >
         <SectionCard title="还没有进行中的 run" description="先回到首页创建一局，再从这里继续排每一周。">
           <p className="text-sm leading-6 text-stone-600">
-            这次改版后的主流程已经换成“先定课程态度，再逐日排周历，最后统一结算”。
+            现在的主流程已经换成“先定课程态度，再逐天安排一周，最后统一结算”。
           </p>
         </SectionCard>
       </AppShell>
@@ -95,12 +108,14 @@ export default async function GamePage({ searchParams }: GamePageProps) {
     month: log.month,
   }));
   const directionSignals = summarizeDirectionSignals(hydratedRun);
+  const directionPerception = buildDirectionPerception(hydratedRun);
+  const publicExamExplanation = buildPublicExamExplanation(hydratedRun);
 
   return (
     <AppShell
       eyebrow="主游戏"
       title={`${formatMonthLabel(bundle.run.currentYear, bundle.run.currentMonth)} 的周历安排`}
-      description="这一轮周历会先让你定课程态度，再逐天给这一周的每天排一个行动；等 7 天都排完，点一次“确认本周安排”，系统再统一结算。"
+      description="这一轮周历会先让你定课程态度，再逐天给这一周的每一天排一个行动；等 7 天都排完，点一次“确认本周安排”，系统再统一结算。"
       actions={
         <>
           <Link
@@ -135,14 +150,50 @@ export default async function GamePage({ searchParams }: GamePageProps) {
           <StatsGrid items={buildStatItems(hydratedRun.stats)} />
         </SectionCard>
 
-        <SectionCard title="后半程方向" description="这轮先把大学后半程的人生导向接进来，让方向在过程中慢慢形成。">
-          <div className="space-y-2 text-sm leading-6 text-stone-700">
-            <p>
-              当前主导倾向：
-              <span className="font-semibold text-stone-900"> {hydratedRun.progression?.dominantDirection ?? "undecided"}</span>
-              。公考进度 {hydratedRun.progression?.publicExam.progress ?? 0}，就业准备 {hydratedRun.progression?.employmentReadiness ?? 0}，深造准备 {hydratedRun.progression?.postgraduateProgress ?? 0}。
-            </p>
-            {directionSignals.length > 0 ? directionSignals.map((line) => <p key={line}>{line}</p>) : <p>目前方向感还比较分散，更多是在积累底子。</p>}
+        <SectionCard
+          title="后半程方向"
+          description="这里不会提前剧透最终结局，只会把你最近正在成形的方向和它为什么会这样慢慢提示出来。"
+          aside={
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+              {formatDirectionStage(directionPerception.stage)}
+            </span>
+          }
+        >
+          <div className="space-y-4 text-sm leading-6 text-stone-700">
+            <div className="rounded-2xl border border-[var(--border)] bg-white/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">近期趋势</p>
+              <p className="mt-3 text-lg font-semibold text-stone-900">
+                你最近最像在往“{directionPerception.primary.label}”这条路靠
+                {directionPerception.secondary ? `，同时也还带着一点 ${directionPerception.secondary.label} 的可能。` : "。"}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-stone-600">{directionPerception.summary}</p>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <article className="rounded-2xl border border-[var(--border)] bg-white/65 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">为什么会往这边偏</p>
+                <div className="mt-3 space-y-2">
+                  {directionPerception.reasons.map((reason) => (
+                    <p key={reason}>{reason}</p>
+                  ))}
+                  {directionSignals.map((line) => (
+                    <p key={line}>{line}</p>
+                  ))}
+                </div>
+              </article>
+
+              <article className="rounded-2xl border border-[var(--border)] bg-white/65 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">现在最值得留意的线索</p>
+                <div className="mt-3 space-y-2">
+                  <p>{publicExamExplanation.summary}</p>
+                  {directionPerception.blockers.length > 0 ? (
+                    directionPerception.blockers.map((line) => <p key={line}>{line}</p>)
+                  ) : (
+                    <p>这条路已经有趋势了，但还没到完全定案的时候，后面的周安排还会继续改变它。</p>
+                  )}
+                </div>
+              </article>
+            </div>
           </div>
         </SectionCard>
 

@@ -409,6 +409,345 @@ export function summarizeDirectionSignals(run: GameRun): string[] {
   return lines.slice(0, 3);
 }
 
+type DirectionScoreCard = {
+  key: DirectionKey;
+  label: string;
+  score: number;
+};
+
+export type DirectionPerception = {
+  stage: "undecided" | "forming" | "clear";
+  primary: DirectionScoreCard;
+  secondary: DirectionScoreCard | null;
+  summary: string;
+  reasons: string[];
+  blockers: string[];
+};
+
+export type RecommendationExplanation = {
+  status: RecommendationQualification;
+  summary: string;
+  strengths: string[];
+  gaps: string[];
+};
+
+export type ScholarshipExplanation = {
+  level: ScholarshipRecord["level"];
+  title: string;
+  summary: string;
+  reasons: string[];
+};
+
+export type PublicExamExplanation = {
+  progress: number;
+  summary: string;
+  signals: string[];
+};
+
+export type ResumeEvidenceSummary = {
+  academic: string[];
+  practice: string[];
+  opportunities: string[];
+};
+
+function formatDirectionLabel(direction: DirectionKey): string {
+  return {
+    employment: "就业",
+    postgraduate: "考研",
+    public_exam: "考公",
+    recommendation: "推免",
+    undecided: "未定",
+  }[direction];
+}
+
+function getDirectionScoreCards(run: GameRun): DirectionScoreCard[] {
+  const ensuredRun = ensureProgressionState(run);
+
+  return DIRECTION_KEYS.map((key) => ({
+    key,
+    label: formatDirectionLabel(key),
+    score: ensuredRun.progression!.tendencies[key],
+  })).sort((left, right) => right.score - left.score);
+}
+
+function getDirectionReasons(run: GameRun, direction: DirectionKey): string[] {
+  const ensuredRun = ensureProgressionState(run);
+  const profile = deriveAcademicProfile(ensuredRun);
+  const scholarshipCount = countScholarshipRecords(ensuredRun.scholarships, undefined);
+  const competitionCount = (ensuredRun.competitionProjects ?? []).filter((project) => project.result).length;
+  const internshipCount = ensuredRun.resume.filter((item) => item.category === "internship").length;
+  const projectCount = ensuredRun.resume.filter((item) => ["project", "competition", "research"].includes(item.category)).length;
+  const reasons: string[] = [];
+
+  switch (direction) {
+    case "employment":
+      if ((ensuredRun.progression?.employmentReadiness ?? 0) >= 25) {
+        reasons.push("履历和求职准备开始连成线了，不再只是零散尝试。");
+      }
+      if (internshipCount > 0) {
+        reasons.push("已经有实习或实践经历在托住这条线，简历更像在往求职方向长。");
+      }
+      if (projectCount >= 2) {
+        reasons.push("项目和竞赛经历正在补实践证明，让就业方向更有抓手。");
+      }
+      break;
+    case "postgraduate":
+      if ((ensuredRun.progression?.postgraduateProgress ?? 0) >= 20) {
+        reasons.push("复习和备考投入开始稳定下来，考研已经不是一句口头想法。");
+      }
+      if (profile.gpa >= 3.2) {
+        reasons.push(`当前 GPA 约 ${profile.gpa}，学业底子能支撑继续往深造方向发力。`);
+      }
+      if (competitionCount > 0) {
+        reasons.push("竞赛和项目积累会让后续继续深造时更有底气。");
+      }
+      break;
+    case "public_exam":
+      if ((ensuredRun.progression?.publicExam.progress ?? 0) >= 15) {
+        reasons.push(`公考进度已经推进到 ${ensuredRun.progression?.publicExam.progress}，这条线开始有持续投入。`);
+      }
+      if ((ensuredRun.progression?.publicExam.aptitudePrep ?? 0) >= 12 || (ensuredRun.progression?.publicExam.essayPrep ?? 0) >= 12) {
+        reasons.push("你不是只看过讲座，而是真的开始在行测和申论上做准备。");
+      }
+      break;
+    case "recommendation":
+      if (profile.gpa >= 3.5 || (profile.rank ?? 99) <= 20) {
+        reasons.push("成绩和排名已经开始提供推免竞争力，不只是单次发挥。");
+      }
+      if (scholarshipCount > 0) {
+        reasons.push("奖学金和长期稳定表现会直接抬高推免画像。");
+      }
+      if (competitionCount > 0 || projectCount > 0) {
+        reasons.push("竞赛、项目和履历成果在给推免这条线补证据。");
+      }
+      break;
+    default:
+      if (projectCount > 0 || internshipCount > 0) {
+        reasons.push("虽然还没完全定型，但你已经开始累积一些会影响未来方向的东西。");
+      }
+      if (reasons.length === 0) {
+        reasons.push("现在更像是在打底子，方向感还没有真正收束。");
+      }
+      break;
+  }
+
+  return reasons.slice(0, 3);
+}
+
+export function buildDirectionPerception(run: GameRun): DirectionPerception {
+  const ensuredRun = ensureProgressionState(run);
+  const scoreCards = getDirectionScoreCards(ensuredRun).filter((item) => item.key !== "undecided");
+  const primary = scoreCards[0] ?? { key: "undecided" as const, label: "未定", score: ensuredRun.progression!.tendencies.undecided };
+  const secondary = scoreCards[1] ?? null;
+  const gap = secondary ? primary.score - secondary.score : primary.score;
+  const stage: DirectionPerception["stage"] =
+    primary.score < 12
+      ? "undecided"
+      : primary.score >= 28 || gap >= 12
+        ? "clear"
+        : "forming";
+  const reasons = getDirectionReasons(ensuredRun, primary.key);
+  const blockers: string[] = [];
+
+  if (primary.key === "recommendation") {
+    const profile = deriveAcademicProfile(ensuredRun);
+    if (profile.gpa < 3.4) {
+      blockers.push("学业还需要再稳一点，推免更看长期成绩的上限。");
+    }
+    if ((ensuredRun.competitionProjects ?? []).filter((project) => project.result).length === 0) {
+      blockers.push("高质量竞赛和项目成果还偏少，画像会显得不够完整。");
+    }
+  }
+
+  if (primary.key === "public_exam" && (ensuredRun.progression?.publicExam.progress ?? 0) < 35) {
+    blockers.push("公考这条线已经起步了，但还没到足够稳的积累段。");
+  }
+
+  if (primary.key === "employment" && (ensuredRun.progression?.employmentReadiness ?? 0) < 30) {
+    blockers.push("方向更像已经偏向就业，但高质量履历还需要继续补。");
+  }
+
+  if (primary.key === "postgraduate" && (ensuredRun.progression?.postgraduateProgress ?? 0) < 28) {
+    blockers.push("备考节奏在形成，但还需要更稳定的投入才能真正坐实。");
+  }
+
+  const summary =
+    stage === "undecided"
+      ? "最近还在打底子，未来方向开始有苗头，但还没有明显定型。"
+      : stage === "forming"
+        ? `你最近已经明显在往“${primary.label}”这条路靠，${secondary ? `同时也还保留一点“${secondary.label}”的可能。` : "只是还没有完全坐实。"}`
+        : `现在最像在往“${primary.label}”这条路走，方向感已经比前面清楚很多。`;
+
+  return {
+    stage,
+    primary,
+    secondary,
+    summary,
+    reasons,
+    blockers: blockers.slice(0, 2),
+  };
+}
+
+export function buildRecommendationExplanation(run: GameRun): RecommendationExplanation {
+  const ensuredRun = ensureProgressionState(run);
+  const profile = deriveAcademicProfile(ensuredRun);
+  const competitionCount = (ensuredRun.competitionProjects ?? []).filter((project) => project.result).length;
+  const scholarshipCount = countScholarshipRecords(ensuredRun.scholarships, undefined);
+  const status = ensuredRun.progression?.recommendationQualification ?? evaluateRecommendationQualification(ensuredRun);
+  const strengths: string[] = [];
+  const gaps: string[] = [];
+
+  if (profile.gpa >= 3.5) {
+    strengths.push(`GPA 约 ${profile.gpa}，学业基础已经在推免竞争线附近。`);
+  } else {
+    gaps.push(`GPA 目前约 ${profile.gpa}，学业上限还可以继续往上抬。`);
+  }
+
+  if ((profile.rank ?? 99) <= 20 || (profile.percentile ?? 0) >= 80) {
+    strengths.push(`当前排名和百分比大致落在比较有竞争力的位置。`);
+  } else {
+    gaps.push("排名还不够稳，推免看的是持续性的前排表现。");
+  }
+
+  if (competitionCount > 0) {
+    strengths.push("已经有竞赛或项目成果在替你补综合画像。");
+  } else {
+    gaps.push("高质量竞赛和项目成果还偏少，综合支撑感不够。");
+  }
+
+  if (scholarshipCount > 0) {
+    strengths.push("奖学金会让老师和评审更容易看到你前期积累的稳定性。");
+  }
+
+  const summaryMap: Record<RecommendationQualification, string> = {
+    pending: "推免资格还没到正式判断的时候，当前更像是在继续积累画像。",
+    eligible: "现在这份画像已经具备比较明确的推免竞争力，后面更像是在决定接不接受这条路。",
+    borderline: "你已经摸到推免边缘了，优势有了，但还需要补齐短板才能更稳。",
+    unlikely: "眼下离推免线还有距离，主要问题不是某一次发挥，而是整体画像还不够硬。",
+    accepted: "推免这条线已经落定，前期积累最后变成了明确结果。",
+    declined_to_postgraduate: "你本来有推免机会，但最后选择把方向转向考研。",
+    declined_to_employment: "你本来有推免机会，但最后选择把方向转向就业。",
+  };
+
+  return {
+    status,
+    summary: summaryMap[status],
+    strengths: strengths.slice(0, 3),
+    gaps: gaps.slice(0, 3),
+  };
+}
+
+export function buildScholarshipExplanation(run: GameRun): ScholarshipExplanation | null {
+  const ensuredRun = ensureProgressionState(run);
+  const latestScholarship = [...(ensuredRun.scholarships ?? [])].sort((left, right) => right.academicYear - left.academicYear)[0];
+
+  if (!latestScholarship) {
+    return null;
+  }
+
+  const profile = deriveAcademicProfile(ensuredRun);
+  const competitionCount = (ensuredRun.competitionProjects ?? []).filter((project) => project.result).length;
+  const hasFailure = ensuredRun.semesters.some((item) => !item.passed);
+  const reasons: string[] = [];
+
+  if (profile.gpa >= 3.3) {
+    reasons.push(`学业表现比较稳，当前 GPA 大约在 ${profile.gpa} 左右。`);
+  } else {
+    reasons.push("学业基础还不算特别突出，奖学金更多取决于整体稳定度。");
+  }
+
+  if ((profile.rank ?? 99) <= 30) {
+    reasons.push("排名和百分比没有掉出前排，这是奖学金最硬的一层底子。");
+  }
+
+  if (competitionCount > 0) {
+    reasons.push("竞赛和项目成果帮你把这份结果往上托了一截。");
+  }
+
+  if (hasFailure) {
+    reasons.push("挂科或学业波动会明显拉低奖学金竞争力。");
+  }
+
+  const summary =
+    latestScholarship.level === "high"
+      ? "这次奖学金更像是上一学年整体积累被看见了，学业、排名和额外成果都在加分。"
+      : latestScholarship.level === "standard"
+        ? "能拿到这笔奖学金，说明你上一学年的整体表现至少是稳住了的。"
+        : "这次没等来奖学金，通常不是单个动作失误，而是学业和成果的综合竞争力还没到线。";
+
+  return {
+    level: latestScholarship.level,
+    title: latestScholarship.title,
+    summary,
+    reasons: reasons.slice(0, 3),
+  };
+}
+
+export function buildPublicExamExplanation(run: GameRun): PublicExamExplanation {
+  const ensuredRun = ensureProgressionState(run);
+  const publicExam = ensuredRun.progression?.publicExam ?? createDefaultCareerRouteState().publicExam;
+  const signals: string[] = [];
+
+  if (publicExam.progress >= 15) {
+    signals.push("你已经不只是偶尔看看信息，而是开始有持续准备。");
+  }
+  if (publicExam.aptitudePrep >= 12) {
+    signals.push("行测准备已经动起来了，这说明公考线不是一句空话。");
+  }
+  if (publicExam.essayPrep >= 12) {
+    signals.push("申论也开始跟上，说明这条线的投入正在变完整。");
+  }
+  if (signals.length === 0) {
+    signals.push("现在更像是在试探这条线，离真正稳定准备还有一点距离。");
+  }
+
+  const summary =
+    publicExam.progress >= 55
+      ? "公考已经从兴趣项变成比较实在的后期路线，接下来更看能不能持续顶住节奏。"
+      : publicExam.progress >= 25
+        ? "公考准备已经形成连续性，这个数值代表你在慢慢把它从想法变成路径。"
+        : "公考进度刚起步，它意味着你已经开始把时间切给这条未来路线。";
+
+  return {
+    progress: publicExam.progress,
+    summary,
+    signals: signals.slice(0, 3),
+  };
+}
+
+export function buildResumeEvidenceSummary(run: GameRun): ResumeEvidenceSummary {
+  const ensuredRun = ensureProgressionState(run);
+  const profile = deriveAcademicProfile(ensuredRun);
+  const competitionCount = (ensuredRun.competitionProjects ?? []).filter((project) => project.result).length;
+  const internshipCount = ensuredRun.resume.filter((item) => item.category === "internship").length;
+  const scholarshipCount = countScholarshipRecords(ensuredRun.scholarships, undefined);
+
+  const academic = [
+    `GPA 约 ${profile.gpa}，当前排名大约在前 ${profile.percentile ?? 0}% 的位置附近。`,
+    scholarshipCount > 0 ? `已经累计 ${scholarshipCount} 次奖学金结果，说明前期成绩不只是偶尔冒尖。` : "奖学金还比较空，说明学业竞争力还在继续补。",
+  ];
+  const practice = [
+    internshipCount > 0 ? `已经有 ${internshipCount} 段实习 / 实践经历在托住就业线。` : "实习和实践经历还偏少，就业线更像刚起步。",
+    competitionCount > 0 ? `竞赛和项目成果已经开始成为履历里的硬证据。` : "竞赛和项目成果还不够多，综合画像会显得薄一点。",
+  ];
+  const opportunities = [
+    ensuredRun.progression?.recommendationQualification === "eligible"
+      ? "推免资格已经打开，后面要考虑的是接受还是转向。"
+      : ensuredRun.progression?.recommendationQualification === "borderline"
+        ? "推免已经摸到边缘，说明努力开始换来现实机会。"
+        : "推免机会暂时还没完全打开，后面更看学业和成果能不能继续往上顶。",
+    (ensuredRun.progression?.publicExam.progress ?? 0) >= 20
+      ? "公考线已经从信息收集变成了有准备痕迹的备选路径。"
+      : "公考目前还只是比较早期的线索，没有真正站稳。",
+  ];
+
+  return {
+    academic,
+    practice,
+    opportunities,
+  };
+}
+
 function createResumeItem(run: GameRun, title: string, summary: string, category: ResumeItem["category"], tags: string[] = []): ResumeItem {
   return {
     id: `${run.id}-${run.currentYear}-${run.currentMonth}-${title}`,
