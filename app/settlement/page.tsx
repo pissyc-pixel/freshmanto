@@ -5,6 +5,12 @@ import { LogFeed } from "@/components/log-feed";
 import { ReportPreview } from "@/components/report-preview";
 import { SectionCard } from "@/components/section-card";
 import { StatsGrid } from "@/components/stats-grid";
+import {
+  buildPublicExamExplanation,
+  buildRecommendationExplanation,
+  buildScholarshipExplanation,
+  ensureProgressionState,
+} from "@/core/resolvers/progression";
 import { buildGrowthJournalEntry, buildMonthlyDiaryDigest } from "@/lib/demo/monthly-digest";
 import { formatMonthLabel, formatStatLabel } from "@/lib/demo/options";
 import { getServerDemoBundle } from "@/lib/demo/server";
@@ -80,6 +86,10 @@ export default async function SettlementPage({ searchParams }: SettlementPagePro
   const summary = monthlyState.snapshot_json;
   const growthLog = buildGrowthJournalEntry(summary, monthlyState.year, monthlyState.month);
   const digest = buildMonthlyDiaryDigest(summary, monthlyState.year, monthlyState.month);
+  const progressedRun = ensureProgressionState(bundle.run);
+  const scholarshipExplanation = buildScholarshipExplanation(progressedRun);
+  const recommendationExplanation = buildRecommendationExplanation(progressedRun);
+  const publicExamExplanation = buildPublicExamExplanation(progressedRun);
   const systemLogs = bundle.logs
     .filter((item) => item.year === monthlyState.year && item.month === monthlyState.month)
     .map((item) => ({
@@ -94,7 +104,7 @@ export default async function SettlementPage({ searchParams }: SettlementPagePro
     <AppShell
       eyebrow="月结算"
       title={`${formatMonthLabel(monthlyState.year, monthlyState.month)} 已结算`}
-      description="成长日志偏事实层，月记偏体验层；这页会把两者拆开，避免都在重复流水动作。"
+      description="成长日志偏事实层，月记偏体验层；这页会把两者拆开，也顺手解释这个月正在把你推向哪里。"
       actions={
         <>
           <Link
@@ -118,10 +128,69 @@ export default async function SettlementPage({ searchParams }: SettlementPagePro
         </SectionCard>
 
         <SectionCard
+          title="这个月正在把你推向哪里"
+          description="这不是最后定案，只是把本月最明显的方向趋势和现实含义先说清楚。"
+        >
+          <FactList
+            items={[
+              digest.directionSignal,
+              ...digest.futureSignals,
+              recommendationExplanation.summary,
+              publicExamExplanation.summary,
+            ]}
+          />
+        </SectionCard>
+
+        <SectionCard
           title="成长日志"
           description="成长日志偏事实整理：这个月主要做了什么，最明显的变化和关键经历是什么。"
         >
           <LogFeed items={[growthLog]} variant="player" />
+        </SectionCard>
+
+        <SectionCard
+          title="结果为什么会这样"
+          description="奖学金、推免和公考线都不再是黑箱掉落，这里只挑当前最关键的解释给你看。"
+        >
+          <div className="grid gap-3 lg:grid-cols-3">
+            <article className="rounded-2xl border border-[var(--border)] bg-white/65 p-4 text-sm leading-6 text-stone-700">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">奖学金</p>
+              {scholarshipExplanation ? (
+                <div className="mt-3 space-y-2">
+                  <p className="font-semibold text-stone-900">{scholarshipExplanation.title}</p>
+                  <p>{scholarshipExplanation.summary}</p>
+                  {scholarshipExplanation.reasons.map((line) => (
+                    <p key={line}>{line}</p>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3">目前还没有奖学金结果，通常要再等学年结算把前期积累落下来。</p>
+              )}
+            </article>
+
+            <article className="rounded-2xl border border-[var(--border)] bg-white/65 p-4 text-sm leading-6 text-stone-700">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">推免资格</p>
+              <div className="mt-3 space-y-2">
+                <p>{recommendationExplanation.summary}</p>
+                {recommendationExplanation.strengths.map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
+                {recommendationExplanation.gaps.map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
+              </div>
+            </article>
+
+            <article className="rounded-2xl border border-[var(--border)] bg-white/65 p-4 text-sm leading-6 text-stone-700">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">公考进度</p>
+              <div className="mt-3 space-y-2">
+                <p>{publicExamExplanation.summary}</p>
+                {publicExamExplanation.signals.map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
+              </div>
+            </article>
+          </div>
         </SectionCard>
 
         <SectionCard
@@ -132,9 +201,11 @@ export default async function SettlementPage({ searchParams }: SettlementPagePro
             items={[
               `主线行动：${digest.mainActions.join("、") || "本月主要在调整节奏"}`,
               `课程态度：${digest.attendanceStrategy}`,
+              `方向趋势：${digest.directionSignal}`,
               `情绪线：${digest.emotionalArc}`,
               `学业线：${digest.academicArc}`,
               `钱和生活：${digest.moneyArc}`,
+              ...digest.futureSignals,
               ...digest.keyMoments,
             ]}
           />
