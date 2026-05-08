@@ -9,6 +9,11 @@ import {
   resolveWeekEnd,
   settleSemester,
 } from "@/core/game-engine";
+import {
+  ensureProgressionState,
+  evaluateRecommendationQualification,
+  settleLongTermProgression,
+} from "@/core/resolvers/progression";
 import { evaluateSemesterFeedback } from "@/core/resolvers";
 import { getMonthlyEventWeight } from "@/core/resolvers/events";
 import { getWeeklyAllowance, getWeeklyLivingExpense } from "@/data/events";
@@ -57,6 +62,7 @@ function createHistoricalSummary(
     actions: actions as StructuredMonthlySummary["actions"],
     attendanceStrategy: "mixed",
     schedule: createMonthlySchedule(month),
+    weeklyCalendar: [],
     statsBefore: {
       money: 1000,
       mood: 60,
@@ -95,10 +101,16 @@ function createHistoricalSummary(
       strategy: "mixed",
       attendanceCounted: true,
       directRollCallPenalty: 0,
+      rollCallRiskDelta: 0,
+      usualScoreRiskDelta: 0,
+      proxyCost: 0,
+      remedyPressure: 0,
       academicRiskDelta: 0,
       academicGain: 12,
       moodDelta: 0,
+      stressDelta: 0,
     },
+    turns: [],
   };
 }
 
@@ -256,7 +268,7 @@ describe("monthly resolution", () => {
     expect(firstWeekStudy.turnSummary.advancesCalendar).toBe(true);
     expect(firstWeekStudy.turnSummary.moneyDelta).toBe(weeklyAllowance - weeklyExpense);
     expect(firstWeekStudy.run.activeMonth?.currentWeek).toBe(1);
-    expect(firstWeekStudy.turnSummary.weekTimeAfter).toBeLessThan(firstWeekStudy.turnSummary.weekTimeBefore);
+    expect(firstWeekStudy.turnSummary.weekTimeAfter).toBeLessThan(firstWeekStudy.turnSummary.weekTimeBefore!);
 
     expect(forcedWeekEnd.run.activeMonth?.currentWeek).toBe(2);
 
@@ -628,5 +640,117 @@ describe("semester and ending evaluation", () => {
     expect(["delayed", "cannot_graduate", "drop_out"]).toContain(
       evaluateGraduationOutcome(failingRun).outcome,
     );
+  });
+
+  it("settles competition projects at semester end with a minimum effort threshold", () => {
+    const baseRun = ensureProgressionState(
+      createInitialGameRun({
+        id: "competition-longline-run",
+        randomValues: [0.16, 0.25, 0.44, 0.52, 0.61, 0.2, 0.35, 0.4],
+      }),
+    );
+    const activeProject = baseRun.competitionProjects?.[0];
+    const underInvestedRun: GameRun = {
+      ...baseRun,
+      competitionProjects: baseRun.competitionProjects?.map((project, index) =>
+        index === 0 && activeProject
+          ? { ...project, status: "active", investedDays: activeProject.minimumEffortDays - 1 }
+          : project,
+      ),
+    };
+    const investedRun: GameRun = {
+      ...baseRun,
+      competitionProjects: baseRun.competitionProjects?.map((project, index) =>
+        index === 0 && activeProject
+          ? { ...project, status: "active", investedDays: activeProject.minimumEffortDays + 3 }
+          : project,
+      ),
+    };
+
+    const expired = settleLongTermProgression(underInvestedRun, {
+      playedYear: 1,
+      playedMonth: 6,
+    });
+    const awarded = settleLongTermProgression(investedRun, {
+      playedYear: 1,
+      playedMonth: 6,
+    });
+
+    expect(expired.run.competitionProjects?.[0]?.status).toBe("expired");
+    expect(awarded.run.competitionProjects?.some((project) => project.result)).toBe(true);
+    expect(awarded.resumeAdditions.some((item) => item.category === "competition")).toBe(true);
+  });
+
+  it("awards scholarships only from the second academic year onward", () => {
+    const baseRun = ensureProgressionState(
+      createInitialGameRun({
+        id: "scholarship-award-run",
+        randomValues: [0.19, 0.25, 0.44, 0.52, 0.61, 0.2, 0.35, 0.4],
+      }),
+    );
+    const yearOneRun: GameRun = {
+      ...baseRun,
+      currentYear: 2,
+      currentMonth: 1,
+      semesters: [
+        { semester: 1, academicScore: 88, feedback: "excellent", passed: true },
+        { semester: 2, academicScore: 84, feedback: "excellent", passed: true },
+      ],
+    };
+
+    const scholarshipResult = settleLongTermProgression(yearOneRun, {
+      playedYear: 1,
+      playedMonth: 12,
+    });
+
+    expect(scholarshipResult.scholarshipAwarded).toBeDefined();
+    expect(["standard", "high", "none"]).toContain(scholarshipResult.scholarshipAwarded?.level ?? "none");
+    expect(scholarshipResult.run.scholarships?.length).toBeGreaterThan(0);
+  });
+
+  it("judges recommendation qualification in the second half of junior year from academics and resume weight", () => {
+    const baseRun = ensureProgressionState(
+      createInitialGameRun({
+        id: "recommendation-run",
+        randomValues: [0.05, 0.15, 0.55, 0.45, 0.92, 0.03, 0.2, 0.1],
+      }),
+    );
+    const strongRun: GameRun = {
+      ...baseRun,
+      currentYear: 3,
+      currentMonth: 7,
+      semesterAverage: 88,
+      semesters: [
+        { semester: 1, academicScore: 90, feedback: "excellent", passed: true },
+        { semester: 2, academicScore: 88, feedback: "excellent", passed: true },
+        { semester: 3, academicScore: 91, feedback: "excellent", passed: true },
+        { semester: 4, academicScore: 87, feedback: "excellent", passed: true },
+      ],
+      resume: [
+        {
+          id: "res-1",
+          category: "competition",
+          title: "National Modeling Contest",
+          summary: "Won a national-level award.",
+          month: 6,
+          tags: ["competition", "national"],
+        },
+      ],
+      scholarships: [
+        {
+          id: "sch-1",
+          academicYear: 2,
+          level: "high",
+          amount: 5000,
+          title: "高等级奖学金",
+          reason: "Strong performance.",
+        },
+      ],
+      competitionProjects: baseRun.competitionProjects?.map((project, index) =>
+        index === 0 ? { ...project, status: "completed", result: { level: "national", rank: "second" } } : project,
+      ),
+    };
+
+    expect(["eligible", "borderline"]).toContain(evaluateRecommendationQualification(strongRun));
   });
 });

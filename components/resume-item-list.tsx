@@ -4,7 +4,26 @@ type ResumeItemListProps = {
   items: ResumeItem[];
 };
 
+const categoryLabels: Record<ResumeItem["category"], string> = {
+  internship: "实习",
+  project: "项目",
+  competition: "比赛",
+  scholarship: "奖学金",
+  research: "研究 / 深造",
+  campus_activity: "校园活动",
+  special_experience: "专项经历",
+  job_progress: "求职进展",
+};
+
 export function ResumeItemList({ items }: ResumeItemListProps) {
+  if (items.length === 0) {
+    return (
+      <div className="rounded-2xl border border-dashed border-[var(--border)] bg-white/60 px-4 py-5 text-sm leading-6 text-stone-600">
+        目前还没有可展示的履历条目。等后续出现比赛、项目、实习、奖学金或校园经历时，这里会自动补上。
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {items.map((item) => (
@@ -15,7 +34,7 @@ export function ResumeItemList({ items }: ResumeItemListProps) {
               <h3 className="mt-1 text-lg font-semibold text-stone-900">{item.title}</h3>
             </div>
             <span className="rounded-full bg-stone-900 px-3 py-1 text-xs font-semibold text-stone-50">
-              {item.category}
+              {categoryLabels[item.category]}
             </span>
           </div>
           <p className="mt-3 text-sm leading-6 text-stone-600">{item.summary}</p>

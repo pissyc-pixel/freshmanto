@@ -3,9 +3,12 @@ export {
   createMonthlySchedule,
   createWeeklyCalendar,
   evaluateGraduationOutcome,
+  confirmPlannedWeek,
+  planWeeklyDayAction,
   resolveActionTurn,
   resolveWeekEnd,
   resolveMonthlyTurn,
+  selectWeekAttendanceStrategy,
   settleSemester,
 } from "@/core/game-engine/monthly";
 

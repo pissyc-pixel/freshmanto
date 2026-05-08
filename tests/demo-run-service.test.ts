@@ -4,6 +4,7 @@ import { createInitialGameRun, createWeeklyCalendar, resolveActionTurn, resolveW
 import type {
   AIReportRecord,
   GameEventLogRecord,
+  Json,
   MonthlyStateRecord,
   ResumeItemRecord,
   RunRecord
@@ -124,7 +125,7 @@ function createRepository(store: InMemoryStore) {
       month: number;
       logType: "action" | "event" | "settlement";
       message: string;
-      metadata?: Record<string, unknown>;
+      metadata?: Record<string, Json>;
     }>) {
       const records = inputs.map((input, index) => ({
         id: `${input.runId}-${input.month}-${index}`,
@@ -170,7 +171,7 @@ function createRepository(store: InMemoryStore) {
       title: string;
       summary: string;
       sourceItemId?: string | null;
-      metadata?: Record<string, unknown>;
+      metadata?: Record<string, Json>;
     }>) {
       const records = inputs.map((input) => ({
         id: `${input.runId}-${input.month}-${input.title}`,

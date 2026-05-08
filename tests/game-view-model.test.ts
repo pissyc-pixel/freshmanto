@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createWeeklyCalendar } from "@/core/game-engine";
+import { buildPlannerWeekdays } from "@/core/resolvers/schedule";
 import {
   buildCurrentActionFeedback,
   buildWeeklyScheduleBlocks,
@@ -24,23 +25,23 @@ function createTurnSummary(overrides?: Partial<ActionTurnSummary>): ActionTurnSu
     turn: 2,
     week: 1,
     slotLabel: "第 1 周",
-    advancesCalendar: false,
+    advancesCalendar: true,
     attendanceStrategy: "mixed",
-    chosenAction: { action: "big_meal", time: "night" },
-    resolvedAction: { action: "big_meal", time: "night", accepted: true },
+    chosenAction: { action: "study", time: "day", label: "复习 / 学习", weekday: "mon" },
+    resolvedAction: { action: "study", time: "day", accepted: true, label: "复习 / 学习", weekday: "mon" },
     statsBefore: createStats(),
-    statsAfter: createStats({ money: 1020, mood: 68, stress: 24 }),
+    statsAfter: createStats({ semesterAcademics: 50, stress: 35 }),
     statsDelta: {
-      money: -180,
-      mood: 8,
-      stress: -6,
-      fulfillment: 0,
+      money: 0,
+      mood: 0,
+      stress: 5,
+      fulfillment: 2,
       social: 0,
-      semesterAcademics: 0,
+      semesterAcademics: 5,
     },
-    moneyDelta: -180,
-    flags: [],
-    notableFacts: ["skip_class released mon, wed daytime blocks"],
+    moneyDelta: 0,
+    flags: ["weekly-opportunity:recruitment-talk"],
+    notableFacts: ["weekly-event:recruitment-talk"],
     allowanceApplied: false,
     course: {
       strategy: "mixed",
@@ -55,16 +56,15 @@ function createTurnSummary(overrides?: Partial<ActionTurnSummary>): ActionTurnSu
       moodDelta: 0,
       stressDelta: 0,
     },
-    weekTimeBefore: 13,
-    weekTimeAfter: 13,
-    releasedClassDays: ["mon", "wed"],
+    weekday: "mon",
+    dayLabel: "周一",
     weekCompleted: false,
     ...overrides,
   };
 }
 
 describe("game page view-model helpers", () => {
-  it("localizes weekly schedule blocks for the active week and released class days", () => {
+  it("summarizes current-week day-by-day planning status on the calendar", () => {
     const weeklyCalendar = createWeeklyCalendar(1);
     const currentWeekState: ActiveWeekState = {
       week: 1,
@@ -72,6 +72,15 @@ describe("game page view-model helpers", () => {
       remainingTimeUnits: 11,
       releasedClassDays: ["mon", "wed"],
       attendanceStrategy: "mixed",
+      attendanceLocked: true,
+      days: buildPlannerWeekdays({
+        week: weeklyCalendar[0]!,
+        releasedClassDays: ["mon", "wed"],
+      }).map((day) => ({
+        ...day,
+        plannedAction: day.weekday === "mon" ? { action: "study", time: "day", label: "复习 / 学习" } : undefined,
+        planningStatus: day.weekday === "mon" ? "planned" : "pending",
+      })),
     };
 
     const blocks = buildWeeklyScheduleBlocks({
@@ -82,25 +91,28 @@ describe("game page view-model helpers", () => {
 
     expect(blocks[0]).toMatchObject({
       label: "第 1 周",
-      detail: "本周还剩 11 / 13 个半天可用。",
-      timeSummary: "这周已经腾出来的上课白天：周一白天、周三白天",
+      detail: "本周课程态度已定为“正常混课”，目前已经排了 1 / 7 天。",
     });
-    expect(blocks[0]?.days.find((day) => day.label === "周一")?.detail).toBe(
-      "这一天的白天已经被这周不去上课腾出来了。",
-    );
+    expect(blocks[0]?.days.find((day) => day.label === "周一")?.detail).toBe("已安排：复习 / 学习");
     expect(blocks[1]).toMatchObject({
       label: "第 2 周",
       detail: "还没轮到这一周。",
     });
   });
 
-  it("builds immediate feedback for the latest action without leaking raw weekday codes", () => {
+  it("builds weekly planning feedback without leaking raw weekday codes", () => {
+    const weeklyCalendar = createWeeklyCalendar(1);
     const currentWeekState: ActiveWeekState = {
       week: 1,
       totalTimeUnits: 13,
       remainingTimeUnits: 11,
       releasedClassDays: ["mon", "wed"],
       attendanceStrategy: "mixed",
+      attendanceLocked: true,
+      days: buildPlannerWeekdays({
+        week: weeklyCalendar[0]!,
+        releasedClassDays: ["mon", "wed"],
+      }),
     };
 
     const feedback = buildCurrentActionFeedback({
@@ -108,10 +120,8 @@ describe("game page view-model helpers", () => {
       currentWeekState,
     });
 
-    expect(feedback.nextStepHint).toContain("本周还剩 11 / 13 个半天");
-    expect(feedback.nextStepHint).toContain("还能继续安排正式行动");
-    expect(feedback.eventLines).toContain("上一轮腾出来的白天：周一白天、周三白天。");
-    expect(feedback.eventLines).toContain("这一步没有消耗正式行动时间。");
+    expect(feedback.nextStepHint).toContain("这周目前已经排了 0 / 7 天");
+    expect(feedback.eventLines.join(" ")).toContain("宣讲");
     expect(feedback.eventLines.join(" ")).not.toContain("mon");
     expect(feedback.eventLines.join(" ")).not.toContain("wed");
   });

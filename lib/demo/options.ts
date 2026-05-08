@@ -13,6 +13,7 @@ import type {
   StructuredMonthlySummary,
   Talent,
   TimeBlockKind,
+  WeeklyDayType,
   Weekday,
 } from "@/types/game";
 
@@ -40,6 +41,7 @@ export const actionOptions: Array<{
   { value: "student_activity", label: "学生活动 / 讲座 / 社团", description: "更有生活感，也有机会留下履历痕迹。" },
   { value: "remedy", label: "补救 / 应急处理", description: "优先止损，把已经堆起来的风险往回拉。" },
   { value: "ask_family", label: "向家里要钱", description: "来钱快，但会带来明显压力，而且有冷却。" },
+  { value: "skip_class", label: "这周不去上课", description: "腾出这周被白天课程锁住的行动位，但后续点名和平时分风险会提高。" },
 ];
 
 export const actionTimeOptions: Array<{
@@ -110,6 +112,12 @@ const timeBlockLabels: Record<TimeBlockKind, string> = {
   busy_day: "白天基本被课程或义务占满",
 };
 
+const weeklyDayTypeLabels: Record<WeeklyDayType, string> = {
+  night_only: "默认只有夜里能安排",
+  half_day: "这天只有半天空档",
+  full_day: "这天基本能自己支配",
+};
+
 const statLabels: Record<keyof DynamicStats, string> = {
   money: "金钱",
   mood: "心情",
@@ -141,18 +149,26 @@ const rejectionReasonLabels: Record<string, string> = {
   "state-refused-study": "状态太差了，根本坐不下来学习",
   "state-refused-work": "状态扛不住，连工作和投递都提不起劲",
   "turn-resolution-missing": "这一步没有被完整结算出来",
+  "insufficient-week-time": "这周剩下的可用时间不够，这一步只能先放下。",
 };
 
 const flagLabels: Record<string, string> = {
   "study-diminishing-returns": "这段时间连续学习太多，边际收益已经明显往下掉了。",
   "stress-efficiency-penalty": "压力和心情在拖后腿，这个月很多行动都没有平时顺手。",
+  "study-efficiency-collapsed": "压力和状态已经把学习效率压得很低了，这一步几乎没真正学进去。",
   "ask-family-on-cooldown": "刚向家里开过口，这个月再伸手只会更有压力。",
   "invalid-night-part-time": "想靠夜里兼职补钱行不通，时间窗口不允许。",
   "midterm-pressure": "之前积下来的学业风险在这个月集中冒头了。",
   "economic-pressure": "手头太紧，经济压力已经开始明显影响状态。",
+  "stress-surge": "这个月压力明显冲了上来，睡眠、耐心和执行力都被磨掉了一层。",
   "burnout-slump": "压力和低落堆在一起，整个人都有点摆烂下去的趋势。",
   "state-refused-study": "有时候不是不想努力，是状态已经差到学不进去。",
   "state-refused-work": "这阵子连找工作和赚钱的心气都被压住了。",
+  "instant-event:cash-crunch": "手头太紧，刚做完这一步就更明显地感到钱带来的分心和压力。",
+  "instant-event:stress-spillover": "压力已经溢出来了，连正常行动都会额外消耗一点心气。",
+  "instant-event:study-group-help": "身边同学顺手拉了一把，资料和节奏都被接上了一点。",
+  "instant-event:teacher-nudge": "前面攒下的学习势头被老师看见了，这次得到了一点及时提醒和肯定。",
+  "insufficient-week-time": "这周剩下的可用时间不够，这一步只能先放下。",
 };
 
 const eventNarratives: Record<string, string> = {
@@ -160,9 +176,16 @@ const eventNarratives: Record<string, string> = {
   "freshman-orientation": "开学适应和破冰活动让你没那么像局外人了。",
   "midterm-pressure": "之前遗漏的课程信息和学业风险，在这个月一起压了上来。",
   "academic-scholarship": "连续几个月把状态稳住之后，终于换来了一点奖学金和认可。",
+  "teacher-attention": "连续用功被老师看见了，一点提点和肯定让接下来的路更清楚了。",
   "social-mutual-aid": "社交值高的时候，身边的人真的会在签到和资料上拉你一把。",
   "economic-pressure": "钱一紧，焦虑感就会从生活边角慢慢渗进来。",
+  "stress-surge": "这个月压力突然抬了上来，人变得更容易疲劳、烦躁和拖延。",
   "burnout-slump": "心情和压力一起失控的时候，人会先开始不想面对任何事。",
+  "monthly-routine-reset": "这个月没有特别戏剧的转折，但日子还是推着你把节奏重新捋了一遍。",
+  "stress-spillover": "压力已经溢出来了，做完这一步之后反而又多了一点疲惫和烦躁。",
+  "study-group-help": "之前攒下的人际关系在这一步派上了用场，有人帮你把资料和节奏接了回来。",
+  "teacher-nudge": "学习势头被老师注意到了，一句提醒或者肯定让你更知道接下来往哪儿用力。",
+  "cash-crunch": "手头太紧让这一步变得更费劲，钱的压力又从旁边挤了进来。",
 };
 
 export type PlayerFacingMonthlyLog = {
@@ -392,6 +415,18 @@ export function formatCityTier(value: CityTier): string {
 }
 
 export function formatActionType(value: ActionType): string {
+  if (value === "postgraduate_prep") {
+    return "考研 / 深造准备";
+  }
+
+  if (value === "public_exam_prep") {
+    return "公考准备";
+  }
+
+  if (value === "competition_project") {
+    return "比赛 / 长期项目投入";
+  }
+
   return actionOptions.find((item) => item.value === value)?.label ?? value;
 }
 
@@ -409,6 +444,39 @@ export function formatGraduationOutcome(value: GraduationOutcome): string {
 
 export function formatTimeBlockKind(value: TimeBlockKind): string {
   return timeBlockLabels[value];
+}
+
+export function formatWeeklyDayType(value: WeeklyDayType): string {
+  return weeklyDayTypeLabels[value];
+}
+
+export function formatPlannerReason(reason?: string): string {
+  if (!reason) {
+    return "这一步最后没做成。";
+  }
+
+  if (reason === "action-daytype-mismatch") {
+    return "这一步和当天能用的时间类型对不上，所以最后没真正排进去。";
+  }
+
+  return formatPlayerFacingFlag(reason);
+}
+
+export function formatWeeklyEventFact(fact: string): string {
+  switch (fact) {
+    case "weekly-event:guest-lecture":
+      return "这周临时冒出来一场讲座，至少把日子从单纯赶课里拉开了一点。";
+    case "weekly-event:recruitment-talk":
+      return "这周去听了场宣讲，虽然还谈不上结果，但方向感比之前清楚了一点。";
+    case "weekly-event:job-prep-boost":
+      return "宣讲带来的信息马上接到了求职准备这条线上，做事时没那么发虚了。";
+    case "weekly-event:class-meeting":
+      return "这周有一天被班会和通知切了一刀，节奏不算舒服，但至少先把它处理掉了。";
+    case "weekly-event:quiet-recovery":
+      return "这周没什么额外插曲，反而让那点休息真的缓回来了一点。";
+    default:
+      return formatPlayerFacingFact(fact);
+  }
 }
 
 export function formatReleasedClassDayList(days: Weekday[]): string {

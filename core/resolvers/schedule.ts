@@ -1,13 +1,19 @@
 import type {
   ActionType,
   ActiveWeekState,
+  GameRun,
+  PlannedWeekdayState,
   CourseAttendanceStrategy,
   ScheduledDay,
   ScheduledWeek,
   ScheduledWeekday,
+  WeeklyActionOption,
+  WeeklyDayType,
+  WeeklyEventInstance,
   TimeBlockKind,
   Weekday,
 } from "@/types/game";
+import { weeklyActionCatalog } from "@/data/actions";
 
 const MONTH_PATTERN: TimeBlockKind[] = [
   "free",
@@ -63,11 +69,34 @@ const ACTION_TIME_COSTS: Record<ActionType, number> = {
   student_activity: 1,
   remedy: 1,
   job_prep: 2,
+  postgraduate_prep: 2,
+  public_exam_prep: 2,
+  competition_project: 2,
   part_time: 2,
   big_meal: 0,
   ask_family: 0,
   skip_class: 0,
 };
+
+function isOptionUnlocked(run: GameRun | undefined, option: WeeklyActionOption): boolean {
+  if (!run) {
+    return true;
+  }
+
+  if (option.action === "postgraduate_prep") {
+    return run.currentYear >= 3;
+  }
+
+  if (option.action === "public_exam_prep") {
+    return run.currentYear > 3 || (run.currentYear === 3 && run.currentMonth >= 7);
+  }
+
+  if (option.action === "competition_project") {
+    return (run.competitionProjects ?? []).some((project) => project.status === "open" || project.status === "active");
+  }
+
+  return true;
+}
 
 function resolveWeekdayKind(weekday: Weekday): TimeBlockKind {
   if (weekday === "sat" || weekday === "sun") {
@@ -91,6 +120,121 @@ function createScheduledWeekday(weekday: Weekday): ScheduledWeekday {
     availableTimes: dayType === "busy_day" ? ["night"] : ["day", "night"],
     courseLockedDaytime: COURSE_LOCKED_DAYTIME_WEEKDAYS.includes(weekday),
   };
+}
+
+function resolveWeeklyDayType(dayType: TimeBlockKind): WeeklyDayType {
+  switch (dayType) {
+    case "busy_day":
+      return "night_only";
+    case "half_free":
+      return "half_day";
+    default:
+      return "full_day";
+  }
+}
+
+export function getWeeklyDayLabel(weekday: Weekday): string {
+  return WEEKDAY_LABELS[weekday];
+}
+
+export function getBaseWeeklyDayType(day: ScheduledWeekday): WeeklyDayType {
+  return resolveWeeklyDayType(day.dayType);
+}
+
+export function isCourseLockedWeekday(weekday: Weekday): boolean {
+  return COURSE_LOCKED_DAYTIME_WEEKDAYS.includes(weekday);
+}
+
+export function buildPlannerWeekdays(input: {
+  week: ScheduledWeek;
+  event?: WeeklyEventInstance | null;
+  releasedClassDays?: Weekday[];
+}): PlannedWeekdayState[] {
+  const releasedDays = new Set(input.releasedClassDays ?? []);
+
+  return input.week.days.map((day) => {
+    const skipClassSelected = releasedDays.has(day.weekday);
+    const baseDayType = getBaseWeeklyDayType(day);
+    const eventApplies = input.event?.weekday === day.weekday;
+    const effectiveDayType = eventApplies && input.event?.dayTypeOverride
+      ? input.event.dayTypeOverride
+      : skipClassSelected && day.courseLockedDaytime
+        ? "full_day"
+        : baseDayType;
+
+    return {
+      weekday: day.weekday,
+      label: day.label,
+      baseDayType,
+      effectiveDayType,
+      skipClassAvailable: Boolean(day.courseLockedDaytime),
+      skipClassSelected,
+      planningStatus: "pending",
+    };
+  });
+}
+
+export function resolveEffectiveDayType(input: {
+  day: PlannedWeekdayState;
+  event?: WeeklyEventInstance | null;
+  skipClassSelected?: boolean;
+}): WeeklyDayType {
+  if (input.event?.weekday === input.day.weekday && input.event.dayTypeOverride) {
+    return input.event.dayTypeOverride;
+  }
+
+  if (input.skipClassSelected && input.day.skipClassAvailable) {
+    return "full_day";
+  }
+
+  return input.day.baseDayType;
+}
+
+export function resolveAvailableWeeklyActions(input: {
+  day: PlannedWeekdayState;
+  event?: WeeklyEventInstance | null;
+  skipClassSelected?: boolean;
+  run?: GameRun;
+}): WeeklyActionOption[] {
+  const effectiveDayType = resolveEffectiveDayType(input);
+  const limitedActions = input.event?.weekday === input.day.weekday
+    ? new Set(input.event?.limitedActions ?? [])
+    : null;
+
+  const allowedByDayType = weeklyActionCatalog.filter((option) => {
+    if (!isOptionUnlocked(input.run, option)) {
+      return false;
+    }
+
+    if (effectiveDayType === "night_only") {
+      return option.availability.includes("night");
+    }
+
+    if (effectiveDayType === "half_day") {
+      return option.availability.includes("night") || option.availability.includes("half_day");
+    }
+
+    return true;
+  });
+
+  const baseOptions = limitedActions
+    ? allowedByDayType.filter((option) => limitedActions.has(option.action))
+    : allowedByDayType;
+
+  const eventOption =
+    input.event?.weekday === input.day.weekday && input.event.specialAction
+      ? [input.event.specialAction]
+      : [];
+
+  return [...baseOptions, ...eventOption];
+}
+
+export function isWeekReadyToConfirm(weekState: ActiveWeekState): boolean {
+  if (!weekState.attendanceLocked || !weekState.days || weekState.days.length === 0) {
+    return false;
+  }
+
+  return weekState.days.every((day) => day.plannedAction);
 }
 
 export function createMonthlySchedule(month: number): ScheduledDay[] {
@@ -137,6 +281,10 @@ export function createWeekTimeState(
     remainingTimeUnits: totalTimeUnits,
     releasedClassDays: [],
     attendanceStrategy,
+    attendanceLocked: false,
+    event: null,
+    days: buildPlannerWeekdays({ week }),
+    readyToConfirm: false,
   };
 }
 

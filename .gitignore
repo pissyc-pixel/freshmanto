@@ -3,6 +3,8 @@ node_modules
 out
 dist
 coverage
+*.tsbuildinfo
+tsconfig.tsbuildinfo
 *.log
 .DS_Store
 Thumbs.db

@@ -1,4 +1,5 @@
 import { createElement } from "react";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
@@ -11,7 +12,16 @@ import { LogFeed } from "@/components/log-feed";
 import { ReportPreview } from "@/components/report-preview";
 import { buildEndingReportPrompt } from "@/core/prompts/ending-report";
 import { buildMonthlyJournalPrompt } from "@/core/prompts/monthly-journal";
-import { attendanceStrategyOptions } from "@/lib/demo/options";
+import {
+  actionEventTemplates,
+  starterEventTemplates,
+} from "@/data/events";
+import {
+  attendanceStrategyOptions,
+  formatActionType,
+  formatPlayerFacingFact,
+  formatPlayerFacingFlag,
+} from "@/lib/demo/options";
 import {
   renderEndingReportFallback,
   renderMonthlyJournalFallback,
@@ -20,6 +30,8 @@ import type {
   EndingReportPromptInput,
   MonthlyJournalPromptInput,
 } from "@/types/ai";
+
+const eventTemplates = [...starterEventTemplates, ...actionEventTemplates];
 
 const monthlyInput: MonthlyJournalPromptInput = {
   kind: "monthly_journal",
@@ -220,6 +232,96 @@ const endingInput: EndingReportPromptInput = {
 };
 
 describe("player-facing narrative helpers", () => {
+  it("keeps raw internal action keys out of game page player copy", () => {
+    const pageSource = readFileSync("app/game/page.tsx", "utf-8");
+
+    expect(pageSource).not.toContain("skip_class 会");
+  });
+
+  it("formats skip class as natural Chinese instead of an internal action key", () => {
+    const label = formatActionType("skip_class");
+
+    expect(label).toContain("不去上课");
+    expect(label).not.toBe("skip_class");
+    expect(label).not.toContain("skip_class");
+  });
+
+  it("formats action event flags as natural Chinese without leaking internal keys", () => {
+    const flags = [
+      "instant-event:cash-crunch",
+      "instant-event:stress-spillover",
+      "instant-event:study-group-help",
+      "instant-event:teacher-nudge",
+      "insufficient-week-time",
+    ];
+
+    for (const flag of flags) {
+      const formatted = formatPlayerFacingFlag(flag);
+
+      expect(formatted).not.toBe(flag);
+      expect(formatted).not.toContain(flag);
+      expect(formatted).not.toContain("instant-event");
+      expect(formatted).not.toContain("insufficient-week-time");
+    }
+  });
+
+  it("formats collapsed study efficiency as player-facing Chinese instead of leaking the raw flag", () => {
+    const formatted = formatPlayerFacingFlag("study-efficiency-collapsed");
+
+    expect(formatted).not.toBe("study-efficiency-collapsed");
+    expect(formatted).not.toContain("study-efficiency-collapsed");
+  });
+
+  it("formats action event notable facts as player-facing Chinese", () => {
+    const facts = [
+      "event:cash-crunch",
+      "event:stress-spillover",
+      "event:study-group-help",
+      "event:teacher-nudge",
+    ];
+
+    for (const fact of facts) {
+      const formatted = formatPlayerFacingFact(fact);
+
+      expect(formatted).not.toBe(fact);
+      expect(formatted).not.toContain(fact);
+      expect(formatted).not.toContain("event:");
+    }
+  });
+
+  it.each(
+    eventTemplates
+      .map((template) => ({
+        eventId: template.id,
+        fact: template.effect.notableFact,
+      }))
+      .filter(
+        (entry): entry is { eventId: string; fact: string } =>
+          typeof entry.fact === "string" && entry.fact.startsWith("event:"),
+      ),
+  )("formats event notable fact for $eventId without leaking the raw fact", ({ fact }) => {
+    const formatted = formatPlayerFacingFact(fact);
+
+    expect(formatted).not.toBe(fact);
+    expect(formatted).not.toContain("event:");
+  });
+
+  it.each(
+    eventTemplates.flatMap((template) =>
+      (template.effect.flags ?? []).map((flag) => ({
+        eventId: template.id,
+        flag,
+      })),
+    ),
+  )("formats event flag for $eventId without leaking the raw flag", ({ flag }) => {
+    const formatted = formatPlayerFacingFlag(flag);
+
+    expect(formatted).not.toBe(flag);
+    if (flag.includes(":")) {
+      expect(formatted).not.toContain(flag);
+    }
+  });
+
   it("renders action planning options in natural Chinese", () => {
     expect(actionOptions.find((item) => item.value === "study")).toMatchObject({
       label: "复习 / 学习",

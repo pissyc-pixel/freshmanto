@@ -51,6 +51,7 @@ const monthlySummary: StructuredMonthlySummary = {
   month: 1,
   actions: ["study", "social"],
   attendanceStrategy: "serious",
+  weeklyCalendar: [],
   schedule: [
     {
       day: 1,
@@ -92,10 +93,16 @@ const monthlySummary: StructuredMonthlySummary = {
     strategy: "serious",
     attendanceCounted: true,
     directRollCallPenalty: 0,
+    rollCallRiskDelta: 0,
+    usualScoreRiskDelta: 0,
+    proxyCost: 0,
+    remedyPressure: 0,
     academicRiskDelta: -2,
     academicGain: 5,
-    moodDelta: -1
-  }
+    moodDelta: -1,
+    stressDelta: 0,
+  },
+  turns: [],
 };
 
 const endingSummary: StructuredEndingSummary = {

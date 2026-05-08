@@ -1,3 +1,8 @@
+import {
+  ensureProgressionState,
+  inferGraduationPath,
+  inferGraduationPathResult,
+} from "@/core/resolvers/progression";
 import type {
   GameRun,
   GraduationOutcome,
@@ -117,17 +122,26 @@ function determineOutcome(run: GameRun): GraduationOutcome {
 }
 
 export function evaluateGraduationOutcome(run: GameRun): StructuredEndingSummary {
-  const outcome = determineOutcome(run);
+  const ensuredRun = ensureProgressionState(run);
+  const outcome = determineOutcome(ensuredRun);
+  const graduationPath = inferGraduationPath(ensuredRun);
 
   return {
-    finalYear: Math.min(run.currentYear, 4),
+    finalYear: Math.min(ensuredRun.currentYear, 4),
     outcome,
     longTermAcademicAverage:
-      run.semesters.length > 0 ? calculateAverage(run.semesters) : Math.max(65, 60 + run.profile.luck / 5),
-    resumeHighlights: run.resume.slice(-5),
+      ensuredRun.semesters.length > 0
+        ? calculateAverage(ensuredRun.semesters)
+        : Math.max(65, 60 + ensuredRun.profile.luck / 5),
+    resumeHighlights: ensuredRun.resume.slice(-5),
     notableFacts: [
-      `failed-semesters:${run.semesters.filter((semester) => !semester.passed).length}`,
-      `risk-flags:${run.riskFlags.length}`,
+      `failed-semesters:${ensuredRun.semesters.filter((semester) => !semester.passed).length}`,
+      `risk-flags:${ensuredRun.riskFlags.length}`,
     ],
+    dominantDirection: ensuredRun.progression?.dominantDirection,
+    graduationPath,
+    pathResult: inferGraduationPathResult(ensuredRun, graduationPath),
+    recommendationQualification: ensuredRun.progression?.recommendationQualification,
+    publicExamProgress: ensuredRun.progression?.publicExam.progress,
   };
 }

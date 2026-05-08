@@ -4,14 +4,19 @@ import { isSupabaseAdminConfigured, isSupabaseConfigured } from "@/lib/supabase/
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const checks = {
+    supabaseConfigured: isSupabaseConfigured(),
+    supabaseAdminConfigured: isSupabaseAdminConfigured(),
+    aiConfigured: isAiConfigured(),
+  };
+  const isHealthy = checks.supabaseConfigured && checks.supabaseAdminConfigured;
+
   return Response.json({
-    status: "ok",
+    status: isHealthy ? "ok" : "degraded",
     service: "freshmanto-beta",
     time: new Date().toISOString(),
-    checks: {
-      supabaseConfigured: isSupabaseConfigured(),
-      supabaseAdminConfigured: isSupabaseAdminConfigured(),
-      aiConfigured: isAiConfigured(),
-    },
+    checks,
+  }, {
+    status: isHealthy ? 200 : 503,
   });
 }
