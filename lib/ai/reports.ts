@@ -2,9 +2,8 @@ import { buildEndingReportPrompt } from "@/core/prompts/ending-report";
 import { buildMonthlyJournalPrompt } from "@/core/prompts/monthly-journal";
 import { createAiClient } from "@/lib/ai/client";
 import { aiConfig, isAiConfigured } from "@/lib/ai/config";
+import { buildGrowthJournalEntry, buildMonthlyDiaryDigest } from "@/lib/demo/monthly-digest";
 import {
-  buildPlayerFacingMonthlyLog,
-  formatActionType,
   formatAttendanceStrategy,
   formatEndingNotableFact,
   formatGraduationOutcome,
@@ -32,42 +31,16 @@ function formatMonthlyHeading(year: number, month: number) {
 }
 
 function formatSignedValue(value: number) {
-  if (value > 0) {
-    return `+${value}`;
-  }
-
-  return `${value}`;
+  return value > 0 ? `+${value}` : `${value}`;
 }
 
 function buildStatDeltaLine(statsDelta: DynamicStats) {
   return [
-    `钱 ${formatSignedValue(statsDelta.money)} 元`,
+    `钱 ${formatSignedValue(statsDelta.money)}`,
     `心情 ${formatSignedValue(statsDelta.mood)}`,
     `压力 ${formatSignedValue(statsDelta.stress)}`,
     `学业 ${formatSignedValue(statsDelta.semesterAcademics)}`,
   ].join("，");
-}
-
-function renderMonthlyMoodLine(input: MonthlyJournalPromptInput): string {
-  const { summary } = input;
-
-  if (summary.eventIds.includes("academic-scholarship")) {
-    return "最直接的感受是，前面那些硬撑着熬过去的日子，这个月终于有了一点看得见的回响。";
-  }
-
-  if (summary.statsDelta.semesterAcademics >= 10) {
-    return "学业这条线总算被我一点点拉了回来，过程不轻松，但月底回头看还是能感觉到差别。";
-  }
-
-  if (summary.statsDelta.stress >= 8) {
-    return "整个月都像在赶路，很多事情不是从容安排出来的，而是咬着牙一件件顶过去的。";
-  }
-
-  if (summary.statsDelta.fulfillment >= 8 || summary.statsDelta.mood >= 8) {
-    return "虽然也忙，但月末回头看，多少还是会觉得自己这段时间没白折腾。";
-  }
-
-  return "它不算特别戏剧化，但情绪和生活节奏都确实留在了这个月里。";
 }
 
 function renderOutcomeSentence(input: EndingReportPromptInput): string {
@@ -85,24 +58,22 @@ function renderOutcomeSentence(input: EndingReportPromptInput): string {
   }
 }
 
-function renderMarkdownFactBlock(lead: string, facts: string[]): string {
+function renderMarkdownFactBlock(lead: string, facts: string[]) {
   return [lead, ...facts.map((fact) => `- ${fact}`)].join("\n");
 }
 
 export function renderMonthlyJournalFallback(input: MonthlyJournalPromptInput): AiReportResult {
   const { summary, year, month } = input;
-  const playerLog = buildPlayerFacingMonthlyLog(summary, year, month);
-  const actionText = summary.actions.map(formatActionType).join("、");
-  const resumeText =
-    summary.resumeAdditions.length > 0
-      ? `这个月多少还是留下了一点以后回头能看见的东西：${summary.resumeAdditions
-          .map((item) => item.title)
-          .join("、")}。`
-      : "这个月没有新增履历条目，但生活本身也不是白过。";
+  const digest = buildMonthlyDiaryDigest(summary, year, month);
+  const growthLog = buildGrowthJournalEntry(summary, year, month);
   const groundedFacts =
-    playerLog.details.length > 0
-      ? renderMarkdownFactBlock("我还记得的几件事：", playerLog.details.slice(0, 5))
-      : "这个月没有额外被记下来的大事，更多是日常一点点往前挪。";
+    digest.keyMoments.length > 0
+      ? renderMarkdownFactBlock("这个月我还记得的几件事：", digest.keyMoments.slice(0, 5))
+      : "这个月没有特别戏剧化的大事，更多还是日常一点点往前挪。";
+  const resumeText =
+    digest.resumeHighlights.length > 0
+      ? `这个月至少还留下了几件以后回头能看见的东西：${digest.resumeHighlights.join("、")}。`
+      : "这个月没有新增很硬的履历亮点，但日子本身也不算白过。";
 
   return {
     kind: "monthly_journal",
@@ -110,14 +81,13 @@ export function renderMonthlyJournalFallback(input: MonthlyJournalPromptInput): 
     markdown: [
       `# ${formatMonthlyHeading(year, month)}`,
       "",
-      `这个月我主要把时间放在 ${actionText || "调整状态"} 上，上课这边基本按「${formatAttendanceStrategy(summary.attendanceStrategy)}」的节奏往前走。`,
-      renderMonthlyMoodLine(input),
-      `月底再看账和状态，我手里还剩 ${summary.statsAfter.money} 块，心情在 ${summary.statsAfter.mood}，压力到了 ${summary.statsAfter.stress}，学业线停在 ${summary.statsAfter.semesterAcademics}。`,
-      `和月初比起来，${buildStatDeltaLine(summary.statsDelta)}。`,
-      `如果非要用一句话概括这个月的学业状态，那大概就是「${formatSemesterFeedback(summary.academicFeedback)}」。`,
+      `这个月我主要把时间放在${digest.mainActions.join("、") || "把节奏稳住"}上，上课这边基本按“${formatAttendanceStrategy(summary.attendanceStrategy)}”的节奏往前走。`,
+      digest.emotionalArc,
+      `月底再看账和状态，我手里还剩 ${digest.endState.money}，心情在 ${digest.endState.mood}，压力到 ${digest.endState.stress}，学业线停在 ${digest.endState.semesterAcademics}。`,
+      `和月初比起来，${buildStatDeltaLine(summary.statsDelta)}。如果非要用一句话概括这个月的学业状态，大概就是“${formatSemesterFeedback(summary.academicFeedback)}”。`,
       groundedFacts,
       resumeText,
-      "写到这里，这个月也算真的翻过去了一页。",
+      `写到这里，这个月差不多也算真的翻过去了一页。${growthLog.title}`,
     ].join("\n\n"),
   };
 }
@@ -137,7 +107,7 @@ export function renderEndingReportFallback(input: EndingReportPromptInput): AiRe
       "# 毕业回望",
       "",
       renderOutcomeSentence(input),
-      `如果把这四年的结果压成一句话，我最后拿到的是「${formatGraduationOutcome(summary.outcome)}」。长期学业表现大概停在 ${summary.longTermAcademicAverage}，写到这里时我已经走到了第 ${summary.finalYear} 学年。`,
+      `如果把这四年的结果压成一句话，我最后拿到的是“${formatGraduationOutcome(summary.outcome)}”。长期学业表现大概停在 ${summary.longTermAcademicAverage}，写到这里时我已经走到了第 ${summary.finalYear} 学年。`,
       highlights,
       endingFacts.length > 0
         ? renderMarkdownFactBlock("再回头看，最能说明这段路是怎么走过来的，其实是这些已经发生过的事：", endingFacts)

@@ -1,21 +1,12 @@
 import Link from "next/link";
-import { ActionResultCard } from "@/components/action-result-card";
 import { AppShell } from "@/components/app-shell";
 import { FactList } from "@/components/fact-list";
 import { LogFeed } from "@/components/log-feed";
 import { ReportPreview } from "@/components/report-preview";
 import { SectionCard } from "@/components/section-card";
 import { StatsGrid } from "@/components/stats-grid";
-import {
-  buildPlayerFacingMonthlyLog,
-  formatActionType,
-  formatAttendanceStrategy,
-  formatMonthLabel,
-  formatPlayerFacingFact,
-  formatPlayerFacingFlag,
-  formatSemesterFeedback,
-  formatStatLabel,
-} from "@/lib/demo/options";
+import { buildGrowthJournalEntry, buildMonthlyDiaryDigest } from "@/lib/demo/monthly-digest";
+import { formatMonthLabel, formatStatLabel } from "@/lib/demo/options";
 import { getServerDemoBundle } from "@/lib/demo/server";
 import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
 import type { DynamicStats } from "@/types/game";
@@ -45,10 +36,10 @@ export default async function SettlementPage({ searchParams }: SettlementPagePro
     return (
       <AppShell
         eyebrow="月结算"
-        title="还没有可查看的月结算"
-        description="先创建 run，并在主游戏页至少推进完整一个月，这里才会出现真实结算。"
+        title="这里会展示月底结算"
+        description="月底结算会把状态总览、成长日志、AI 月记和系统留档分开展示。"
       >
-        <SectionCard title="需要一个真实 run" description="月结算页只展示已经写入数据库的月度快照和 AI 月记。">
+        <SectionCard title="还没有可查询的 run" description="先回到首页创建一局，再从主游戏推进到月底。">
           <Link href="/" className="text-sm font-semibold text-amber-700 underline-offset-4 hover:underline">
             返回开局页
           </Link>
@@ -60,21 +51,13 @@ export default async function SettlementPage({ searchParams }: SettlementPagePro
   const monthlyState =
     bundle.monthlyStates.find((item) => item.year === year && item.month === month) ??
     bundle.monthlyStates.at(-1);
-  const report =
-    bundle.aiReports.find(
-      (item) =>
-        item.report_type === "monthly_journal" &&
-        (year ? item.year === year : true) &&
-        (month ? item.month === month : true),
-    ) ??
-    [...bundle.aiReports].reverse().find((item) => item.report_type === "monthly_journal");
 
-  if (!monthlyState || !report) {
+  if (!monthlyState) {
     return (
       <AppShell
         eyebrow="月结算"
-        title="这一局还没有月结算记录"
-        description="完成至少一次月结算之后，这里才会显示结构化快照、玩家回顾和 AI 月记。"
+        title="这局还没有月结算记录"
+        description="完成至少一次月底结算之后，这里才会出现结构化快照、成长日志和 AI 月记。"
       >
         <SectionCard title="当前没有可展示内容" description="先回到主游戏页继续推进。">
           <Link
@@ -88,9 +71,15 @@ export default async function SettlementPage({ searchParams }: SettlementPagePro
     );
   }
 
+  const report = bundle.aiReports.find(
+    (item) =>
+      item.report_type === "monthly_journal" &&
+      item.year === monthlyState.year &&
+      item.month === monthlyState.month,
+  );
   const summary = monthlyState.snapshot_json;
-  const playerLog = buildPlayerFacingMonthlyLog(summary, monthlyState.year, monthlyState.month);
-  const lastTurn = summary.turns.at(-1);
+  const growthLog = buildGrowthJournalEntry(summary, monthlyState.year, monthlyState.month);
+  const digest = buildMonthlyDiaryDigest(summary, monthlyState.year, monthlyState.month);
   const systemLogs = bundle.logs
     .filter((item) => item.year === monthlyState.year && item.month === monthlyState.month)
     .map((item) => ({
@@ -100,25 +89,12 @@ export default async function SettlementPage({ searchParams }: SettlementPagePro
       year: item.year,
       month: item.month,
     }));
-  const factItems = [
-    `课程策略：${formatAttendanceStrategy(summary.attendanceStrategy)}`,
-    `本月行动：${summary.actions.map(formatActionType).join("、") || "无"}`,
-    `学业反馈：${formatSemesterFeedback(summary.academicFeedback)}`,
-    ...summary.notableFacts.map(formatPlayerFacingFact),
-    ...summary.flags.map(formatPlayerFacingFlag),
-  ];
-  const actionEventLines =
-    summary.eventIds.length > 0
-      ? [
-          `这次收束之后，这个月还额外触发了 ${summary.eventIds.length} 个变化，它们已经并进下面的月度回顾里。`,
-        ]
-      : [];
 
   return (
     <AppShell
       eyebrow="月结算"
       title={`${formatMonthLabel(monthlyState.year, monthlyState.month)} 已结算`}
-      description="同一个月拆成两套视角：前台日志给玩家看“这个月我过得怎么样”，后台日志保留开发与系统留档。AI 月记只能基于规则层已经算好的结构化事实。"
+      description="成长日志偏事实层，月记偏体验层；这页会把两者拆开，避免都在重复流水动作。"
       actions={
         <>
           <Link
@@ -141,49 +117,45 @@ export default async function SettlementPage({ searchParams }: SettlementPagePro
           <StatsGrid items={buildDeltaItems(summary.statsAfter, summary.statsDelta)} />
         </SectionCard>
 
-        {lastTurn ? (
-          <SectionCard
-            title="最近一次行动"
-            description="先看把这个月真正收束起来的最后一轮行动，它改了什么、接下来又能做什么。"
-          >
-            <ActionResultCard
-              turn={lastTurn}
-              eventLines={actionEventLines}
-              nextStepHint="这轮已经把本月推进成结算了。接下来可以先读月记，也可以直接进入下个月。"
-            />
-          </SectionCard>
-        ) : null}
-
         <SectionCard
-          title="前台日志：这个月发生了什么"
-          description="这一列只给玩家看，尽量说人话，不直接复读系统字段。"
+          title="成长日志"
+          description="成长日志偏事实整理：这个月主要做了什么，最明显的变化和关键经历是什么。"
         >
-          <LogFeed items={[playerLog]} variant="player" />
+          <LogFeed items={[growthLog]} variant="player" />
         </SectionCard>
 
         <SectionCard
-          title="规则层事实清单"
-          description="下面这些是 AI 可以引用的真实事实来源，但当前页面只展示已经翻译过的玩家可读版本。"
+          title="给月记的结构化摘要"
+          description="AI 月记只负责表达，不负责规则判定；这里展示的是喂给它的月度摘要骨架。"
         >
-          <FactList items={factItems} />
-        </SectionCard>
-
-        <SectionCard
-          title="AI 月记"
-          description="这里展示的是最终保存下来的月记正文。结构化原始摘要默认不向玩家直接暴露。"
-        >
-          <ReportPreview
-            title={`${formatMonthLabel(monthlyState.year, monthlyState.month)} 月记`}
-            contractLabel={report.model ?? "fallback"}
-            markdown={report.output_markdown}
+          <FactList
+            items={[
+              `主线行动：${digest.mainActions.join("、") || "本月主要在调整节奏"}`,
+              `课程态度：${digest.attendanceStrategy}`,
+              `情绪线：${digest.emotionalArc}`,
+              `学业线：${digest.academicArc}`,
+              `钱和生活：${digest.moneyArc}`,
+              ...digest.keyMoments,
+            ]}
           />
         </SectionCard>
 
-        <SectionCard
-          title="后台日志：系统留档"
-          description="这里保留开发和系统记录，方便追踪结算过程，但不直接替代玩家回顾。"
-        >
-          <LogFeed items={systemLogs} emptyMessage="这个月还没有额外的后台记录。" />
+        <SectionCard title="AI 月记" description="月记偏体验层，更像“我这个月到底是怎么过来的”。">
+          {report ? (
+            <ReportPreview
+              title={`${formatMonthLabel(monthlyState.year, monthlyState.month)} 月记`}
+              contractLabel={report.model ?? "fallback"}
+              markdown={report.output_markdown}
+            />
+          ) : (
+            <div className="rounded-2xl border border-dashed border-[var(--border)] bg-white/60 px-4 py-5 text-sm leading-6 text-stone-600">
+              正在生成 AI 月记 / 月度总结。如果你刚结束月底结算，稍等一下再刷新这里。
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard title="后台日志" description="这里保留系统层面的动作、事件和结算留档，方便追踪本月结算过程。">
+          <LogFeed items={systemLogs} emptyMessage="这个月还没有额外的后台日志留档。" />
         </SectionCard>
       </div>
     </AppShell>
