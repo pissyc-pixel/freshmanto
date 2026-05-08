@@ -7,6 +7,9 @@ type ResumeItemListProps = {
 const categoryLabels: Record<ResumeItem["category"], string> = {
   internship: "实习",
   project: "项目",
+  competition: "比赛",
+  scholarship: "奖学金",
+  research: "研究 / 深造",
   campus_activity: "校园活动",
   special_experience: "专项经历",
   job_progress: "求职进展",

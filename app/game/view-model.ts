@@ -16,6 +16,7 @@ import type {
   ActiveMonthState,
   ActiveWeekState,
   ActionTurnSummary,
+  GameRun,
   PlannedWeekdayState,
   ScheduledWeek,
   TimeBlockKind,
@@ -97,18 +98,20 @@ export function buildWeeklyScheduleBlocks(input: {
   }));
 }
 
-export function buildPlannerDaysView(currentWeekState: ActiveWeekState) {
+export function buildPlannerDaysView(currentWeekState: ActiveWeekState, run?: GameRun) {
   return (currentWeekState.days ?? []).map((day) => {
     const normalOptions = resolveAvailableWeeklyActions({
       day,
       event: currentWeekState.event,
       skipClassSelected: false,
+      run,
     });
     const skipOptions = day.skipClassAvailable
       ? resolveAvailableWeeklyActions({
           day,
           event: currentWeekState.event,
           skipClassSelected: true,
+          run,
         })
       : normalOptions;
 

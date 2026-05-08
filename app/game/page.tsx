@@ -17,6 +17,7 @@ import { StatsGrid } from "@/components/stats-grid";
 import { TimeBlockStrip } from "@/components/time-block-strip";
 import { WeeklySettlementCard } from "@/components/weekly-settlement-card";
 import { createWeeklyCalendar } from "@/core/game-engine";
+import { ensureProgressionState, summarizeDirectionSignals } from "@/core/resolvers/progression";
 import {
   formatMonthLabel,
   formatStatLabel,
@@ -68,8 +69,9 @@ export default async function GamePage({ searchParams }: GamePageProps) {
     );
   }
 
-  const activeMonth = bundle.run.activeMonth;
-  const weeklyCalendar = activeMonth?.weeklyCalendar ?? createWeeklyCalendar(bundle.run.currentMonth);
+  const hydratedRun = ensureProgressionState(bundle.run);
+  const activeMonth = hydratedRun.activeMonth;
+  const weeklyCalendar = activeMonth?.weeklyCalendar ?? createWeeklyCalendar(hydratedRun.currentMonth);
   const currentWeek = activeMonth?.currentWeek ?? 1;
   const currentWeekState = resolveCurrentWeekState(weeklyCalendar, activeMonth);
   const schedule = buildWeeklyScheduleBlocks({
@@ -77,7 +79,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
     currentWeek,
     currentWeekState,
   });
-  const plannerDays = buildPlannerDaysView(currentWeekState);
+  const plannerDays = buildPlannerDaysView(currentWeekState, hydratedRun);
   const plannerStatusText = buildPlannerStatusText(currentWeekState);
   const plannerLines = buildPlannerFeedbackLines(currentWeekState);
   const weeklySettlement = buildWeeklySettlementView(activeMonth?.latestWeekSettlement);
@@ -92,6 +94,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
     year: log.year,
     month: log.month,
   }));
+  const directionSignals = summarizeDirectionSignals(hydratedRun);
 
   return (
     <AppShell
@@ -125,11 +128,22 @@ export default async function GamePage({ searchParams }: GamePageProps) {
     >
       <div className="space-y-6">
         <SectionCard title="开局底子" description="这些基础属性会贯穿整局游戏。">
-          <ProfileSummary profile={bundle.run.profile} />
+          <ProfileSummary profile={hydratedRun.profile} />
         </SectionCard>
 
         <SectionCard title="当前状态" description="每次周结算后，状态都会在这里更新。">
-          <StatsGrid items={buildStatItems(bundle.run.stats)} />
+          <StatsGrid items={buildStatItems(hydratedRun.stats)} />
+        </SectionCard>
+
+        <SectionCard title="后半程方向" description="这轮先把大学后半程的人生导向接进来，让方向在过程中慢慢形成。">
+          <div className="space-y-2 text-sm leading-6 text-stone-700">
+            <p>
+              当前主导倾向：
+              <span className="font-semibold text-stone-900"> {hydratedRun.progression?.dominantDirection ?? "undecided"}</span>
+              。公考进度 {hydratedRun.progression?.publicExam.progress ?? 0}，就业准备 {hydratedRun.progression?.employmentReadiness ?? 0}，深造准备 {hydratedRun.progression?.postgraduateProgress ?? 0}。
+            </p>
+            {directionSignals.length > 0 ? directionSignals.map((line) => <p key={line}>{line}</p>) : <p>目前方向感还比较分散，更多是在积累底子。</p>}
+          </div>
         </SectionCard>
 
         {weeklySettlement ? (

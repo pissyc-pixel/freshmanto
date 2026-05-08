@@ -1,3 +1,4 @@
+import { ensureProgressionState } from "@/core/resolvers/progression";
 import type {
   CityTier,
   CollegeTrack,
@@ -163,7 +164,7 @@ export function createStarterProfile(options: InitialGameRunOptions = {}): Start
 export function createInitialGameRun(options: InitialGameRunOptions = {}): GameRun {
   const profile = createStarterProfile(options);
 
-  return {
+  return ensureProgressionState({
     id: options.id ?? `run-${Date.now()}`,
     status: "active",
     currentYear: 1,
@@ -184,5 +185,5 @@ export function createInitialGameRun(options: InitialGameRunOptions = {}): GameR
       burnout: 0,
     },
     riskFlags: [],
-  };
+  });
 }

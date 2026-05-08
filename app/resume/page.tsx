@@ -4,6 +4,7 @@ import { LogFeed } from "@/components/log-feed";
 import { ResumeItemList } from "@/components/resume-item-list";
 import { ResumePriorityPanel } from "@/components/resume-priority-panel";
 import { SectionCard } from "@/components/section-card";
+import { deriveAcademicProfile, ensureProgressionState, summarizeDirectionSignals } from "@/core/resolvers/progression";
 import { buildGrowthJournalEntry } from "@/lib/demo/monthly-digest";
 import { formatMonthLabel } from "@/lib/demo/options";
 import { getServerDemoBundle } from "@/lib/demo/server";
@@ -40,6 +41,9 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
     );
   }
 
+  const hydratedRun = ensureProgressionState(bundle.run);
+  const academicProfile = deriveAcademicProfile(hydratedRun);
+  const directionSignals = summarizeDirectionSignals(hydratedRun);
   const resumeItems = bundle.resumeItems.map((item) => ({
     id: item.id,
     category: item.category,
@@ -90,7 +94,7 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
     year: log.year,
     month: log.month,
   }));
-  const gpaValue = bundle.run.semesterAverage > 0 ? (bundle.run.semesterAverage / 20).toFixed(2) : "暂未生成";
+  const gpaValue = academicProfile.gpa.toFixed(2);
   const priorityItems = [
     {
       label: "GPA",
@@ -136,6 +140,17 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
           description="优先展示 GPA / 排名 / 百分比 / 比赛 / 实习 / 奖学金；未实装字段先给兼容占位。"
         >
           <ResumePriorityPanel items={priorityItems} />
+        </SectionCard>
+
+        <SectionCard title="方向正在形成" description="这轮先把后半程方向感接到履历页上，让玩家能看到自己正在往哪边偏。">
+          <div className="space-y-2 text-sm leading-6 text-stone-700">
+            <p>
+              当前主导倾向：
+              <span className="font-semibold text-stone-900"> {hydratedRun.progression?.dominantDirection ?? "undecided"}</span>
+              ，推导 GPA {academicProfile.gpa.toFixed(2)}，公考进度 {hydratedRun.progression?.publicExam.progress ?? 0}。
+            </p>
+            {directionSignals.length > 0 ? directionSignals.map((line) => <p key={line}>{line}</p>) : <p>目前还在打底，未来走向暂时没有明显定型。</p>}
+          </div>
         </SectionCard>
 
         <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">

@@ -415,6 +415,18 @@ export function formatCityTier(value: CityTier): string {
 }
 
 export function formatActionType(value: ActionType): string {
+  if (value === "postgraduate_prep") {
+    return "考研 / 深造准备";
+  }
+
+  if (value === "public_exam_prep") {
+    return "公考准备";
+  }
+
+  if (value === "competition_project") {
+    return "比赛 / 长期项目投入";
+  }
+
   return actionOptions.find((item) => item.value === value)?.label ?? value;
 }
 

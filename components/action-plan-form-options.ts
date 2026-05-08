@@ -27,6 +27,21 @@ export const actionOptions: Array<{
     description: `打磨简历、投递和准备面试，也会消耗一些钱和精力。${formatActionCost("job_prep")}`,
   },
   {
+    value: "postgraduate_prep",
+    label: "考研 / 深造准备",
+    description: `开始把时间更稳定地往考研、科研或继续深造上投。${formatActionCost("postgraduate_prep")}`,
+  },
+  {
+    value: "public_exam_prep",
+    label: "公考准备",
+    description: `给行测、申论和节奏做长期积累，主要在后半程才会更常用。${formatActionCost("public_exam_prep")}`,
+  },
+  {
+    value: "competition_project",
+    label: "比赛 / 长期项目投入",
+    description: `把一天正式投进手里的竞赛或项目线，靠积累换后面的成果。${formatActionCost("competition_project")}`,
+  },
+  {
     value: "part_time",
     label: "兼职 / 赚钱",
     description: `补一点现金流，但夜间不能安排。${formatActionCost("part_time")}`,

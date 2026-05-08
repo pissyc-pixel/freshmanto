@@ -1,6 +1,7 @@
 import type {
   ActionType,
   ActiveWeekState,
+  GameRun,
   PlannedWeekdayState,
   CourseAttendanceStrategy,
   ScheduledDay,
@@ -68,11 +69,34 @@ const ACTION_TIME_COSTS: Record<ActionType, number> = {
   student_activity: 1,
   remedy: 1,
   job_prep: 2,
+  postgraduate_prep: 2,
+  public_exam_prep: 2,
+  competition_project: 2,
   part_time: 2,
   big_meal: 0,
   ask_family: 0,
   skip_class: 0,
 };
+
+function isOptionUnlocked(run: GameRun | undefined, option: WeeklyActionOption): boolean {
+  if (!run) {
+    return true;
+  }
+
+  if (option.action === "postgraduate_prep") {
+    return run.currentYear >= 3;
+  }
+
+  if (option.action === "public_exam_prep") {
+    return run.currentYear > 3 || (run.currentYear === 3 && run.currentMonth >= 7);
+  }
+
+  if (option.action === "competition_project") {
+    return (run.competitionProjects ?? []).some((project) => project.status === "open" || project.status === "active");
+  }
+
+  return true;
+}
 
 function resolveWeekdayKind(weekday: Weekday): TimeBlockKind {
   if (weekday === "sat" || weekday === "sun") {
@@ -170,6 +194,7 @@ export function resolveAvailableWeeklyActions(input: {
   day: PlannedWeekdayState;
   event?: WeeklyEventInstance | null;
   skipClassSelected?: boolean;
+  run?: GameRun;
 }): WeeklyActionOption[] {
   const effectiveDayType = resolveEffectiveDayType(input);
   const limitedActions = input.event?.weekday === input.day.weekday
@@ -177,6 +202,10 @@ export function resolveAvailableWeeklyActions(input: {
     : null;
 
   const allowedByDayType = weeklyActionCatalog.filter((option) => {
+    if (!isOptionUnlocked(input.run, option)) {
+      return false;
+    }
+
     if (effectiveDayType === "night_only") {
       return option.availability.includes("night");
     }

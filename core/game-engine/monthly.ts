@@ -2,6 +2,7 @@ import { createInitialGameRun } from "@/core/generators";
 import { resolveActionPlan } from "@/core/resolvers/actions";
 import { resolveCourseStrategy } from "@/core/resolvers/attendance";
 import { resolveMonthEvents } from "@/core/resolvers/events";
+import { applyAcceptedActionProgression, ensureProgressionState } from "@/core/resolvers/progression";
 import { findWeeklyEventBoost, resolveWeeklyEvent } from "@/core/resolvers/weekly-events";
 import { findWeeklyActionOption } from "@/data/actions";
 import { getWeeklyAllowance, getWeeklyLivingExpense } from "@/data/events";
@@ -352,26 +353,32 @@ function deriveMonthlyRiskFlags(run: GameRun): string[] {
 }
 
 function ensureActiveMonth(run: GameRun): ActiveMonthState {
-  if (run.activeMonth && run.activeMonth.year === run.currentYear && run.activeMonth.month === run.currentMonth) {
+  const ensuredRun = ensureProgressionState(run);
+
+  if (
+    ensuredRun.activeMonth &&
+    ensuredRun.activeMonth.year === ensuredRun.currentYear &&
+    ensuredRun.activeMonth.month === ensuredRun.currentMonth
+  ) {
     return {
-      ...run.activeMonth,
-      currentWeekState: ensurePlanningWeekState(run, run.activeMonth),
+      ...ensuredRun.activeMonth,
+      currentWeekState: ensurePlanningWeekState(ensuredRun, ensuredRun.activeMonth),
     };
   }
 
-  const weeklyCalendar = createWeeklyCalendar(run.currentMonth);
+  const weeklyCalendar = createWeeklyCalendar(ensuredRun.currentMonth);
 
   return {
-    year: run.currentYear,
-    month: run.currentMonth,
+    year: ensuredRun.currentYear,
+    month: ensuredRun.currentMonth,
     currentWeek: 1,
     totalWeeks: WEEKS_PER_MONTH,
     allowanceApplied: false,
-    cooldownsAtStart: { ...run.cooldowns },
+    cooldownsAtStart: { ...ensuredRun.cooldowns },
     weeklyCalendar,
-    currentWeekState: buildWeekPlanningState(run, 1, "mixed"),
+    currentWeekState: buildWeekPlanningState(ensuredRun, 1, "mixed"),
     completedWeeks: [],
-    statsAtStart: cloneStats(run.stats),
+    statsAtStart: cloneStats(ensuredRun.stats),
     turns: [],
   };
 }
@@ -1017,6 +1024,7 @@ export function planWeeklyDayAction(input: {
     day,
     event: weekState.event,
     skipClassSelected,
+    run: input.run,
   });
   const chosenOption = availableOptions.find((option) => option.optionId === input.optionId);
 
@@ -1133,6 +1141,7 @@ export function confirmPlannedWeek(run: GameRun): {
         day,
         event: weekState.event,
         skipClassSelected: day.skipClassSelected,
+        run: projectedRun,
       }).find((item) => item.optionId === plannedAction.optionId) ??
       findWeeklyActionOption(plannedAction.optionId ?? plannedAction.action);
 
@@ -1267,6 +1276,9 @@ export function confirmPlannedWeek(run: GameRun): {
         lastResolvedTurn: turnSummary,
       },
     };
+    if (turnSummary.resolvedAction.accepted) {
+      projectedRun = applyAcceptedActionProgression(projectedRun, turnSummary.resolvedAction.action);
+    }
     dayTurns.push(turnSummary);
   }
 
@@ -1287,7 +1299,8 @@ export function confirmPlannedWeek(run: GameRun): {
 }
 
 export function resolveActionTurn(run: GameRun, plan: ActionTurnPlan): ResolvedTurnResult {
-  const activeMonth = ensureActiveMonth(run);
+  const ensuredRun = ensureProgressionState(run);
+  const activeMonth = ensureActiveMonth(ensuredRun);
   const week = activeMonth.weeklyCalendar[activeMonth.currentWeek - 1];
 
   if (!week) {
@@ -1296,8 +1309,8 @@ export function resolveActionTurn(run: GameRun, plan: ActionTurnPlan): ResolvedT
 
   const timeCost = getActionTimeCost(plan.action.action);
   const weekTimeBefore = activeMonth.currentWeekState.remainingTimeUnits;
-  const allowanceDelta = activeMonth.allowanceApplied ? 0 : run.profile.monthlyAllowance;
-  const initialActionResolution = resolveActionPlan(run, {
+  const allowanceDelta = activeMonth.allowanceApplied ? 0 : ensuredRun.profile.monthlyAllowance;
+  const initialActionResolution = resolveActionPlan(ensuredRun, {
     attendanceStrategy: plan.attendanceStrategy,
     actions: [plan.action],
   });
@@ -1332,7 +1345,7 @@ export function resolveActionTurn(run: GameRun, plan: ActionTurnPlan): ResolvedT
           reclaimedTimeUnits: 0,
         };
   const weekTimeAfter = Math.max(0, weekTimeBefore - effectiveTimeCost + skipClassRelease.reclaimedTimeUnits);
-  const statsBefore = run.stats;
+  const statsBefore = ensuredRun.stats;
   const statsDelta: DynamicStats = {
     money: allowanceDelta + actionResolution.moneyDelta + actionResolution.stats.money,
     mood: actionResolution.stats.mood,
@@ -1342,7 +1355,7 @@ export function resolveActionTurn(run: GameRun, plan: ActionTurnPlan): ResolvedT
     semesterAcademics: actionResolution.stats.semesterAcademics,
   };
   const statsAfter = addStats(statsBefore, statsDelta);
-  const riskAfter = mergeRisk(run.risk, actionResolution.risk);
+  const riskAfter = mergeRisk(ensuredRun.risk, actionResolution.risk);
   const flags = dedupe([
     ...actionResolution.flags,
     rejectedForTime ? "insufficient-week-time" : "",
@@ -1388,19 +1401,22 @@ export function resolveActionTurn(run: GameRun, plan: ActionTurnPlan): ResolvedT
       releasedClassDays: skipClassRelease.releasedClassDays,
     },
   };
-  const updatedRun: GameRun = {
-    ...run,
+  let updatedRun: GameRun = {
+    ...ensuredRun,
     stats: statsAfter,
     risk: riskAfter,
-    cooldowns: updateCooldownsDuringMonth(run, actionResolution.askFamilyUsed),
-    resume: [...run.resume, ...actionResolution.resumeAdditions],
+    cooldowns: updateCooldownsDuringMonth(ensuredRun, actionResolution.askFamilyUsed),
+    resume: [...ensuredRun.resume, ...actionResolution.resumeAdditions],
     riskFlags: deriveMonthlyRiskFlags({
-      ...run,
+      ...ensuredRun,
       stats: statsAfter,
       risk: riskAfter,
     }),
     activeMonth: updatedActiveMonth,
   };
+  if (resolvedAction.accepted) {
+    updatedRun = applyAcceptedActionProgression(updatedRun, resolvedAction.action);
+  }
 
   if (weekTimeAfter > 0) {
     return {

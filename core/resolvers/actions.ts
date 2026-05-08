@@ -148,7 +148,14 @@ function refusalReason(run: GameRun, action: SupportedAction): string | null {
     return "state-refused-study";
   }
 
-  if ((action === "job_prep" || action === "part_time") && (run.stats.stress >= 90 || run.stats.mood <= 10)) {
+  if (
+    (action === "job_prep" ||
+      action === "part_time" ||
+      action === "postgraduate_prep" ||
+      action === "public_exam_prep" ||
+      action === "competition_project") &&
+    (run.stats.stress >= 90 || run.stats.mood <= 10)
+  ) {
     return "state-refused-work";
   }
 
@@ -156,7 +163,15 @@ function refusalReason(run: GameRun, action: SupportedAction): string | null {
 }
 
 function isProductiveAction(action: SupportedAction): boolean {
-  return action === "study" || action === "job_prep" || action === "part_time" || action === "remedy";
+  return (
+    action === "study" ||
+    action === "job_prep" ||
+    action === "postgraduate_prep" ||
+    action === "public_exam_prep" ||
+    action === "competition_project" ||
+    action === "part_time" ||
+    action === "remedy"
+  );
 }
 
 function shouldApplyWeeklySettlement(run: GameRun, action: SupportedAction): boolean {
@@ -342,6 +357,37 @@ export function resolveActionPlan(
         actionStatsDelta.money -= 60;
         resumeAdditions.push(
           createResumeItem(run, "Resume Sprint", "Started tightening the resume and testing job directions.", "job_progress"),
+        );
+        break;
+      case "postgraduate_prep":
+        actionStatsDelta.stress += 5;
+        actionStatsDelta.semesterAcademics += Math.max(2, Math.round(4 * efficiency));
+        actionStatsDelta.fulfillment += Math.max(1, Math.round(2 * efficiency));
+        actionStatsDelta.mood -= efficiency < 0.7 ? 1 : 0;
+        actionRiskDelta.academicRisk -= Math.max(1, Math.round(2 * Math.max(0.65, efficiency)));
+        if (run.currentYear >= 3) {
+          resumeAdditions.push(
+            createResumeItem(run, "Postgraduate Prep", "Started to prepare a more explicit postgraduate study rhythm.", "research"),
+          );
+        }
+        break;
+      case "public_exam_prep":
+        actionStatsDelta.stress += 4;
+        actionStatsDelta.fulfillment += Math.max(1, Math.round(2 * efficiency));
+        actionStatsDelta.money -= 40;
+        if (run.currentYear >= 3) {
+          resumeAdditions.push(
+            createResumeItem(run, "Public Exam Prep", "Started building a stable public exam preparation rhythm.", "project"),
+          );
+        }
+        break;
+      case "competition_project":
+        actionStatsDelta.stress += 5;
+        actionStatsDelta.fulfillment += Math.max(2, Math.round(3 * efficiency));
+        actionStatsDelta.semesterAcademics += Math.max(1, Math.round(3 * efficiency));
+        actionStatsDelta.money -= 50;
+        resumeAdditions.push(
+          createResumeItem(run, "Competition Project", "Put another day into a longer competition or project line.", "competition"),
         );
         break;
       case "part_time":
