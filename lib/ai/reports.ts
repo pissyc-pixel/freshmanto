@@ -43,6 +43,17 @@ function buildStatDeltaLine(statsDelta: DynamicStats) {
   ].join("，");
 }
 
+function emptyStatsDelta(): DynamicStats {
+  return {
+    money: 0,
+    mood: 0,
+    stress: 0,
+    fulfillment: 0,
+    social: 0,
+    semesterAcademics: 0,
+  };
+}
+
 function renderOutcomeSentence(input: EndingReportPromptInput): string {
   switch (input.summary.outcome) {
     case "graduate":
@@ -66,6 +77,8 @@ export function renderMonthlyJournalFallback(input: MonthlyJournalPromptInput): 
   const { summary, year, month } = input;
   const digest = buildMonthlyDiaryDigest(summary, year, month);
   const growthLog = buildGrowthJournalEntry(summary, year, month);
+  const statsDelta = summary.statsDelta ?? emptyStatsDelta();
+  const attendanceStrategy = summary.attendanceStrategy ?? "mixed";
   const groundedFacts =
     digest.keyMoments.length > 0
       ? renderMarkdownFactBlock("这个月我还记得的几件事：", digest.keyMoments.slice(0, 5))
@@ -81,10 +94,10 @@ export function renderMonthlyJournalFallback(input: MonthlyJournalPromptInput): 
     markdown: [
       `# ${formatMonthlyHeading(year, month)}`,
       "",
-      `这个月我主要把时间放在${digest.mainActions.join("、") || "把节奏稳住"}上，上课这边基本按“${formatAttendanceStrategy(summary.attendanceStrategy)}”的节奏往前走。`,
+      `这个月我主要把时间放在${digest.mainActions.join("、") || "把节奏稳住"}上，上课这边基本按“${formatAttendanceStrategy(attendanceStrategy)}”的节奏往前走。`,
       digest.emotionalArc,
       `月底再看账和状态，我手里还剩 ${digest.endState.money}，心情在 ${digest.endState.mood}，压力到 ${digest.endState.stress}，学业线停在 ${digest.endState.semesterAcademics}。`,
-      `和月初比起来，${buildStatDeltaLine(summary.statsDelta)}。如果非要用一句话概括这个月的学业状态，大概就是“${formatSemesterFeedback(summary.academicFeedback)}”。`,
+      `和月初比起来，${buildStatDeltaLine(statsDelta)}。如果非要用一句话概括这个月的学业状态，大概就是“${formatSemesterFeedback(summary.academicFeedback ?? "stable")}”。`,
       groundedFacts,
       resumeText,
       `写到这里，这个月差不多也算真的翻过去了一页。${growthLog.title}`,
@@ -94,7 +107,7 @@ export function renderMonthlyJournalFallback(input: MonthlyJournalPromptInput): 
 
 export function renderEndingReportFallback(input: EndingReportPromptInput): AiReportResult {
   const { summary } = input;
-  const endingFacts = summary.notableFacts.map(formatEndingNotableFact);
+  const endingFacts = (summary.notableFacts ?? []).map(formatEndingNotableFact);
   const highlights =
     summary.resumeHighlights.length > 0
       ? `回头看，最拿得出手的履历亮点是：${summary.resumeHighlights.map((item) => item.title).join("、")}。`

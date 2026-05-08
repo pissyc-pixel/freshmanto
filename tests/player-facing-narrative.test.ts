@@ -28,6 +28,7 @@ import {
   renderEndingReportFallback,
   renderMonthlyJournalFallback,
 } from "@/lib/ai/reports";
+import { buildGrowthJournalEntry, buildMonthlyDiaryDigest } from "@/lib/demo/monthly-digest";
 import type {
   EndingReportPromptInput,
   MonthlyJournalPromptInput,
@@ -451,6 +452,30 @@ describe("player-facing narrative helpers", () => {
     expect(report.markdown).not.toContain("规则层");
     expect(report.markdown).not.toContain("statsDelta");
     expect(report.markdown).not.toContain("eventIds");
+  });
+
+  it("keeps monthly digest and fallback stable for legacy partial summaries", () => {
+    const legacySummary = {
+      ...monthlyInput.summary,
+      actions: undefined,
+      eventIds: undefined,
+      resumeAdditions: undefined,
+      notableFacts: undefined,
+      resolvedActions: undefined,
+      flags: undefined,
+      statsDelta: undefined,
+    } as unknown as MonthlyJournalPromptInput["summary"];
+    const digest = buildMonthlyDiaryDigest(legacySummary, 2, 3);
+    const journal = buildGrowthJournalEntry(legacySummary, 2, 3);
+    const report = renderMonthlyJournalFallback({
+      ...monthlyInput,
+      summary: legacySummary,
+    });
+
+    expect(digest.mainActions).toEqual([]);
+    expect(journal.title.length).toBeGreaterThan(0);
+    expect(report.markdown).toContain("#");
+    expect(report.usedFallback).toBe(true);
   });
 
   it("renders a grounded ending fallback in first-person voice", () => {
