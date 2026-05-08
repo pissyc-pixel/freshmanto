@@ -283,6 +283,10 @@ export function getLeadCompetitionProject(run: GameRun): CompetitionProject | nu
     ?? null;
 }
 
+export function getOpenCompetitionProjects(run: GameRun): CompetitionProject[] {
+  return ensureProgressionState(run).competitionProjects!.filter((project) => project.status === "open");
+}
+
 function touchCompetitionProject(run: GameRun, projectId: string, effortDays: number): GameRun {
   const ensuredRun = ensureProgressionState(run);
   const projects = ensuredRun.competitionProjects!.map((project) => {
@@ -300,6 +304,45 @@ function touchCompetitionProject(run: GameRun, projectId: string, effortDays: nu
   return {
     ...ensuredRun,
     competitionProjects: projects,
+  };
+}
+
+export function activateCompetitionProject(run: GameRun, projectId: string): GameRun {
+  const ensuredRun = ensureProgressionState(run);
+
+  return {
+    ...ensuredRun,
+    competitionProjects: ensuredRun.competitionProjects!.map((project) => {
+      if (project.id !== projectId || project.status !== "open") {
+        return project;
+      }
+
+      return {
+        ...project,
+        status: "active" as const,
+      };
+    }),
+  };
+}
+
+export function closeCompetitionProject(run: GameRun, projectId: string): GameRun {
+  const ensuredRun = ensureProgressionState(run);
+
+  return {
+    ...ensuredRun,
+    competitionProjects: ensuredRun.competitionProjects!.map((project) => {
+      if (
+        project.id !== projectId ||
+        (project.status !== "open" && project.status !== "active")
+      ) {
+        return project;
+      }
+
+      return {
+        ...project,
+        status: "expired" as const,
+      };
+    }),
   };
 }
 

@@ -26,6 +26,7 @@ import type {
   MonthlyActionPlan,
   SemesterFeedback,
   StructuredMonthlySummary,
+  WeeklyActionOption,
 } from "@/types/game";
 
 function createDecision(
@@ -776,5 +777,90 @@ describe("semester and ending evaluation", () => {
     expect(settlement?.dailyResults).toHaveLength(7);
     expect(settlement?.dailyResults.filter((day) => day.resolvedAction.action === "idle")).toHaveLength(6);
     expect(settlement?.dailyResults.some((day) => day.resolvedAction.autoFilled)).toBe(true);
+  });
+
+  it("explains weekly allowance and fixed living costs in weekly settlement", () => {
+    const baseRun = createInitialGameRun({
+      id: "weekly-budget-run",
+      randomValues: [0.18, 0.24, 0.31, 0.41, 0.52, 0.61, 0.74, 0.28],
+    });
+    const withAttendance = selectWeekAttendanceStrategy(baseRun, "mixed");
+    const result = confirmPlannedWeek(withAttendance);
+    const settlement = result.run.activeMonth?.latestWeekSettlement;
+
+    expect(settlement?.budgetLines?.some((line) => line.includes("生活费到账"))).toBe(true);
+    expect(settlement?.budgetLines?.some((line) => line.includes(`${getWeeklyLivingExpense(withAttendance)} 元`))).toBe(true);
+    expect(settlement?.dailyResults.every((day) => day.notableFacts.some((fact) => fact.startsWith("daily-living-cost:")))).toBe(true);
+  });
+
+  it("closes a competition project line after skipping its briefing day", () => {
+    const baseRun = createInitialGameRun({
+      id: "competition-skip-run",
+      randomValues: [0.44, 0.2, 0.36, 0.58, 0.62, 0.48, 0.21, 0.39],
+    });
+    const withAttendance = selectWeekAttendanceStrategy(baseRun, "mixed");
+    const project = withAttendance.competitionProjects?.find((item) => item.status === "open");
+
+    expect(project).toBeDefined();
+
+    const runWithEvent = {
+      ...withAttendance,
+      activeMonth: {
+        ...withAttendance.activeMonth!,
+        currentWeekState: {
+          ...withAttendance.activeMonth!.currentWeekState,
+          event: {
+            id: "weekly-competition-invite",
+            title: `《${project!.title}》说明会 / 招募会`,
+            summary: `这周会接触到“${project!.title}”这条长期比赛 / 项目线。`,
+            weekday: "sat" as const,
+            effectDescription: "周六会撞上一场项目说明会。",
+            specialAction: {
+              optionId: `weekly-competition-invite-attend:${project!.id}`,
+              action: "student_activity" as const,
+              label: `参加《${project!.title}》说明会`,
+              description: "先去听说明会，把这条项目线接起来。",
+              availability: ["night", "half_day", "full_day"] as WeeklyActionOption["availability"],
+              source: "weekly_event" as const,
+              sourceEventId: "weekly-competition-invite",
+            },
+            linkedProjectId: project!.id,
+            linkedProjectTitle: project!.title,
+            skipClosesProjectLine: true,
+            defaultAttendIfUnplanned: true,
+          },
+        },
+      },
+    };
+    const planned = {
+      ...runWithEvent,
+      activeMonth: {
+        ...runWithEvent.activeMonth!,
+        currentWeekState: {
+          ...runWithEvent.activeMonth!.currentWeekState,
+          days: runWithEvent.activeMonth!.currentWeekState.days?.map((day) =>
+            day.weekday === "sat"
+              ? {
+                  ...day,
+                  plannedAction: {
+                    action: "social" as const,
+                    optionId: "social",
+                    label: "社交 / 关系",
+                    time: "day" as const,
+                    weekday: "sat" as const,
+                  },
+                  planningStatus: "planned" as const,
+                }
+              : day,
+          ),
+        },
+      },
+    };
+    const result = confirmPlannedWeek(planned);
+    const updatedProject = result.run.competitionProjects?.find((item) => item.id === project!.id);
+    const saturdayResult = result.run.activeMonth?.latestWeekSettlement?.dailyResults.find((day) => day.weekday === "sat");
+
+    expect(updatedProject?.status).toBe("expired");
+    expect(saturdayResult?.notableFacts).toContain(`weekly-event:competition-skipped:${project!.title}`);
   });
 });

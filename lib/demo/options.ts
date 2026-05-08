@@ -309,6 +309,11 @@ function describeNotableFact(fact: string): string | undefined {
     return "\u8fd9\u4e00\u5929\u6ca1\u6709\u624b\u52a8\u5b89\u6392\uff0c\u7cfb\u7edf\u81ea\u52a8\u8865\u6210\u4e86\u201c\u6446\u70c2 / \u53d1\u5446\u201d\u3002";
   }
 
+  if (fact.startsWith("weekly-event:competition-skipped:")) {
+    const projectTitle = fact.split(":").slice(2).join(":");
+    return `???${projectTitle || "?????"}????????????????????????`;
+  }
+
   if (fact.startsWith("skip_class released ")) {
     const rawDays = fact
       .replace("skip_class released ", "")

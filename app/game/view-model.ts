@@ -192,6 +192,7 @@ export function buildWeeklySettlementView(settlement?: WeeklySettlementSummary) 
       { label: "社交", value: settlement.totals.social },
       { label: "成就感", value: settlement.totals.fulfillment },
     ],
+    budgetLines: settlement.budgetLines ?? [],
     riskLines: uniqueLines([
       ...settlement.flags.map(formatPlayerFacingFlag),
       ...settlement.opportunities,

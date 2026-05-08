@@ -2,7 +2,12 @@ import { createInitialGameRun } from "@/core/generators";
 import { resolveActionPlan } from "@/core/resolvers/actions";
 import { resolveCourseStrategy } from "@/core/resolvers/attendance";
 import { resolveMonthEvents } from "@/core/resolvers/events";
-import { applyAcceptedActionProgression, ensureProgressionState } from "@/core/resolvers/progression";
+import {
+  activateCompetitionProject,
+  applyAcceptedActionProgression,
+  closeCompetitionProject,
+  ensureProgressionState,
+} from "@/core/resolvers/progression";
 import { findWeeklyEventBoost, resolveWeeklyEvent } from "@/core/resolvers/weekly-events";
 import { findWeeklyActionOption } from "@/data/actions";
 import { getWeeklyAllowance, getWeeklyLivingExpense } from "@/data/events";
@@ -731,6 +736,38 @@ function createAutoFilledIdleAction(day: PlannedWeekdayState): PlannedAction {
   };
 }
 
+function createAutoFilledSpecialAction(day: PlannedWeekdayState, weekEvent: ActiveWeekState["event"]): PlannedAction | null {
+  if (!weekEvent?.specialAction || weekEvent.weekday !== day.weekday || !weekEvent.defaultAttendIfUnplanned) {
+    return null;
+  }
+
+  return {
+    action: weekEvent.specialAction.action,
+    optionId: weekEvent.specialAction.optionId,
+    label: weekEvent.specialAction.label,
+    time: day.effectiveDayType === "night_only" ? "night" : "day",
+    weekday: day.weekday,
+    skipClass: false,
+    sourceEventId: weekEvent.specialAction.sourceEventId ?? weekEvent.id,
+    autoFilled: true,
+  };
+}
+
+function createDefaultPlannedActionForDay(day: PlannedWeekdayState, weekEvent: ActiveWeekState["event"]): PlannedAction {
+  return createAutoFilledSpecialAction(day, weekEvent) ?? createAutoFilledIdleAction(day);
+}
+
+function distributeWeeklyLivingCost(total: number, daysCount: number): number[] {
+  if (daysCount <= 0) {
+    return [];
+  }
+
+  const base = Math.floor(total / daysCount);
+  const remainder = total - base * daysCount;
+
+  return Array.from({ length: daysCount }, (_, index) => base + (index < remainder ? 1 : 0));
+}
+
 function applyWeeklyEffectToTurn(
   turnSummary: ActionTurnSummary,
   effect: WeeklyActionEffect | undefined,
@@ -833,7 +870,9 @@ function finalizePlannedWeek(input: {
   const releasedClassDays = input.activeMonth.currentWeekState.days
     ?.filter((day) => day.skipClassSelected)
     .map((day) => day.weekday) ?? [];
-  const weeklyBudgetDelta = getWeeklyAllowance(input.run) - getWeeklyLivingExpense(input.run);
+  const weeklyAllowance = getWeeklyAllowance(input.run);
+  const weeklyLivingExpense = getWeeklyLivingExpense(input.run);
+  const weeklyBudgetDelta = weeklyAllowance;
   const course = resolveCourseStrategy(input.attendanceStrategy);
   const statsAfter = addStats(input.run.stats, createCourseStatsDelta(course, weeklyBudgetDelta));
   const riskAfter = mergeRisk(input.run.risk, {
@@ -855,6 +894,12 @@ function finalizePlannedWeek(input: {
     riskDelta: settlementRiskDelta,
     flags: dedupe(input.dayTurns.flatMap((turn) => turn.flags)),
     opportunities: [],
+    budgetLines: [
+      `本周生活费到账 ${weeklyAllowance} 元。`,
+      `固定生活支出一共 ${weeklyLivingExpense} 元，已经按天拆进了逐日结算。`,
+      `行动本身带来的直接收支合计 ${input.dayTurns.reduce((sum, turn) => sum + turn.moneyDelta, 0) + weeklyLivingExpense} 元。`,
+      course.proxyCost > 0 ? `翘课或代价带来的额外课程成本 ${course.proxyCost} 元。` : "",
+    ].filter(Boolean),
   };
   weeklySettlement.opportunities = buildWeeklyOpportunities({
     settlement: weeklySettlement,
@@ -1143,9 +1188,10 @@ export function confirmPlannedWeek(run: GameRun): {
   };
   const dayTurns: ActionTurnSummary[] = [];
   let resumeAdded = 0;
+  const dailyLivingCosts = distributeWeeklyLivingCost(getWeeklyLivingExpense(projectedRun), weekState.days.length);
 
-  for (const day of weekState.days) {
-    const plannedAction = day.plannedAction ?? createAutoFilledIdleAction(day);
+  for (const [dayIndex, day] of weekState.days.entries()) {
+    const plannedAction = day.plannedAction ?? createDefaultPlannedActionForDay(day, weekState.event);
 
     const option =
       resolveAvailableWeeklyActions({
@@ -1205,31 +1251,41 @@ export function confirmPlannedWeek(run: GameRun): {
     };
     const eventBoost = findWeeklyEventBoost(weekState.event, option);
     const skipClassEffect = createSkipClassDayEffect(day);
+    const livingCostEffect: WeeklyActionEffect = {
+      money: -(dailyLivingCosts[dayIndex] ?? 0),
+      notableFact: `daily-living-cost:${dailyLivingCosts[dayIndex] ?? 0}`,
+    };
     const combinedEffect: WeeklyActionEffect = resolvedAction.accepted
       ? {
           stats: sumStats(
-            sumStats(emptyStatsDelta(), eventBoost.stats),
+            sumStats(
+              sumStats(emptyStatsDelta(), eventBoost.stats),
+              livingCostEffect.stats,
+            ),
             skipClassEffect.stats,
           ),
           money:
             (eventBoost.money ?? 0) +
+            (livingCostEffect.money ?? 0) +
             (skipClassEffect.money ?? 0),
           risk: sumRisk(
-            sumRisk(emptyRiskDelta(), eventBoost.risk),
+            sumRisk(
+              sumRisk(emptyRiskDelta(), eventBoost.risk),
+              livingCostEffect.risk,
+            ),
             skipClassEffect.risk,
           ),
           flags: dedupe([
             ...(eventBoost.flags ?? []),
+            ...(livingCostEffect.flags ?? []),
             ...(skipClassEffect.flags ?? []),
           ]),
-          notableFact:
-            eventBoost.notableFact ??
-            skipClassEffect.notableFact,
+          notableFact: eventBoost.notableFact ?? livingCostEffect.notableFact ?? skipClassEffect.notableFact,
           resume:
             eventBoost.resume ??
             skipClassEffect.resume,
         }
-      : {};
+      : livingCostEffect;
     const statsBefore = projectedRun.stats;
     const statsDelta: DynamicStats = {
       money:
@@ -1248,7 +1304,7 @@ export function confirmPlannedWeek(run: GameRun): {
       projectedRun.risk,
       sumRisk(baseResolution.risk, combinedEffect.risk),
     );
-    const turnSummary: ActionTurnSummary = applyWeeklyEffectToTurn(
+    let turnSummary: ActionTurnSummary = applyWeeklyEffectToTurn(
       {
         turn: projectedRun.activeMonth!.turns.length + 1,
         week: activeMonth.currentWeek,
@@ -1278,6 +1334,24 @@ export function confirmPlannedWeek(run: GameRun): {
       },
       combinedEffect,
     );
+    turnSummary = {
+      ...turnSummary,
+      notableFacts: dedupe([
+        ...turnSummary.notableFacts,
+        `daily-living-cost:${dailyLivingCosts[dayIndex] ?? 0}`,
+      ]),
+    };
+    const skippedCompetitionLine =
+      weekState.event?.weekday === day.weekday &&
+      weekState.event.skipClosesProjectLine &&
+      Boolean(weekState.event.linkedProjectId) &&
+      turnSummary.resolvedAction.sourceEventId !== weekState.event.id;
+
+    if (skippedCompetitionLine) {
+      turnSummary = applyWeeklyEffectToTurn(turnSummary, {
+        notableFact: `weekly-event:competition-skipped:${weekState.event?.linkedProjectTitle ?? "competition-line"}`,
+      });
+    }
     const weeklyResume = createResumeItemFromWeeklyEffect(projectedRun, combinedEffect);
     resumeAdded += baseResolution.resumeAdditions.length + weeklyResume.length;
     projectedRun = {
@@ -1297,6 +1371,16 @@ export function confirmPlannedWeek(run: GameRun): {
         lastResolvedTurn: turnSummary,
       },
     };
+    if (
+      weekState.event?.weekday === day.weekday &&
+      weekState.event.linkedProjectId &&
+      turnSummary.resolvedAction.accepted &&
+      turnSummary.resolvedAction.sourceEventId === weekState.event.id
+    ) {
+      projectedRun = activateCompetitionProject(projectedRun, weekState.event.linkedProjectId);
+    } else if (skippedCompetitionLine && weekState.event?.linkedProjectId) {
+      projectedRun = closeCompetitionProject(projectedRun, weekState.event.linkedProjectId);
+    }
     if (turnSummary.resolvedAction.accepted) {
       projectedRun = applyAcceptedActionProgression(projectedRun, turnSummary.resolvedAction.action);
     }

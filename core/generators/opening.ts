@@ -118,13 +118,13 @@ function rollCityTier(schoolTier: SchoolTier, roll: number): CityTier {
 function calculateAllowance(background: FamilyBackground, luck: number, roll: number): number {
   const baseByBackground: Record<FamilyBackground, number> = {
     struggling: 900,
-    ordinary: 1400,
-    stable: 2200,
-    "well-connected": 3200,
-    affluent: 5000,
+    ordinary: 1350,
+    stable: 1650,
+    "well-connected": 2000,
+    affluent: 2800,
   };
 
-  const variance = Math.round((roll * 400 + luck * 2) / 10) * 10;
+  const variance = Math.round((roll * 180 + luck * 0.6) / 10) * 10;
   return baseByBackground[background] + variance;
 }
 

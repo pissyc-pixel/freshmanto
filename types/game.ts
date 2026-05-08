@@ -269,6 +269,10 @@ export type WeeklyEventInstance = {
   limitedActions?: ActionType[];
   specialAction?: WeeklyActionOption;
   actionBoosts?: WeeklyEventActionBoost[];
+  linkedProjectId?: string;
+  linkedProjectTitle?: string;
+  skipClosesProjectLine?: boolean;
+  defaultAttendIfUnplanned?: boolean;
 };
 
 export type PlannedWeekdayState = {
@@ -407,6 +411,7 @@ export type WeeklySettlementSummary = {
   riskDelta: RiskState;
   flags: string[];
   opportunities: string[];
+  budgetLines?: string[];
 };
 
 export type ActiveMonthState = {
