@@ -41,6 +41,10 @@ export type TimeBlockKind = "free" | "half_free" | "busy_day";
 
 export type Weekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 
+export type WeeklyDayType = "night_only" | "half_day" | "full_day";
+
+export type ActionAvailability = "night" | "half_day" | "full_day";
+
 export type ResumeCategory =
   | "internship"
   | "project"
@@ -141,6 +145,11 @@ export type PlannedAction = {
   action: ActionType;
   time: ActionTime;
   skipClassDays?: Weekday[];
+  optionId?: string;
+  label?: string;
+  weekday?: Weekday;
+  skipClass?: boolean;
+  sourceEventId?: string;
 };
 
 export type ResolvedAction = PlannedAction & {
@@ -164,6 +173,71 @@ export type ActiveWeekState = {
   remainingTimeUnits: number;
   releasedClassDays: Weekday[];
   attendanceStrategy: CourseAttendanceStrategy;
+  attendanceLocked?: boolean;
+  event?: WeeklyEventInstance | null;
+  days?: PlannedWeekdayState[];
+  readyToConfirm?: boolean;
+  plannerFeedback?: PlannerFeedback;
+  lastSelectedOptionId?: string;
+};
+
+export type PlannerFeedback = {
+  kind: "info" | "success" | "error";
+  title: string;
+  message: string;
+};
+
+export type WeeklyActionEffect = {
+  stats?: Partial<DynamicStats>;
+  money?: number;
+  risk?: Partial<RiskState>;
+  flags?: string[];
+  notableFact?: string;
+  resume?: {
+    category: ResumeCategory;
+    title: string;
+    summary: string;
+    tags: string[];
+  };
+};
+
+export type WeeklyActionOption = {
+  optionId: string;
+  action: ActionType;
+  label: string;
+  description: string;
+  availability: ActionAvailability[];
+  source: "default" | "weekly_event";
+  sourceEventId?: string;
+  effect?: WeeklyActionEffect;
+};
+
+export type WeeklyEventActionBoost = {
+  action: ActionType;
+  effect: WeeklyActionEffect;
+};
+
+export type WeeklyEventInstance = {
+  id: string;
+  title: string;
+  summary: string;
+  weekday: Weekday;
+  effectDescription: string;
+  dayTypeOverride?: WeeklyDayType;
+  limitedActions?: ActionType[];
+  specialAction?: WeeklyActionOption;
+  actionBoosts?: WeeklyEventActionBoost[];
+};
+
+export type PlannedWeekdayState = {
+  weekday: Weekday;
+  label: string;
+  baseDayType: WeeklyDayType;
+  effectiveDayType: WeeklyDayType;
+  skipClassAvailable: boolean;
+  skipClassSelected: boolean;
+  plannedAction?: PlannedAction;
+  planningStatus: "pending" | "planned" | "settled";
 };
 
 export type CourseResolution = {
@@ -213,11 +287,25 @@ export type ActionTurnSummary = {
   notableFacts: string[];
   allowanceApplied: boolean;
   course: CourseResolution;
+  weekday?: Weekday;
+  dayLabel?: string;
   timeCost?: number;
   weekTimeBefore?: number;
   weekTimeAfter?: number;
   releasedClassDays?: Weekday[];
   weekCompleted?: boolean;
+};
+
+export type WeeklySettlementSummary = {
+  week: number;
+  attendanceStrategy: CourseAttendanceStrategy;
+  event?: WeeklyEventInstance | null;
+  dailyResults: ActionTurnSummary[];
+  totals: DynamicStats;
+  moneyDelta: number;
+  riskDelta: RiskState;
+  flags: string[];
+  opportunities: string[];
 };
 
 export type ActiveMonthState = {
@@ -236,6 +324,8 @@ export type ActiveMonthState = {
     releasedClassDays: Weekday[];
     endedEarly: boolean;
   }>;
+  latestWeekSettlement?: WeeklySettlementSummary;
+  weeklySettlements?: WeeklySettlementSummary[];
   statsAtStart: DynamicStats;
   turns: ActionTurnSummary[];
   lastResolvedTurn?: ActionTurnSummary;
@@ -260,6 +350,7 @@ export type StructuredMonthlySummary = {
   cooldowns: CooldownState;
   course: CourseResolution;
   turns: ActionTurnSummary[];
+  weeklySettlements?: WeeklySettlementSummary[];
 };
 
 export type SemesterSettlement = {

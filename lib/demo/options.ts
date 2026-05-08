@@ -13,6 +13,7 @@ import type {
   StructuredMonthlySummary,
   Talent,
   TimeBlockKind,
+  WeeklyDayType,
   Weekday,
 } from "@/types/game";
 
@@ -109,6 +110,12 @@ const timeBlockLabels: Record<TimeBlockKind, string> = {
   free: "全天都能自己安排",
   half_free: "只有半天空档",
   busy_day: "白天基本被课程或义务占满",
+};
+
+const weeklyDayTypeLabels: Record<WeeklyDayType, string> = {
+  night_only: "默认只有夜里能安排",
+  half_day: "这天只有半天空档",
+  full_day: "这天基本能自己支配",
 };
 
 const statLabels: Record<keyof DynamicStats, string> = {
@@ -425,6 +432,39 @@ export function formatGraduationOutcome(value: GraduationOutcome): string {
 
 export function formatTimeBlockKind(value: TimeBlockKind): string {
   return timeBlockLabels[value];
+}
+
+export function formatWeeklyDayType(value: WeeklyDayType): string {
+  return weeklyDayTypeLabels[value];
+}
+
+export function formatPlannerReason(reason?: string): string {
+  if (!reason) {
+    return "这一步最后没做成。";
+  }
+
+  if (reason === "action-daytype-mismatch") {
+    return "这一步和当天能用的时间类型对不上，所以最后没真正排进去。";
+  }
+
+  return formatPlayerFacingFlag(reason);
+}
+
+export function formatWeeklyEventFact(fact: string): string {
+  switch (fact) {
+    case "weekly-event:guest-lecture":
+      return "这周临时冒出来一场讲座，至少把日子从单纯赶课里拉开了一点。";
+    case "weekly-event:recruitment-talk":
+      return "这周去听了场宣讲，虽然还谈不上结果，但方向感比之前清楚了一点。";
+    case "weekly-event:job-prep-boost":
+      return "宣讲带来的信息马上接到了求职准备这条线上，做事时没那么发虚了。";
+    case "weekly-event:class-meeting":
+      return "这周有一天被班会和通知切了一刀，节奏不算舒服，但至少先把它处理掉了。";
+    case "weekly-event:quiet-recovery":
+      return "这周没什么额外插曲，反而让那点休息真的缓回来了一点。";
+    default:
+      return formatPlayerFacingFact(fact);
+  }
 }
 
 export function formatReleasedClassDayList(days: Weekday[]): string {

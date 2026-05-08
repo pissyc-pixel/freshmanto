@@ -1,143 +1,268 @@
+"use client";
+
+import { useState } from "react";
+import { useFormStatus } from "react-dom";
 import { submitActionTurnAction } from "@/app/actions";
-import {
-  actionTimeOptions,
-  attendanceStrategyOptions,
-  formatReleasedClassDayList,
-} from "@/lib/demo/options";
-import { actionOptions, skipClassDayOptions } from "@/components/action-plan-form-options";
-import type { CourseAttendanceStrategy, Weekday } from "@/types/game";
+import type { CourseAttendanceStrategy } from "@/types/game";
+
+type PlannerDayOptionView = {
+  optionId: string;
+  label: string;
+  description: string;
+  selected: boolean;
+};
+
+type PlannerDayView = {
+  weekday: string;
+  label: string;
+  status: string;
+  plannedActionLabel: string | null;
+  baseTypeLabel: string;
+  effectiveTypeLabel: string;
+  skipClassAvailable: boolean;
+  skipClassSelected: boolean;
+  eventTitle: string | null;
+  eventSummary: string | null;
+  normalOptions: PlannerDayOptionView[];
+  skipOptions: PlannerDayOptionView[];
+};
+
+type PlannerFeedback = {
+  kind: "info" | "success" | "error";
+  title: string;
+  message: string;
+};
 
 type ActionPlanFormProps = {
   runId: string;
   currentWeek: number;
-  remainingTimeUnits: number;
-  totalTimeUnits: number;
-  releasedClassDays: Weekday[];
-  defaultAttendanceStrategy?: CourseAttendanceStrategy;
+  attendanceLocked: boolean;
+  defaultAttendanceStrategy: CourseAttendanceStrategy;
+  plannerStatusText: string;
+  plannerLines: string[];
+  readyToConfirm: boolean;
+  plannerFeedback?: PlannerFeedback;
+  days: PlannerDayView[];
 };
+
+function PendingHint({ text }: { text: string }) {
+  const { pending } = useFormStatus();
+
+  if (!pending) {
+    return null;
+  }
+
+  return <p className="text-sm leading-6 text-amber-700">{text}</p>;
+}
+
+function SubmitButton(props: {
+  label: string;
+  pendingLabel: string;
+  className: string;
+  disabled?: boolean;
+}) {
+  const { pending } = useFormStatus();
+
+  return (
+    <button type="submit" disabled={pending || props.disabled} className={props.className}>
+      {pending ? props.pendingLabel : props.label}
+    </button>
+  );
+}
 
 export function ActionPlanForm({
   runId,
   currentWeek,
-  remainingTimeUnits,
-  totalTimeUnits,
-  releasedClassDays,
-  defaultAttendanceStrategy = "mixed",
+  attendanceLocked,
+  defaultAttendanceStrategy,
+  plannerStatusText,
+  plannerLines,
+  readyToConfirm,
+  plannerFeedback,
+  days,
 }: ActionPlanFormProps) {
+  const [selectedWeekday, setSelectedWeekday] = useState<string | null>(null);
+  const selectedDay = days.find((day) => day.weekday === selectedWeekday) ?? null;
+  const [skipClassDraft, setSkipClassDraft] = useState(false);
+  const currentOptions = selectedDay
+    ? skipClassDraft && selectedDay.skipClassAvailable
+      ? selectedDay.skipOptions
+      : selectedDay.normalOptions
+    : [];
+
   return (
-    <form action={submitActionTurnAction} className="space-y-5">
-      <input type="hidden" name="runId" value={runId} />
-
+    <div className="space-y-6">
       <div className="rounded-2xl border border-[var(--border)] bg-white/70 p-4 text-sm leading-6 text-stone-700">
-        <p className="font-semibold text-stone-900">
-          第 {currentWeek} 周，剩余 {remainingTimeUnits} / {totalTimeUnits} 个半天
-        </p>
-        <p className="mt-2">
-          现在每次只推进一个动作。普通动作会消耗本周时间池；时间池耗尽时自动结束本周。
-          如果你不想把这一周的时间全部用完，也可以直接提前结束本周。
-        </p>
-        <p className="mt-2 text-xs text-stone-500">
-          已释放的白天课程日：
-          {releasedClassDays.length > 0 ? ` ${formatReleasedClassDayList(releasedClassDays)}` : " 暂无"}
-        </p>
+        <p className="font-semibold text-stone-900">第 {currentWeek} 周</p>
+        <p className="mt-2">{plannerStatusText}</p>
+        {plannerLines.length > 0 ? (
+          <ul className="mt-3 space-y-2 text-sm text-stone-600">
+            {plannerLines.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        ) : null}
       </div>
 
-      <div className="space-y-3">
-        <label className="text-sm font-semibold text-stone-800" htmlFor="attendanceStrategy">
-          本周上课状态
-        </label>
-        <select
-          id="attendanceStrategy"
-          name="attendanceStrategy"
-          defaultValue={defaultAttendanceStrategy}
-          className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-stone-800"
+      {plannerFeedback ? (
+        <div
+          className={`rounded-2xl border px-4 py-4 text-sm leading-6 ${
+            plannerFeedback.kind === "error"
+              ? "border-rose-200 bg-rose-50 text-rose-900"
+              : plannerFeedback.kind === "success"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                : "border-amber-200 bg-amber-50 text-amber-900"
+          }`}
         >
-          {attendanceStrategyOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label} - {option.description}
-            </option>
-          ))}
-        </select>
-      </div>
+          <p className="font-semibold">{plannerFeedback.title}</p>
+          <p className="mt-1">{plannerFeedback.message}</p>
+        </div>
+      ) : null}
 
-      <article className="rounded-2xl border border-[var(--border)] bg-white/80 p-4">
-        <p className="text-sm font-semibold text-stone-900">执行一个动作</p>
-        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+      <form action={submitActionTurnAction} className="space-y-4 rounded-2xl border border-[var(--border)] bg-white/80 p-4">
+        <input type="hidden" name="runId" value={runId} />
+        <input type="hidden" name="intent" value="set_attendance" />
+        <div className="space-y-3">
+          <label className="text-sm font-semibold text-stone-800" htmlFor="attendanceStrategy">
+            本周课程态度
+          </label>
           <select
-            name="action"
-            defaultValue="study"
-            className="w-full rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm text-stone-800"
+            id="attendanceStrategy"
+            name="attendanceStrategy"
+            defaultValue={defaultAttendanceStrategy}
+            disabled={attendanceLocked}
+            className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-stone-800 disabled:bg-stone-100"
           >
-            {actionOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label} - {option.description}
-              </option>
-            ))}
-          </select>
-          <select
-            name="time"
-            defaultValue="night"
-            className="w-full rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm text-stone-800"
-          >
-            {actionTimeOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
+            <option value="serious">认真上课</option>
+            <option value="mixed">正常混课</option>
+            <option value="phone">人在课堂，魂在手机</option>
           </select>
         </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <SubmitButton
+            label={attendanceLocked ? "本周课程态度已锁定" : "先确定本周课程态度"}
+            pendingLabel="正在保存课程态度..."
+            disabled={attendanceLocked}
+            className="rounded-full bg-amber-600 px-5 py-3 font-semibold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-stone-400"
+          />
+          <PendingHint text="正在保存这周的课程态度..." />
+        </div>
+      </form>
 
-        <div className="mt-4 rounded-2xl border border-dashed border-[var(--border)] bg-stone-50/80 p-4">
-          <p className="text-sm font-semibold text-stone-900">
-            翘课只在选择独立行为时生效
-          </p>
-          <p className="mt-2 text-sm leading-6 text-stone-600">
-            这一步不会直接扣学业值，只会把本周还被课程锁住的白天整块释放出来，并把代价转成点名风险、
-            平时分风险、代签花费和后续补救压力。
-          </p>
-          <div className="mt-3 flex flex-wrap gap-3">
-            {skipClassDayOptions.map((option) => (
-              <label
-                key={option.value}
-                className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-white px-3 py-2 text-sm text-stone-700"
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {days.map((day) => (
+          <button
+            key={day.weekday}
+            type="button"
+            disabled={!attendanceLocked}
+            onClick={() => {
+              setSelectedWeekday(day.weekday);
+              setSkipClassDraft(day.skipClassSelected);
+            }}
+            className="rounded-2xl border border-[var(--border)] bg-white/80 p-4 text-left transition hover:border-amber-300 hover:bg-amber-50/70 disabled:cursor-not-allowed disabled:bg-stone-100"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-stone-900">{day.label}</p>
+                <p className="mt-1 text-xs text-stone-500">{day.status}</p>
+              </div>
+              <span className="rounded-full bg-stone-900 px-3 py-1 text-xs font-semibold text-stone-50">
+                {day.eventTitle ? "有事" : "可排"}
+              </span>
+            </div>
+            <p className="mt-3 text-sm leading-6 text-stone-700">
+              {day.plannedActionLabel ? `已排：${day.plannedActionLabel}` : day.effectiveTypeLabel}
+            </p>
+            <p className="mt-2 text-xs leading-5 text-stone-500">默认节奏：{day.baseTypeLabel}</p>
+            {day.eventTitle ? <p className="mt-2 text-xs leading-5 text-amber-700">{day.eventTitle}</p> : null}
+          </button>
+        ))}
+      </div>
+
+      <form action={submitActionTurnAction} className="space-y-3 rounded-2xl border border-[var(--border)] bg-white/80 p-4">
+        <input type="hidden" name="runId" value={runId} />
+        <input type="hidden" name="intent" value="confirm_week" />
+        <input type="hidden" name="attendanceStrategy" value={defaultAttendanceStrategy} />
+        <div className="flex flex-wrap items-center gap-3">
+          <SubmitButton
+            label="确认本周安排"
+            pendingLabel="正在结算本周安排 / 生成 AI 月记..."
+            disabled={!readyToConfirm}
+            className="rounded-full bg-stone-900 px-5 py-3 font-semibold text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-400"
+          />
+          {!readyToConfirm ? <span className="text-sm text-stone-500">要先把这一周 7 天都排完。</span> : null}
+        </div>
+        <PendingHint text="正在统一结算本周安排；如果这是月底，也会顺带生成 AI 月记 / 月度总结。" />
+      </form>
+
+      {selectedDay ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/45 p-4">
+          <div className="w-full max-w-2xl rounded-[2rem] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[0_24px_80px_rgba(28,25,23,0.22)]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-amber-700">{selectedDay.label}</p>
+                <h3 className="mt-2 text-2xl font-semibold text-stone-900">给这一天排一个行动</h3>
+                <p className="mt-2 text-sm leading-6 text-stone-600">
+                  默认节奏：{selectedDay.baseTypeLabel}。当前可排：{skipClassDraft && selectedDay.skipClassAvailable ? "翘课后释放白天" : selectedDay.effectiveTypeLabel}。
+                </p>
+                {selectedDay.eventTitle ? (
+                  <p className="mt-2 text-sm leading-6 text-amber-700">
+                    {selectedDay.eventTitle}：{selectedDay.eventSummary}
+                  </p>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedWeekday(null)}
+                className="rounded-full border border-[var(--border)] px-3 py-2 text-sm text-stone-700 transition hover:bg-stone-100"
               >
+                关闭
+              </button>
+            </div>
+
+            {selectedDay.skipClassAvailable ? (
+              <label className="mt-5 flex items-start gap-3 rounded-2xl border border-dashed border-[var(--border)] bg-stone-50/80 px-4 py-3 text-sm leading-6 text-stone-700">
                 <input
                   type="checkbox"
-                  name="skipClassDays"
-                  value={option.value}
-                  defaultChecked={releasedClassDays.includes(option.value)}
-                  className="h-4 w-4 rounded border-stone-300 text-amber-600"
+                  checked={skipClassDraft}
+                  onChange={(event) => setSkipClassDraft(event.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-stone-300 text-amber-600"
                 />
-                <span>{option.label}</span>
+                <span>这天翘课，释放白天时间。代价是学业会掉一点、压力会涨一点。</span>
               </label>
-            ))}
+            ) : null}
+
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              {currentOptions.map((option) => (
+                <form key={option.optionId} action={submitActionTurnAction} className="rounded-2xl border border-[var(--border)] bg-white/90 p-4">
+                  <input type="hidden" name="runId" value={runId} />
+                  <input type="hidden" name="intent" value="plan_day" />
+                  <input type="hidden" name="attendanceStrategy" value={defaultAttendanceStrategy} />
+                  <input type="hidden" name="weekday" value={selectedDay.weekday} />
+                  <input type="hidden" name="skipClass" value={String(skipClassDraft && selectedDay.skipClassAvailable)} />
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h4 className="text-base font-semibold text-stone-900">{option.label}</h4>
+                      {option.selected ? (
+                        <p className="mt-1 text-xs font-medium text-amber-700">上一次你排过类似行动</p>
+                      ) : null}
+                    </div>
+                    <button
+                      type="submit"
+                      name="optionId"
+                      value={option.optionId}
+                      className="rounded-full bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700"
+                    >
+                      排到这一天
+                    </button>
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-stone-600">{option.description}</p>
+                </form>
+              ))}
+            </div>
           </div>
         </div>
-      </article>
-
-      <div className="rounded-2xl border border-dashed border-[var(--border)] bg-white/60 px-4 py-3 text-sm leading-6 text-stone-600">
-        周一 / 三 / 五默认只有夜间，周二 / 四有白天 + 夜间，周六 / 日是完整双时段。
-        实习准备和兼职会消耗 2 个半天；吃大餐、向家里要钱、翘课都是 0 时间动作。
-      </div>
-
-      <div className="flex flex-wrap gap-3">
-        <button
-          type="submit"
-          name="intent"
-          value="act"
-          className="rounded-full bg-amber-600 px-5 py-3 font-semibold text-white transition hover:bg-amber-700"
-        >
-          结算这个动作
-        </button>
-        <button
-          type="submit"
-          name="intent"
-          value="end_week"
-          className="rounded-full border border-stone-300 bg-white px-5 py-3 font-semibold text-stone-800 transition hover:bg-stone-50"
-        >
-          提前结束本周
-        </button>
-      </div>
-    </form>
+      ) : null}
+    </div>
   );
 }

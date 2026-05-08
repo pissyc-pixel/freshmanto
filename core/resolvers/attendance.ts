@@ -47,30 +47,30 @@ const SKIP_CLASS_RISK_RULES: Record<
   {
     rollCallRiskDelta: number;
     usualScoreRiskDelta: number;
-    proxyCost: number;
-    remedyPressure: number;
+    stressDelta: number;
+    academicGain: number;
     academicRiskDelta: number;
   }
 > = {
   serious: {
     rollCallRiskDelta: 2,
     usualScoreRiskDelta: 1,
-    proxyCost: 30,
-    remedyPressure: 1,
+    stressDelta: 2,
+    academicGain: -2,
     academicRiskDelta: 2,
   },
   mixed: {
     rollCallRiskDelta: 3,
     usualScoreRiskDelta: 2,
-    proxyCost: 40,
-    remedyPressure: 1,
+    stressDelta: 3,
+    academicGain: -2,
     academicRiskDelta: 3,
   },
   phone: {
     rollCallRiskDelta: 2,
     usualScoreRiskDelta: 2,
-    proxyCost: 35,
-    remedyPressure: 1,
+    stressDelta: 2,
+    academicGain: -1,
     academicRiskDelta: 2,
   },
 };
@@ -89,9 +89,11 @@ export function resolveCourseStrategy(
     ...base,
     rollCallRiskDelta: base.rollCallRiskDelta + skippedCount * skipRule.rollCallRiskDelta,
     usualScoreRiskDelta: base.usualScoreRiskDelta + skippedCount * skipRule.usualScoreRiskDelta,
-    proxyCost: base.proxyCost + skippedCount * skipRule.proxyCost,
-    remedyPressure: base.remedyPressure + skippedCount * skipRule.remedyPressure,
+    proxyCost: 0,
+    remedyPressure: base.remedyPressure + skippedCount,
     academicRiskDelta: base.academicRiskDelta + skippedCount * skipRule.academicRiskDelta,
+    academicGain: base.academicGain + skippedCount * skipRule.academicGain,
+    stressDelta: base.stressDelta + skippedCount * skipRule.stressDelta,
     note: skippedCount > 0 ? `Skipped ${skippedCount} daytime class blocks this week.` : undefined,
   };
 }

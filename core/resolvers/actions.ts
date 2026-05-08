@@ -23,6 +23,11 @@ type ActionResolution = {
   askFamilyUsed: boolean;
 };
 
+type ResolveActionPlanOptions = {
+  suppressAllowanceCorrection?: boolean;
+  suppressWeeklySettlement?: boolean;
+};
+
 function emptyStatsDelta(): DynamicStats {
   return {
     money: 0,
@@ -178,7 +183,11 @@ function projectRun(run: GameRun, statsDelta: DynamicStats, moneyDelta: number, 
   };
 }
 
-export function resolveActionPlan(run: GameRun, plan: MonthlyActionPlan): ActionResolution {
+export function resolveActionPlan(
+  run: GameRun,
+  plan: MonthlyActionPlan,
+  options: ResolveActionPlanOptions = {},
+): ActionResolution {
   const stats = emptyStatsDelta();
   const risk: RiskState = {
     academicRisk: 0,
@@ -197,7 +206,7 @@ export function resolveActionPlan(run: GameRun, plan: MonthlyActionPlan): Action
   for (const requestedAction of plan.actions) {
     const action = requestedAction.action as SupportedAction;
 
-    if (!monthlyAllowanceCorrected) {
+    if (!monthlyAllowanceCorrected && !options.suppressAllowanceCorrection) {
       moneyDelta -= projectedRun.profile.monthlyAllowance;
       monthlyAllowanceCorrected = true;
       projectedRun = projectRun(projectedRun, emptyStatsDelta(), -projectedRun.profile.monthlyAllowance, {
@@ -206,7 +215,11 @@ export function resolveActionPlan(run: GameRun, plan: MonthlyActionPlan): Action
       });
     }
 
-    if (!weeklySettlementHandled && shouldApplyWeeklySettlement(projectedRun, action)) {
+    if (
+      !options.suppressWeeklySettlement &&
+      !weeklySettlementHandled &&
+      shouldApplyWeeklySettlement(projectedRun, action)
+    ) {
       const weeklyBudgetDelta = getWeeklyAllowance(projectedRun) - getWeeklyLivingExpense(projectedRun);
 
       moneyDelta += weeklyBudgetDelta;

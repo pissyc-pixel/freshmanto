@@ -57,6 +57,7 @@ function createHistoricalSummary(
     actions: actions as StructuredMonthlySummary["actions"],
     attendanceStrategy: "mixed",
     schedule: createMonthlySchedule(month),
+    weeklyCalendar: [],
     statsBefore: {
       money: 1000,
       mood: 60,
@@ -95,10 +96,16 @@ function createHistoricalSummary(
       strategy: "mixed",
       attendanceCounted: true,
       directRollCallPenalty: 0,
+      rollCallRiskDelta: 0,
+      usualScoreRiskDelta: 0,
+      proxyCost: 0,
+      remedyPressure: 0,
       academicRiskDelta: 0,
       academicGain: 12,
       moodDelta: 0,
+      stressDelta: 0,
     },
+    turns: [],
   };
 }
 
@@ -256,7 +263,7 @@ describe("monthly resolution", () => {
     expect(firstWeekStudy.turnSummary.advancesCalendar).toBe(true);
     expect(firstWeekStudy.turnSummary.moneyDelta).toBe(weeklyAllowance - weeklyExpense);
     expect(firstWeekStudy.run.activeMonth?.currentWeek).toBe(1);
-    expect(firstWeekStudy.turnSummary.weekTimeAfter).toBeLessThan(firstWeekStudy.turnSummary.weekTimeBefore);
+    expect(firstWeekStudy.turnSummary.weekTimeAfter).toBeLessThan(firstWeekStudy.turnSummary.weekTimeBefore!);
 
     expect(forcedWeekEnd.run.activeMonth?.currentWeek).toBe(2);
 

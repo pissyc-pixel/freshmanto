@@ -4,7 +4,13 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { ensureDemoSchema } from "@/db/ensure-schema";
 import { generateAiReport } from "@/lib/ai/reports";
-import { advanceServerDemoTurn, createServerDemoRun } from "@/lib/demo/server";
+import {
+  advanceServerDemoTurn,
+  confirmServerWeek,
+  createServerDemoRun,
+  planServerWeekdayAction,
+  setServerWeekAttendance,
+} from "@/lib/demo/server";
 import { endDemoWeek } from "@/lib/demo/run-service";
 import { createServerSupabaseRepository } from "@/lib/supabase";
 import type { ActionTime, ActionType, CourseAttendanceStrategy } from "@/types/game";
@@ -62,6 +68,34 @@ export async function submitActionTurnAction(formData: FormData) {
   const attendanceStrategy = attendanceSchema.parse(
     readString(formData, "attendanceStrategy"),
   ) as CourseAttendanceStrategy;
+
+  if (intent === "set_attendance") {
+    await setServerWeekAttendance(runId, attendanceStrategy);
+    redirect(`/game?runId=${runId}`);
+  }
+
+  if (intent === "plan_day") {
+    const weekday = weekdaySchema.parse(readString(formData, "weekday"));
+    const optionId = z.string().min(1).parse(readString(formData, "optionId"));
+    const skipClass = readString(formData, "skipClass") === "true";
+
+    await planServerWeekdayAction(runId, {
+      weekday,
+      optionId,
+      skipClass,
+    });
+    redirect(`/game?runId=${runId}`);
+  }
+
+  if (intent === "confirm_week") {
+    const result = await confirmServerWeek(runId);
+
+    if (result.monthCompleted) {
+      redirect(`/settlement?runId=${runId}&year=${result.playedYear}&month=${result.playedMonth}`);
+    }
+
+    redirect(`/game?runId=${runId}`);
+  }
 
   if (intent === "end_week") {
     await ensureDemoSchema();

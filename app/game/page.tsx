@@ -1,29 +1,30 @@
 import Link from "next/link";
 import { startNewRunAction } from "@/app/actions";
-import { createWeeklyCalendar } from "@/core/game-engine";
-import { ActionResultCard } from "@/components/action-result-card";
-import { AppShell } from "@/components/app-shell";
+import {
+  buildPlannerDaysView,
+  buildPlannerFeedbackLines,
+  buildPlannerStatusText,
+  buildWeeklyScheduleBlocks,
+  buildWeeklySettlementView,
+  resolveCurrentWeekState,
+} from "@/app/game/view-model";
 import { ActionPlanForm } from "@/components/action-plan-form";
+import { AppShell } from "@/components/app-shell";
 import { LogFeed } from "@/components/log-feed";
 import { ProfileSummary } from "@/components/profile-summary";
 import { SectionCard } from "@/components/section-card";
 import { StatsGrid } from "@/components/stats-grid";
 import { TimeBlockStrip } from "@/components/time-block-strip";
-import { getServerDemoBundle } from "@/lib/demo/server";
+import { WeeklySettlementCard } from "@/components/weekly-settlement-card";
+import { createWeeklyCalendar } from "@/core/game-engine";
 import {
-  buildPlayerFacingMonthlyLog,
-  formatAttendanceStrategy,
   formatMonthLabel,
-  formatReleasedClassDayList,
   formatStatLabel,
 } from "@/lib/demo/options";
+import { buildGrowthJournalEntry } from "@/lib/demo/monthly-digest";
+import { getServerDemoBundle } from "@/lib/demo/server";
 import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
 import type { DynamicStats } from "@/types/game";
-import {
-  buildCurrentActionFeedback,
-  buildWeeklyScheduleBlocks,
-  resolveCurrentWeekState,
-} from "@/app/game/view-model";
 
 export const dynamic = "force-dynamic";
 
@@ -46,9 +47,9 @@ export default async function GamePage({ searchParams }: GamePageProps) {
   if (!runId || !bundle) {
     return (
       <AppShell
-        eyebrow="主游戏页"
-        title="先创建一局新的校园人生"
-        description="主游戏页需要真实的 runId，才能展示当前周内剩余时间、行动入口和最近结算。"
+        eyebrow="主游戏"
+        title="先开一局新的大学生活"
+        description="这里会承载每周课程态度、逐日安排、统一周结算，以及月底的成长日志和月记。"
         actions={
           <Link
             href="/"
@@ -58,12 +59,9 @@ export default async function GamePage({ searchParams }: GamePageProps) {
           </Link>
         }
       >
-        <SectionCard
-          title="还没有进行中的 run"
-          description="从开局页创建新档之后，这里会展示当前 run 的实时快照。"
-        >
+        <SectionCard title="还没有进行中的 run" description="先回到首页创建一局，再从这里继续排每一周。">
           <p className="text-sm leading-6 text-stone-600">
-            页面层只负责展示状态与收集输入，时间池、课程风险和月结算仍然都在规则层里处理。
+            这次改版后的主流程已经换成“先定课程态度，再逐日排周历，最后统一结算”。
           </p>
         </SectionCard>
       </AppShell>
@@ -74,35 +72,32 @@ export default async function GamePage({ searchParams }: GamePageProps) {
   const weeklyCalendar = activeMonth?.weeklyCalendar ?? createWeeklyCalendar(bundle.run.currentMonth);
   const currentWeek = activeMonth?.currentWeek ?? 1;
   const currentWeekState = resolveCurrentWeekState(weeklyCalendar, activeMonth);
-  const lastTurn = activeMonth?.lastResolvedTurn;
-  const latestMonthlyState = bundle.monthlyStates.at(-1);
-  const latestPlayerLog = latestMonthlyState
-    ? buildPlayerFacingMonthlyLog(latestMonthlyState.snapshot_json, latestMonthlyState.year, latestMonthlyState.month)
-    : null;
   const schedule = buildWeeklyScheduleBlocks({
     weeklyCalendar,
     currentWeek,
     currentWeekState,
   });
-  const latestSystemLogs = bundle.logs.slice(-5).reverse().map((log) => ({
+  const plannerDays = buildPlannerDaysView(currentWeekState);
+  const plannerStatusText = buildPlannerStatusText(currentWeekState);
+  const plannerLines = buildPlannerFeedbackLines(currentWeekState);
+  const weeklySettlement = buildWeeklySettlementView(activeMonth?.latestWeekSettlement);
+  const latestMonthlyState = bundle.monthlyStates.at(-1);
+  const latestGrowthLog = latestMonthlyState
+    ? buildGrowthJournalEntry(latestMonthlyState.snapshot_json, latestMonthlyState.year, latestMonthlyState.month)
+    : null;
+  const latestSystemLogs = bundle.logs.slice(-6).reverse().map((log) => ({
     id: log.id,
     logType: log.log_type,
     message: log.message,
     year: log.year,
     month: log.month,
   }));
-  const latestActionFeedback = lastTurn
-    ? buildCurrentActionFeedback({
-        turn: lastTurn,
-        currentWeekState,
-      })
-    : null;
 
   return (
     <AppShell
-      eyebrow="主游戏页"
-      title={`${formatMonthLabel(bundle.run.currentYear, bundle.run.currentMonth)} 的周内行动`}
-      description="现在是一周一个时间池。你可以在同一周连续做多个动作，直到时间耗尽，或者主动提前结束本周。"
+      eyebrow="主游戏"
+      title={`${formatMonthLabel(bundle.run.currentYear, bundle.run.currentMonth)} 的周历安排`}
+      description="这一轮周历会先让你定课程态度，再逐天给这一周的每天排一个行动；等 7 天都排完，点一次“确认本周安排”，系统再统一结算。"
       actions={
         <>
           <Link
@@ -115,101 +110,70 @@ export default async function GamePage({ searchParams }: GamePageProps) {
             href={`/resume?runId=${bundle.run.id}`}
             className="rounded-full border border-amber-900/15 bg-white/60 px-5 py-3 font-semibold text-stone-800 transition hover:bg-white/90"
           >
-            查看履历与日志
+            履历与成长日志
           </Link>
           <form action={startNewRunAction}>
             <button
               type="submit"
               className="rounded-full border border-red-900/15 bg-red-50/80 px-5 py-3 font-semibold text-red-900 transition hover:bg-red-100"
             >
-              重开新档
+              重新开局
             </button>
           </form>
         </>
       }
     >
       <div className="space-y-6">
-        <SectionCard title="随机开局" description="这些固定属性会贯穿整局游戏。">
+        <SectionCard title="开局底子" description="这些基础属性会贯穿整局游戏。">
           <ProfileSummary profile={bundle.run.profile} />
         </SectionCard>
 
-        <SectionCard title="当前状态" description="每做完一个动作就即时刷新。">
+        <SectionCard title="当前状态" description="每次周结算后，状态都会在这里更新。">
           <StatsGrid items={buildStatItems(bundle.run.stats)} />
         </SectionCard>
 
-        <SectionCard
-          title="本周时间池"
-          description={`第 ${currentWeek} 周还剩 ${currentWeekState.remainingTimeUnits} / ${currentWeekState.totalTimeUnits} 个半天，可继续决策。`}
-        >
-          <div className="space-y-3 text-sm leading-6 text-stone-700">
-            <p>
-              当前周课程策略：
-              <strong>{formatAttendanceStrategy(lastTurn?.attendanceStrategy ?? currentWeekState.attendanceStrategy)}</strong>
-            </p>
-            <p>
-              已释放的课程白天：
-              {currentWeekState.releasedClassDays.length > 0
-                ? ` ${formatReleasedClassDayList(currentWeekState.releasedClassDays)}`
-                : " 暂无"}
-            </p>
-            <p>
-              {currentWeekState.remainingTimeUnits > 0
-                ? "这一周还可以继续安排行动，也可以直接结束本周。"
-                : "本周时间已经耗尽，系统会自动推进到下一周。"}
-            </p>
-          </div>
-        </SectionCard>
+        {weeklySettlement ? (
+          <SectionCard title="上一周结算" description="这一周已经统一结算完，可以先看看逐日反馈和总变化。">
+            <WeeklySettlementCard {...weeklySettlement} />
+          </SectionCard>
+        ) : null}
 
         <SectionCard
           title="本月周历"
-          description="默认时间窗口来自课程安排，“这周不去上课”会把仍被课占住的白天即时释放。"
+          description="保留原来的周历承载，但玩家主视角不再直接面对半天槽计数，而是看每天能不能排、排了什么。"
         >
           <TimeBlockStrip blocks={schedule} />
         </SectionCard>
 
         <SectionCard
-          title="上一轮反馈"
-          description="这里直接显示最近一次动作的即时结果，以及你接下来还能怎么安排这一周。"
-        >
-          {lastTurn && latestActionFeedback ? (
-            <ActionResultCard
-              turn={lastTurn}
-              eventLines={latestActionFeedback.eventLines}
-              nextStepHint={latestActionFeedback.nextStepHint}
-            />
-          ) : (
-            <p className="text-sm leading-6 text-stone-600">
-              这个月还没有结算过任何动作。先做一个决定，系统会立刻更新剩余时间和当前状态。
-            </p>
-          )}
-        </SectionCard>
-
-        {latestPlayerLog ? (
-          <SectionCard
-            title="最近一次月度回顾"
-            description="这是上一份已经落库的前台日志，方便回头看上个月是怎么过来的。"
-          >
-            <LogFeed items={[latestPlayerLog]} variant="player" />
-          </SectionCard>
-        ) : null}
-
-        <SectionCard
-          title="提交本轮行动"
-          description="每次只推进一个动作；如果这周不想继续安排，也可以直接提前结束本周。"
+          title="安排这一周"
+          description="先定本周课程态度，再点击每一天。周一 / 三 / 五默认白天被课程占用；如果这天决定翘课，会释放白天，但会吃学业和压力代价。"
         >
           <ActionPlanForm
             runId={bundle.run.id}
             currentWeek={Math.min(currentWeek, 4)}
-            remainingTimeUnits={currentWeekState.remainingTimeUnits}
-            totalTimeUnits={currentWeekState.totalTimeUnits}
-            releasedClassDays={currentWeekState.releasedClassDays}
-            defaultAttendanceStrategy={lastTurn?.attendanceStrategy ?? currentWeekState.attendanceStrategy}
+            attendanceLocked={Boolean(currentWeekState.attendanceLocked)}
+            defaultAttendanceStrategy={currentWeekState.attendanceStrategy}
+            plannerStatusText={plannerStatusText}
+            plannerLines={plannerLines}
+            readyToConfirm={Boolean(currentWeekState.readyToConfirm)}
+            plannerFeedback={currentWeekState.plannerFeedback}
+            days={plannerDays}
           />
         </SectionCard>
 
+        {latestGrowthLog ? (
+          <SectionCard
+            title="最近一条成长日志"
+            description="成长日志偏事实层，帮你回看上个月到底发生了什么，不直接照搬后台流水。"
+          >
+            <LogFeed items={[latestGrowthLog]} variant="player" />
+          </SectionCard>
+        ) : null}
+
         <SectionCard
           title="后台日志"
-          description="这里保留系统留档，方便核对当前 run 的推进过程。"
+          description="这里保留系统层面的动作、事件和结算留档，方便排查当前 run 的推进过程。"
         >
           <LogFeed items={latestSystemLogs} emptyMessage="目前还没有系统日志留档。" />
         </SectionCard>
