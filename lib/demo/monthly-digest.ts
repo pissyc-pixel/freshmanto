@@ -51,6 +51,49 @@ function formatDirectionLabel(direction: DirectionKey) {
   }[direction];
 }
 
+function emptyStats() {
+  return {
+    money: 0,
+    mood: 0,
+    stress: 0,
+    fulfillment: 0,
+    social: 0,
+    semesterAcademics: 0,
+  };
+}
+
+function normalizeMonthlySummary(summary: StructuredMonthlySummary): StructuredMonthlySummary {
+  return {
+    ...summary,
+    actions: summary.actions ?? [],
+    eventIds: summary.eventIds ?? [],
+    resumeAdditions: summary.resumeAdditions ?? [],
+    notableFacts: summary.notableFacts ?? [],
+    resolvedActions: summary.resolvedActions ?? [],
+    flags: summary.flags ?? [],
+    weeklySettlements: summary.weeklySettlements ?? [],
+    statsBefore: summary.statsBefore ?? emptyStats(),
+    statsAfter: summary.statsAfter ?? summary.statsBefore ?? emptyStats(),
+    statsDelta: summary.statsDelta ?? emptyStats(),
+    academicFeedback: summary.academicFeedback ?? "stable",
+    cooldowns: summary.cooldowns ?? { askFamilyMonths: 0 },
+    course: summary.course ?? {
+      strategy: summary.attendanceStrategy ?? "mixed",
+      attendanceCounted: true,
+      directRollCallPenalty: 0,
+      rollCallRiskDelta: 0,
+      usualScoreRiskDelta: 0,
+      proxyCost: 0,
+      remedyPressure: 0,
+      academicRiskDelta: 0,
+      academicGain: 0,
+      moodDelta: 0,
+      stressDelta: 0,
+    },
+    turns: summary.turns ?? [],
+  };
+}
+
 function summarizeEmotionalArc(summary: StructuredMonthlySummary) {
   if (summary.statsDelta.stress >= 8) {
     return "这个月明显是在顶着压力往前赶，很多时候不是从容安排，而是硬把事情往下推。";
@@ -237,27 +280,28 @@ export function buildMonthlyDiaryDigest(
   year: number,
   month: number,
 ): MonthlyDiaryDigest {
-  const mainActions = uniqueStrings(summary.actions.map((action) => formatActionType(action))).slice(0, 4);
-  const directionSignal = buildDirectionSignal(summary);
+  const safeSummary = normalizeMonthlySummary(summary);
+  const mainActions = uniqueStrings(safeSummary.actions.map((action) => formatActionType(action))).slice(0, 4);
+  const directionSignal = buildDirectionSignal(safeSummary);
 
   return {
     monthLabel: formatMonthLabel(year, month),
-    attendanceStrategy: formatAttendanceStrategy(summary.attendanceStrategy),
+    attendanceStrategy: formatAttendanceStrategy(safeSummary.attendanceStrategy),
     mainActions,
-    coreChanges: buildCoreChanges(summary),
-    emotionalArc: summarizeEmotionalArc(summary),
-    academicArc: summarizeAcademicArc(summary),
-    moneyArc: summarizeMoneyArc(summary),
+    coreChanges: buildCoreChanges(safeSummary),
+    emotionalArc: summarizeEmotionalArc(safeSummary),
+    academicArc: summarizeAcademicArc(safeSummary),
+    moneyArc: summarizeMoneyArc(safeSummary),
     directionSignal,
-    futureSignals: buildFutureSignals(summary),
-    resumeHighlights: summary.resumeAdditions.map((item) => item.title).slice(0, 3),
-    keyMoments: buildKeyMoments(summary, directionSignal),
+    futureSignals: buildFutureSignals(safeSummary),
+    resumeHighlights: safeSummary.resumeAdditions.map((item) => item.title).slice(0, 3),
+    keyMoments: buildKeyMoments(safeSummary, directionSignal),
     endState: {
-      money: summary.statsAfter.money,
-      mood: summary.statsAfter.mood,
-      stress: summary.statsAfter.stress,
-      semesterAcademics: summary.statsAfter.semesterAcademics,
-      feedback: formatSemesterFeedback(summary.academicFeedback),
+      money: safeSummary.statsAfter.money,
+      mood: safeSummary.statsAfter.mood,
+      stress: safeSummary.statsAfter.stress,
+      semesterAcademics: safeSummary.statsAfter.semesterAcademics,
+      feedback: formatSemesterFeedback(safeSummary.academicFeedback),
     },
   };
 }
@@ -267,7 +311,8 @@ export function buildGrowthJournalEntry(
   year: number,
   month: number,
 ): GrowthJournalEntry {
-  const digest = buildMonthlyDiaryDigest(summary, year, month);
+  const safeSummary = normalizeMonthlySummary(summary);
+  const digest = buildMonthlyDiaryDigest(safeSummary, year, month);
   const actionLead = digest.mainActions.join("、");
   const detailLines = uniqueStrings([
     digest.directionSignal,
@@ -280,7 +325,7 @@ export function buildGrowthJournalEntry(
   return {
     badge: "成长日志",
     periodLabel: digest.monthLabel,
-    title: buildTitle(summary),
+    title: buildTitle(safeSummary),
     message: `这个月主要围着${actionLead || "把节奏稳住"}在转。课程态度是“${digest.attendanceStrategy}”，最直接的状态变化是${digest.coreChanges.join("、") || "没有特别剧烈的波动"}。这些事也在把未来方向慢慢推出来：${digest.directionSignal}${digest.emotionalArc}`,
     details: detailLines,
   };

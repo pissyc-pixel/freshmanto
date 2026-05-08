@@ -28,7 +28,7 @@ const kindStyles: Record<TimeBlockView["kind"], string> = {
 const kindLabels: Record<TimeBlockView["kind"], string> = {
   free: "全天可支配",
   half_free: "半天空档",
-  busy_day: "白天被课占住",
+  busy_day: "\u767d\u5929\u6ee1\u8bfe",
 };
 
 export function TimeBlockStrip({ blocks }: TimeBlockStripProps) {

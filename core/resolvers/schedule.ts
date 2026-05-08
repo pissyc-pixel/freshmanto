@@ -66,6 +66,7 @@ const ACTION_TIME_COSTS: Record<ActionType, number> = {
   study: 1,
   social: 1,
   relax: 1,
+  idle: 0,
   student_activity: 1,
   remedy: 1,
   job_prep: 2,
@@ -234,7 +235,7 @@ export function isWeekReadyToConfirm(weekState: ActiveWeekState): boolean {
     return false;
   }
 
-  return weekState.days.every((day) => day.plannedAction);
+  return true;
 }
 
 export function createMonthlySchedule(month: number): ScheduledDay[] {

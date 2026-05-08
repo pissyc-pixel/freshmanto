@@ -97,7 +97,7 @@ export async function submitActionTurnAction(formData: FormData) {
       redirect(`/settlement?runId=${runId}&year=${result.playedYear}&month=${result.playedMonth}`);
     }
 
-    redirect(`/game?runId=${runId}`);
+    redirect(`/game?runId=${runId}&focus=weekly-settlement`);
   }
 
   if (intent === "end_week") {

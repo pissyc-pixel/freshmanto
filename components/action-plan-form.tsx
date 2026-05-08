@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { submitActionTurnAction } from "@/app/actions";
 import type { CourseAttendanceStrategy } from "@/types/game";
@@ -17,6 +17,7 @@ type PlannerDayView = {
   label: string;
   status: string;
   plannedActionLabel: string | null;
+  justPlanned: boolean;
   baseTypeLabel: string;
   effectiveTypeLabel: string;
   skipClassAvailable: boolean;
@@ -60,13 +61,36 @@ function SubmitButton(props: {
   pendingLabel: string;
   className: string;
   disabled?: boolean;
+  onClick?: () => void;
 }) {
   const { pending } = useFormStatus();
 
   return (
-    <button type="submit" disabled={pending || props.disabled} className={props.className}>
+    <button
+      type="submit"
+      disabled={pending || props.disabled}
+      className={props.className}
+      onClick={props.onClick}
+    >
       {pending ? props.pendingLabel : props.label}
     </button>
+  );
+}
+
+function FeedbackBanner({ feedback }: { feedback: PlannerFeedback }) {
+  return (
+    <div
+      className={`rounded-2xl border px-4 py-4 text-sm leading-6 ${
+        feedback.kind === "error"
+          ? "border-rose-200 bg-rose-50 text-rose-900"
+          : feedback.kind === "success"
+            ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+            : "border-amber-200 bg-amber-50 text-amber-900"
+      }`}
+    >
+      <p className="font-semibold">{feedback.title}</p>
+      <p className="mt-1">{feedback.message}</p>
+    </div>
   );
 }
 
@@ -82,18 +106,54 @@ export function ActionPlanForm({
   days,
 }: ActionPlanFormProps) {
   const [selectedWeekday, setSelectedWeekday] = useState<string | null>(null);
-  const selectedDay = days.find((day) => day.weekday === selectedWeekday) ?? null;
   const [skipClassDraft, setSkipClassDraft] = useState(false);
+  const [localFeedback, setLocalFeedback] = useState<PlannerFeedback | null>(null);
+  const [pendingPlan, setPendingPlan] = useState<{ weekday: string; label: string } | null>(null);
+  const selectedDay = days.find((day) => day.weekday === selectedWeekday) ?? null;
   const currentOptions = selectedDay
     ? skipClassDraft && selectedDay.skipClassAvailable
       ? selectedDay.skipOptions
       : selectedDay.normalOptions
     : [];
+  const activeFeedback = localFeedback ?? plannerFeedback ?? null;
+  const missingCount = useMemo(
+    () => days.filter((day) => !day.plannedActionLabel).length,
+    [days],
+  );
+  const highlightedWeekday =
+    pendingPlan?.weekday ?? days.find((day) => day.justPlanned)?.weekday ?? null;
+
+  function openDayPlanner(day: PlannerDayView) {
+    if (!attendanceLocked) {
+      setLocalFeedback({
+        kind: "info",
+        title: "先确定这周课程态度",
+        message: "课程态度还没锁定前，这些天还不能真正排进去。先保存本周的上课态度，再逐天点选。",
+      });
+      return;
+    }
+
+    setLocalFeedback(null);
+    setPendingPlan(null);
+    setSelectedWeekday(day.weekday);
+    setSkipClassDraft(day.skipClassSelected);
+  }
 
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-[var(--border)] bg-white/70 p-4 text-sm leading-6 text-stone-700">
-        <p className="font-semibold text-stone-900">第 {currentWeek} 周</p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="font-semibold text-stone-900">第 {currentWeek} 周操作</p>
+          {missingCount > 0 ? (
+            <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-700">
+              还差 {missingCount} 天没点，确认时会自动补成摆烂 / 发呆
+            </span>
+          ) : (
+            <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
+              这一周已经全部排完
+            </span>
+          )}
+        </div>
         <p className="mt-2">{plannerStatusText}</p>
         {plannerLines.length > 0 ? (
           <ul className="mt-3 space-y-2 text-sm text-stone-600">
@@ -104,22 +164,19 @@ export function ActionPlanForm({
         ) : null}
       </div>
 
-      {plannerFeedback ? (
-        <div
-          className={`rounded-2xl border px-4 py-4 text-sm leading-6 ${
-            plannerFeedback.kind === "error"
-              ? "border-rose-200 bg-rose-50 text-rose-900"
-              : plannerFeedback.kind === "success"
-                ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-                : "border-amber-200 bg-amber-50 text-amber-900"
-          }`}
-        >
-          <p className="font-semibold">{plannerFeedback.title}</p>
-          <p className="mt-1">{plannerFeedback.message}</p>
+      {activeFeedback ? <FeedbackBanner feedback={activeFeedback} /> : null}
+
+      {pendingPlan ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+          <p className="font-semibold">{days.find((day) => day.weekday === pendingPlan.weekday)?.label} 正在保存</p>
+          <p className="mt-1">这一天已经点成“{pendingPlan.label}”，页面刷新后会立刻在当天卡片上显示。</p>
         </div>
       ) : null}
 
-      <form action={submitActionTurnAction} className="space-y-4 rounded-2xl border border-[var(--border)] bg-white/80 p-4">
+      <form
+        action={submitActionTurnAction}
+        className="space-y-4 rounded-2xl border border-[var(--border)] bg-white/80 p-4"
+      >
         <input type="hidden" name="runId" value={runId} />
         <input type="hidden" name="intent" value="set_attendance" />
         <div className="space-y-3">
@@ -150,36 +207,57 @@ export function ActionPlanForm({
       </form>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {days.map((day) => (
-          <button
-            key={day.weekday}
-            type="button"
-            disabled={!attendanceLocked}
-            onClick={() => {
-              setSelectedWeekday(day.weekday);
-              setSkipClassDraft(day.skipClassSelected);
-            }}
-            className="rounded-2xl border border-[var(--border)] bg-white/80 p-4 text-left transition hover:border-amber-300 hover:bg-amber-50/70 disabled:cursor-not-allowed disabled:bg-stone-100"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-stone-900">{day.label}</p>
-                <p className="mt-1 text-xs text-stone-500">{day.status}</p>
+        {days.map((day) => {
+          const isHighlighted = highlightedWeekday === day.weekday;
+          const isPlanned = Boolean(day.plannedActionLabel);
+
+          return (
+            <button
+              key={day.weekday}
+              type="button"
+              onClick={() => openDayPlanner(day)}
+              className={`rounded-2xl border p-4 text-left transition ${
+                isHighlighted
+                  ? "border-emerald-300 bg-emerald-50/90 shadow-[0_16px_32px_rgba(16,185,129,0.15)]"
+                  : isPlanned
+                    ? "border-amber-300 bg-amber-50/70"
+                    : "border-[var(--border)] bg-white/80 hover:border-amber-300 hover:bg-amber-50/70"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-stone-900">{day.label}</p>
+                  <p className="mt-1 text-xs text-stone-500">{day.status}</p>
+                </div>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                    day.eventTitle
+                      ? "bg-amber-100 text-amber-800"
+                      : isPlanned
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-stone-900 text-stone-50"
+                  }`}
+                >
+                  {day.eventTitle ? "有事" : isPlanned ? "已安排" : "可排"}
+                </span>
               </div>
-              <span className="rounded-full bg-stone-900 px-3 py-1 text-xs font-semibold text-stone-50">
-                {day.eventTitle ? "有事" : "可排"}
-              </span>
-            </div>
-            <p className="mt-3 text-sm leading-6 text-stone-700">
-              {day.plannedActionLabel ? `已排：${day.plannedActionLabel}` : day.effectiveTypeLabel}
-            </p>
-            <p className="mt-2 text-xs leading-5 text-stone-500">默认节奏：{day.baseTypeLabel}</p>
-            {day.eventTitle ? <p className="mt-2 text-xs leading-5 text-amber-700">{day.eventTitle}</p> : null}
-          </button>
-        ))}
+              <p className="mt-3 text-sm leading-6 text-stone-700">
+                {day.plannedActionLabel ? `已安排：${day.plannedActionLabel}` : day.effectiveTypeLabel}
+              </p>
+              <p className="mt-2 text-xs leading-5 text-stone-500">默认节奏：{day.baseTypeLabel}</p>
+              {day.eventTitle ? <p className="mt-2 text-xs leading-5 text-amber-700">{day.eventTitle}</p> : null}
+              {!attendanceLocked ? (
+                <p className="mt-3 text-xs leading-5 text-stone-500">先定课程态度，再点这一天。</p>
+              ) : null}
+            </button>
+          );
+        })}
       </div>
 
-      <form action={submitActionTurnAction} className="space-y-3 rounded-2xl border border-[var(--border)] bg-white/80 p-4">
+      <form
+        action={submitActionTurnAction}
+        className="space-y-3 rounded-2xl border border-[var(--border)] bg-white/80 p-4"
+      >
         <input type="hidden" name="runId" value={runId} />
         <input type="hidden" name="intent" value="confirm_week" />
         <input type="hidden" name="attendanceStrategy" value={defaultAttendanceStrategy} />
@@ -190,9 +268,15 @@ export function ActionPlanForm({
             disabled={!readyToConfirm}
             className="rounded-full bg-stone-900 px-5 py-3 font-semibold text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-400"
           />
-          {!readyToConfirm ? <span className="text-sm text-stone-500">要先把这一周 7 天都排完。</span> : null}
+          {attendanceLocked ? (
+            <span className="text-sm text-stone-500">
+              没点到的日期会自动补成“摆烂 / 发呆”，不会因为漏选卡住。
+            </span>
+          ) : (
+            <span className="text-sm text-stone-500">先把这周课程态度锁定，系统才知道怎么结算这一周。</span>
+          )}
         </div>
-        <PendingHint text="正在统一结算本周安排；如果这是月底，也会顺带生成 AI 月记 / 月度总结。" />
+        <PendingHint text="正在统一结算本周安排；如果这是月末，也会顺带生成 AI 月记 / 月度总结。" />
       </form>
 
       {selectedDay ? (
@@ -203,7 +287,8 @@ export function ActionPlanForm({
                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-amber-700">{selectedDay.label}</p>
                 <h3 className="mt-2 text-2xl font-semibold text-stone-900">给这一天排一个行动</h3>
                 <p className="mt-2 text-sm leading-6 text-stone-600">
-                  默认节奏：{selectedDay.baseTypeLabel}。当前可排：{skipClassDraft && selectedDay.skipClassAvailable ? "翘课后释放白天" : selectedDay.effectiveTypeLabel}。
+                  默认节奏：{selectedDay.baseTypeLabel}。当前可排：
+                  {skipClassDraft && selectedDay.skipClassAvailable ? "翘课后释放白天" : selectedDay.effectiveTypeLabel}。
                 </p>
                 {selectedDay.eventTitle ? (
                   <p className="mt-2 text-sm leading-6 text-amber-700">
@@ -228,18 +313,26 @@ export function ActionPlanForm({
                   onChange={(event) => setSkipClassDraft(event.target.checked)}
                   className="mt-1 h-4 w-4 rounded border-stone-300 text-amber-600"
                 />
-                <span>这天翘课，释放白天时间。代价是学业会掉一点、压力会涨一点。</span>
+                <span>这天翘课，释放白天时间。代价是学业会掉一点、压力会上来一点。</span>
               </label>
             ) : null}
 
             <div className="mt-5 grid gap-3 md:grid-cols-2">
               {currentOptions.map((option) => (
-                <form key={option.optionId} action={submitActionTurnAction} className="rounded-2xl border border-[var(--border)] bg-white/90 p-4">
+                <form
+                  key={option.optionId}
+                  action={submitActionTurnAction}
+                  className="rounded-2xl border border-[var(--border)] bg-white/90 p-4"
+                >
                   <input type="hidden" name="runId" value={runId} />
                   <input type="hidden" name="intent" value="plan_day" />
                   <input type="hidden" name="attendanceStrategy" value={defaultAttendanceStrategy} />
                   <input type="hidden" name="weekday" value={selectedDay.weekday} />
-                  <input type="hidden" name="skipClass" value={String(skipClassDraft && selectedDay.skipClassAvailable)} />
+                  <input
+                    type="hidden"
+                    name="skipClass"
+                    value={String(skipClassDraft && selectedDay.skipClassAvailable)}
+                  />
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <h4 className="text-base font-semibold text-stone-900">{option.label}</h4>
@@ -247,14 +340,23 @@ export function ActionPlanForm({
                         <p className="mt-1 text-xs font-medium text-amber-700">上一次你排过类似行动</p>
                       ) : null}
                     </div>
-                    <button
-                      type="submit"
-                      name="optionId"
-                      value={option.optionId}
+                    <SubmitButton
+                      label="排到这一天"
+                      pendingLabel="正在保存..."
                       className="rounded-full bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700"
-                    >
-                      排到这一天
-                    </button>
+                      onClick={() => {
+                        setPendingPlan({
+                          weekday: selectedDay.weekday,
+                          label: option.label,
+                        });
+                        setLocalFeedback({
+                          kind: "success",
+                          title: `${selectedDay.label} 已点上`,
+                          message: `已经把“${option.label}”排到这一天，正在保存并刷新这周安排。`,
+                        });
+                        setSelectedWeekday(null);
+                      }}
+                    />
                   </div>
                   <p className="mt-3 text-sm leading-6 text-stone-600">{option.description}</p>
                 </form>

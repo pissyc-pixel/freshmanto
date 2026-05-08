@@ -23,6 +23,7 @@ type WeeklySettlementCardProps = {
     label: string;
     value: number;
   }>;
+  budgetLines: string[];
   riskLines: string[];
 };
 
@@ -74,6 +75,16 @@ export function WeeklySettlementCard(props: WeeklySettlementCardProps) {
             </div>
           ))}
         </div>
+      {props.budgetLines.length > 0 ? (
+        <div className="mt-6 rounded-2xl border border-[var(--border)] bg-white/90 p-4 text-sm leading-6 text-stone-700">
+          <p className="font-semibold text-stone-900">\u672c\u5468\u6536\u652f\u62c6\u89e3</p>
+          <ul className="mt-2 space-y-2">
+            {props.budgetLines.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       </div>
 
       {props.riskLines.length > 0 ? (

@@ -12,6 +12,7 @@ import { ActionPlanForm } from "@/components/action-plan-form";
 import { AppShell } from "@/components/app-shell";
 import { LogFeed } from "@/components/log-feed";
 import { ProfileSummary } from "@/components/profile-summary";
+import { ScrollIntoView } from "@/components/scroll-into-view";
 import { SectionCard } from "@/components/section-card";
 import { StatsGrid } from "@/components/stats-grid";
 import { TimeBlockStrip } from "@/components/time-block-strip";
@@ -56,6 +57,7 @@ function formatDirectionStage(stage: "undecided" | "forming" | "clear") {
 export default async function GamePage({ searchParams }: GamePageProps) {
   const params = await searchParams;
   const runId = readSearchParam(params.runId);
+  const focusParam = readSearchParam(params.focus);
   const bundle = runId ? await getServerDemoBundle(runId) : null;
 
   if (!runId || !bundle) {
@@ -197,22 +199,27 @@ export default async function GamePage({ searchParams }: GamePageProps) {
           </div>
         </SectionCard>
 
-        {weeklySettlement ? (
-          <SectionCard title="上一周结算" description="这一周已经统一结算完，可以先看看逐日反馈和总变化。">
-            <WeeklySettlementCard {...weeklySettlement} />
-          </SectionCard>
+                {weeklySettlement ? (
+          <>
+            <ScrollIntoView targetId="weekly-settlement" active={focusParam === "weekly-settlement"} />
+            <div id="weekly-settlement">
+              <SectionCard title="\u4e0a\u5468\u7ed3\u7b97" description="\u8fd9\u4e00\u5468\u5df2\u7ecf\u7edf\u4e00\u7ed3\u7b97\u5b8c\uff0c\u53ef\u4ee5\u76f4\u63a5\u770b\u9010\u65e5\u53cd\u9988\u548c\u672c\u5468\u603b\u53d8\u5316\u3002">
+                <WeeklySettlementCard {...weeklySettlement} />
+              </SectionCard>
+            </div>
+          </>
         ) : null}
 
         <SectionCard
-          title="本月周历"
-          description="保留原来的周历承载，但玩家主视角不再直接面对半天槽计数，而是看每天能不能排、排了什么。"
+          title="\u672c\u6708\u6982\u89c8"
+          description="\u8fd9\u91cc\u5148\u770b\u8fd9\u4e2a\u6708 4 \u5468\u7684\u6574\u4f53\u8282\u594f\u548c\u5f53\u524d\u5468\u4f4d\u7f6e\uff1b\u771f\u6b63\u7684\u9010\u5929\u70b9\u9009\u5165\u53e3\u653e\u5728\u4e0b\u4e00\u5757\u3002"
         >
           <TimeBlockStrip blocks={schedule} />
         </SectionCard>
 
         <SectionCard
-          title="安排这一周"
-          description="先定本周课程态度，再点击每一天。周一 / 三 / 五默认白天被课程占用；如果这天决定翘课，会释放白天，但会吃学业和压力代价。"
+          title="\u5b89\u6392\u8fd9\u4e00\u5468"
+          description="\u8fd9\u91cc\u624d\u662f\u672c\u5468\u7684\u5b9e\u9645\u64cd\u4f5c\u5165\u53e3\u3002\u5148\u5b9a\u8bfe\u7a0b\u6001\u5ea6\uff0c\u518d\u9010\u5929\u70b9\u9009\uff1b\u5468\u4e00 / \u4e09 / \u4e94\u9ed8\u8ba4\u767d\u5929\u6ee1\u8bfe\uff0c\u7fd8\u8bfe\u624d\u4f1a\u91ca\u653e\u767d\u5929\u3002"
         >
           <ActionPlanForm
             runId={bundle.run.id}

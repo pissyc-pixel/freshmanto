@@ -32,6 +32,7 @@ export type ActionType =
   | "part_time"
   | "social"
   | "relax"
+  | "idle"
   | "big_meal"
   | "student_activity"
   | "remedy"
@@ -186,6 +187,7 @@ export type PlannedAction = {
   weekday?: Weekday;
   skipClass?: boolean;
   sourceEventId?: string;
+  autoFilled?: boolean;
 };
 
 export type ResolvedAction = PlannedAction & {
@@ -215,6 +217,7 @@ export type ActiveWeekState = {
   readyToConfirm?: boolean;
   plannerFeedback?: PlannerFeedback;
   lastSelectedOptionId?: string;
+  lastPlannedWeekday?: Weekday;
 };
 
 export type PlannerFeedback = {
@@ -266,6 +269,10 @@ export type WeeklyEventInstance = {
   limitedActions?: ActionType[];
   specialAction?: WeeklyActionOption;
   actionBoosts?: WeeklyEventActionBoost[];
+  linkedProjectId?: string;
+  linkedProjectTitle?: string;
+  skipClosesProjectLine?: boolean;
+  defaultAttendIfUnplanned?: boolean;
 };
 
 export type PlannedWeekdayState = {
@@ -404,6 +411,7 @@ export type WeeklySettlementSummary = {
   riskDelta: RiskState;
   flags: string[];
   opportunities: string[];
+  budgetLines?: string[];
 };
 
 export type ActiveMonthState = {
