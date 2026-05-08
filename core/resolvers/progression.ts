@@ -3,9 +3,14 @@ import type {
   ActionType,
   CareerRouteState,
   CompetitionProject,
+  CompetitionAward,
   DirectionKey,
   DirectionTendencyMap,
+  GraduationPath,
+  GraduationPathResult,
   GameRun,
+  RecommendationQualification,
+  ResumeItem,
   ScholarshipRecord,
   StarterProfile,
 } from "@/types/game";
@@ -402,4 +407,286 @@ export function summarizeDirectionSignals(run: GameRun): string[] {
   }
 
   return lines.slice(0, 3);
+}
+
+function createResumeItem(run: GameRun, title: string, summary: string, category: ResumeItem["category"], tags: string[] = []): ResumeItem {
+  return {
+    id: `${run.id}-${run.currentYear}-${run.currentMonth}-${title}`,
+    category,
+    title,
+    summary,
+    month: run.currentMonth,
+    tags,
+  };
+}
+
+function competitionScore(run: GameRun, project: CompetitionProject): number {
+  const academic = deriveAcademicProfile(run).recommendationScore;
+  const effort = project.investedDays * 8;
+  const school = schoolTierScore(run.profile) * 4;
+
+  return clamp(academic + effort + school + run.profile.luck / 4, 0, 100);
+}
+
+function decideCompetitionAward(run: GameRun, project: CompetitionProject): CompetitionAward | null {
+  if (project.investedDays < project.minimumEffortDays) {
+    return null;
+  }
+
+  const score = competitionScore(run, project);
+
+  if (project.awardPool.includes("national") && score >= 90) {
+    return { level: "national", rank: score >= 96 ? "first" : score >= 93 ? "second" : "third" };
+  }
+  if (project.awardPool.includes("provincial") && score >= 72) {
+    return { level: "provincial", rank: score >= 86 ? "first" : score >= 79 ? "second" : "third" };
+  }
+  if (score >= 55) {
+    return { level: "school", rank: score >= 68 ? "first" : score >= 61 ? "second" : "third" };
+  }
+
+  return null;
+}
+
+function formatCompetitionAward(award: CompetitionAward): string {
+  const levelLabel = {
+    school: "校级",
+    provincial: "省级",
+    national: "国家级",
+  }[award.level];
+  const rankLabel = {
+    first: "一等奖",
+    second: "二等奖",
+    third: "三等奖",
+  }[award.rank];
+
+  return `${levelLabel}${rankLabel}`;
+}
+
+function evaluateScholarshipLevel(run: GameRun, academicYear: number): ScholarshipRecord | null {
+  if (academicYear <= 1) {
+    return null;
+  }
+
+  const existing = run.scholarships?.some((record) => record.academicYear === academicYear);
+  if (existing) {
+    return null;
+  }
+
+  const semesterStart = (academicYear - 2) * 2;
+  const yearSemesters = run.semesters.slice(semesterStart, semesterStart + 2);
+  if (yearSemesters.length === 0) {
+    return null;
+  }
+
+  const average = yearSemesters.reduce((sum, item) => sum + item.academicScore, 0) / yearSemesters.length;
+  const hasFailure = yearSemesters.some((item) => !item.passed);
+  const competitionBonus = (run.competitionProjects ?? []).filter((project) => project.result).length;
+  const resumeBonus = run.resume.filter((item) => item.category === "competition" || item.category === "research").length;
+  const schoolBonus = schoolTierScore(run.profile);
+  const score = average + competitionBonus * 5 + resumeBonus * 2 + schoolBonus * 1.5 - (hasFailure ? 20 : 0);
+
+  if (score >= 92) {
+    return {
+      id: `${run.id}-scholarship-${academicYear}`,
+      academicYear,
+      level: "high",
+      amount: 5000,
+      title: "高等级奖学金",
+      reason: "上一学年的学业表现、竞赛和履历积累都比较强。",
+    };
+  }
+
+  if (score >= 78) {
+    return {
+      id: `${run.id}-scholarship-${academicYear}`,
+      academicYear,
+      level: "standard",
+      amount: 2000,
+      title: "普通奖学金",
+      reason: "上一学年的整体表现比较稳，拿到了基础奖学金。",
+    };
+  }
+
+  return {
+    id: `${run.id}-scholarship-${academicYear}`,
+    academicYear,
+    level: "none",
+    amount: 0,
+    title: "未获得奖学金",
+    reason: "上一学年的表现还没有到奖学金线。",
+  };
+}
+
+export function evaluateRecommendationQualification(run: GameRun): RecommendationQualification {
+  const profile = deriveAcademicProfile(run);
+  const competitionCount = (run.competitionProjects ?? []).filter((project) => project.result).length;
+  const scholarshipCount = (run.scholarships ?? []).filter((record) => record.level !== "none").length;
+  const score =
+    profile.gpa * 20 +
+    (100 - (profile.rank ?? 90)) * 0.4 +
+    (profile.percentile ?? 0) * 0.2 +
+    competitionCount * 6 +
+    scholarshipCount * 6 +
+    schoolTierScore(run.profile) * 3;
+
+  if (score >= 88) {
+    return "eligible";
+  }
+  if (score >= 72) {
+    return "borderline";
+  }
+  return "unlikely";
+}
+
+export function settleLongTermProgression(run: GameRun, input: {
+  playedYear: number;
+  playedMonth: number;
+}) {
+  let nextRun = ensureProgressionState(run);
+  const resumeAdditions: ResumeItem[] = [];
+  const notableFacts: string[] = [];
+  let scholarshipAwarded: ScholarshipRecord | undefined;
+
+  if (input.playedMonth % 6 === 0) {
+    const semesterKey = `${input.playedYear}-${input.playedMonth <= 6 ? "spring" : "fall"}`;
+    const updatedProjects = nextRun.competitionProjects!.map((project) => {
+      if (project.semesterKey !== semesterKey || (project.status !== "open" && project.status !== "active")) {
+        return project;
+      }
+
+      const award = decideCompetitionAward(nextRun, project);
+      if (!award) {
+        notableFacts.push(`competition:${project.title}:unfinished`);
+        return {
+          ...project,
+          status: "expired" as const,
+          result: null,
+        };
+      }
+
+      const awardLabel = formatCompetitionAward(award);
+      notableFacts.push(`competition:${project.title}:${award.level}-${award.rank}`);
+      resumeAdditions.push(
+        createResumeItem(
+          nextRun,
+          `${project.title} ${awardLabel}`,
+          `在 ${project.title} 中拿到了 ${awardLabel}，属于这一学期比较扎实的一条长期成果。`,
+          "competition",
+          [project.category, award.level, award.rank],
+        ),
+      );
+      return {
+        ...project,
+        status: "completed" as const,
+        result: award,
+      };
+    });
+
+    nextRun = {
+      ...nextRun,
+      competitionProjects: updatedProjects,
+      resume: [...nextRun.resume, ...resumeAdditions],
+    };
+  }
+
+  if (input.playedMonth === 12) {
+    const scholarship = evaluateScholarshipLevel(nextRun, nextRun.currentYear);
+    if (scholarship) {
+      scholarshipAwarded = scholarship;
+      notableFacts.push(`scholarship:${scholarship.level}:${scholarship.academicYear}`);
+      nextRun = {
+        ...nextRun,
+        stats: {
+          ...nextRun.stats,
+          money: nextRun.stats.money + scholarship.amount,
+          fulfillment: clamp(nextRun.stats.fulfillment + (scholarship.level === "high" ? 8 : scholarship.level === "standard" ? 4 : 0), 0, 100),
+        },
+        scholarships: [...(nextRun.scholarships ?? []), scholarship],
+      };
+
+      if (scholarship.level !== "none") {
+        const scholarshipResume = createResumeItem(
+          nextRun,
+          scholarship.title,
+          scholarship.reason,
+          "scholarship",
+          ["scholarship", scholarship.level],
+        );
+        nextRun = {
+          ...nextRun,
+          resume: [...nextRun.resume, scholarshipResume],
+        };
+        resumeAdditions.push(scholarshipResume);
+      }
+    }
+  }
+
+  if (
+    nextRun.currentYear === 3 &&
+    nextRun.currentMonth >= 7 &&
+    nextRun.progression?.recommendationQualification === "pending"
+  ) {
+    const qualification = evaluateRecommendationQualification(nextRun);
+    nextRun = {
+      ...nextRun,
+      progression: {
+        ...nextRun.progression!,
+        recommendationQualification: qualification,
+        recommendationEvaluatedAtYear: nextRun.currentYear,
+        recommendationEvaluatedAtMonth: nextRun.currentMonth,
+        latestHints: [
+          `大三下已经出现了一次较明确的推免资格判断：${qualification}。`,
+          ...nextRun.progression!.latestHints,
+        ].slice(0, 6),
+      },
+    };
+    notableFacts.push(`recommendation:${qualification}`);
+  }
+
+  return {
+    run: nextRun,
+    resumeAdditions,
+    notableFacts,
+    scholarshipAwarded,
+  };
+}
+
+export function inferGraduationPath(run: GameRun): GraduationPath {
+  const ensuredRun = ensureProgressionState(run);
+
+  if (ensuredRun.progression?.recommendationQualification === "eligible" && ensuredRun.progression.dominantDirection === "recommendation") {
+    return "recommendation";
+  }
+  if ((ensuredRun.progression?.publicExam.progress ?? 0) >= 55 && ensuredRun.progression?.dominantDirection === "public_exam") {
+    return "public_exam";
+  }
+  if ((ensuredRun.progression?.postgraduateProgress ?? 0) >= 45 && ["postgraduate", "recommendation"].includes(ensuredRun.progression?.dominantDirection ?? "")) {
+    return "postgraduate_exam";
+  }
+  if ((ensuredRun.progression?.employmentReadiness ?? 0) >= 35 || ensuredRun.progression?.dominantDirection === "employment") {
+    return "employment";
+  }
+
+  return "undecided";
+}
+
+export function inferGraduationPathResult(run: GameRun, path: GraduationPath): GraduationPathResult {
+  const profile = deriveAcademicProfile(run);
+
+  switch (path) {
+    case "recommendation":
+      if (run.progression?.recommendationQualification === "eligible") {
+        return "success";
+      }
+      return run.progression?.recommendationQualification === "borderline" ? "ordinary" : "pivot";
+    case "public_exam":
+      return (run.progression?.publicExam.progress ?? 0) >= 75 ? "success" : (run.progression?.publicExam.progress ?? 0) >= 45 ? "ordinary" : "failure";
+    case "postgraduate_exam":
+      return (run.progression?.postgraduateProgress ?? 0) + profile.gpa * 10 >= 78 ? "success" : (run.progression?.postgraduateProgress ?? 0) >= 38 ? "ordinary" : "failure";
+    case "employment":
+      return (run.progression?.employmentReadiness ?? 0) + schoolTierScore(run.profile) * 4 >= 65 ? "success" : (run.progression?.employmentReadiness ?? 0) >= 28 ? "ordinary" : "failure";
+    default:
+      return "pivot";
+  }
 }

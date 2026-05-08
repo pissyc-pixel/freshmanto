@@ -10,6 +10,7 @@ import {
   selectWeekAttendanceStrategy,
   settleSemester,
 } from "@/core/game-engine";
+import { deriveAcademicProfile, settleLongTermProgression } from "@/core/resolvers/progression";
 import type { AiReportRequest, AiReportResult } from "@/types/ai";
 import type {
   ActionTurnPlan,
@@ -321,6 +322,7 @@ async function persistMonthArtifacts(input: {
 }) {
   let settledRun = input.nextRun;
   let semesterSettlement: SemesterSettlement | undefined;
+  let monthlySummary: StructuredMonthlySummary = input.monthlySummary;
 
   if (input.playedMonth % 6 === 0) {
     const settlement = settleSemester(settledRun);
@@ -328,33 +330,48 @@ async function persistMonthArtifacts(input: {
     semesterSettlement = settlement.summary;
   }
 
+  const longTermSettlement = settleLongTermProgression(settledRun, {
+    playedYear: input.playedYear,
+    playedMonth: input.playedMonth,
+  });
+  settledRun = longTermSettlement.run;
+  monthlySummary = {
+    ...monthlySummary,
+    resumeAdditions: [...monthlySummary.resumeAdditions, ...longTermSettlement.resumeAdditions],
+    notableFacts: [...monthlySummary.notableFacts, ...longTermSettlement.notableFacts],
+    academicProfile: deriveAcademicProfile(settledRun),
+    progression: settledRun.progression,
+    competitionProjects: settledRun.competitionProjects,
+    scholarshipAwarded: longTermSettlement.scholarshipAwarded,
+  };
+
   const monthlyReport = await input.generateReport({
     kind: "monthly_journal",
     runId: input.runId,
     year: input.playedYear,
     month: input.playedMonth,
-    summary: input.monthlySummary,
+    summary: monthlySummary,
   });
 
   await input.repository.saveMonthlyState({
     runId: input.runId,
     year: input.playedYear,
     month: input.playedMonth,
-    snapshot: input.monthlySummary,
+    snapshot: monthlySummary,
   });
   await input.repository.saveAiReport({
     runId: input.runId,
     year: input.playedYear,
     month: input.playedMonth,
     reportType: "monthly_journal",
-    inputSummary: input.monthlySummary,
+    inputSummary: monthlySummary,
     outputMarkdown: monthlyReport.markdown,
     model: monthlyReport.model ?? null,
   });
 
-  if (input.monthlySummary.resumeAdditions.length > 0) {
+  if (monthlySummary.resumeAdditions.length > 0) {
     await input.repository.saveResumeItems(
-      mapResumeItems(settledRun, input.playedMonth, input.monthlySummary.resumeAdditions),
+      mapResumeItems(settledRun, input.playedMonth, monthlySummary.resumeAdditions),
     );
   }
 
@@ -389,7 +406,7 @@ async function persistMonthArtifacts(input: {
       runId: input.runId,
       year: input.playedYear,
       month: input.playedMonth,
-      summary: input.monthlySummary,
+      summary: monthlySummary,
       semesterSettlement,
       endingSummary,
     }),
@@ -397,6 +414,7 @@ async function persistMonthArtifacts(input: {
 
   return {
     nextRun: settledRun,
+    monthlySummary,
     monthlyReport,
     semesterSettlement,
     endingSummary,
@@ -542,6 +560,7 @@ export async function confirmDemoWeek(input: {
   const playedWeek = baseRun.activeMonth?.currentWeek ?? 1;
   const weekResult = confirmPlannedWeek(baseRun);
   let nextRun = weekResult.run;
+  let resolvedMonthlySummary = weekResult.monthlySummary;
   let monthlyReport: AiReportResult | undefined;
   let semesterSettlement: SemesterSettlement | undefined;
   let endingSummary: StructuredEndingSummary | undefined;
@@ -572,6 +591,8 @@ export async function confirmDemoWeek(input: {
     });
 
     nextRun = monthArtifacts.nextRun;
+    resolvedMonthlySummary = monthArtifacts.monthlySummary;
+    resolvedMonthlySummary = monthArtifacts.monthlySummary;
     monthlyReport = monthArtifacts.monthlyReport;
     semesterSettlement = monthArtifacts.semesterSettlement;
     endingSummary = monthArtifacts.endingSummary;
@@ -592,7 +613,7 @@ export async function confirmDemoWeek(input: {
     playedMonth,
     playedWeek,
     monthCompleted: weekResult.monthCompleted,
-    monthlySummary: weekResult.monthlySummary,
+    monthlySummary: resolvedMonthlySummary,
     monthlyReport,
     semesterSettlement,
     endingSummary,
@@ -618,6 +639,7 @@ export async function advanceDemoTurn(input: {
   const playedWeek = baseRun.activeMonth?.currentWeek ?? 1;
   const turnResult = resolveActionTurn(baseRun, input.plan);
   let nextRun = turnResult.run;
+  let resolvedMonthlySummary = turnResult.monthlySummary;
   let monthlyReport: AiReportResult | undefined;
   let semesterSettlement: SemesterSettlement | undefined;
   let endingSummary: StructuredEndingSummary | undefined;
@@ -644,6 +666,7 @@ export async function advanceDemoTurn(input: {
     });
 
     nextRun = monthArtifacts.nextRun;
+    resolvedMonthlySummary = monthArtifacts.monthlySummary;
     monthlyReport = monthArtifacts.monthlyReport;
     semesterSettlement = monthArtifacts.semesterSettlement;
     endingSummary = monthArtifacts.endingSummary;
@@ -665,7 +688,7 @@ export async function advanceDemoTurn(input: {
     playedWeek,
     turnSummary: turnResult.turnSummary,
     monthCompleted: turnResult.monthCompleted,
-    monthlySummary: turnResult.monthlySummary,
+    monthlySummary: resolvedMonthlySummary,
     monthlyReport,
     semesterSettlement,
     endingSummary,
@@ -691,6 +714,7 @@ export async function endDemoWeek(input: {
   const playedWeek = baseRun.activeMonth?.currentWeek ?? 1;
   const weekResult = resolveWeekEnd(baseRun, input.attendanceStrategy);
   let nextRun = weekResult.run;
+  let resolvedMonthlySummary = weekResult.monthlySummary;
   let monthlyReport: AiReportResult | undefined;
   let semesterSettlement: SemesterSettlement | undefined;
   let endingSummary: StructuredEndingSummary | undefined;
@@ -718,6 +742,7 @@ export async function endDemoWeek(input: {
     });
 
     nextRun = monthArtifacts.nextRun;
+    resolvedMonthlySummary = monthArtifacts.monthlySummary;
     monthlyReport = monthArtifacts.monthlyReport;
     semesterSettlement = monthArtifacts.semesterSettlement;
     endingSummary = monthArtifacts.endingSummary;
@@ -738,7 +763,7 @@ export async function endDemoWeek(input: {
     playedMonth,
     playedWeek,
     monthCompleted: weekResult.monthCompleted,
-    monthlySummary: weekResult.monthlySummary,
+    monthlySummary: resolvedMonthlySummary,
     monthlyReport,
     semesterSettlement,
     endingSummary,
