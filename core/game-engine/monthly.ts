@@ -255,8 +255,9 @@ function buildWeekPlanningState(
     plannerFeedback: input?.plannerFeedback,
     event,
     days: mergedDays,
-    readyToConfirm: mergedDays.every((day) => day.plannedAction) && Boolean(input?.attendanceLocked),
+    readyToConfirm: Boolean(input?.attendanceLocked) && mergedDays.length > 0,
     lastSelectedOptionId: input?.lastSelectedOptionId,
+    lastPlannedWeekday: input?.existingDays?.find((day) => day.plannedAction)?.weekday,
   };
 }
 
@@ -718,6 +719,18 @@ function createSkipClassDayEffect(day: PlannedWeekdayState): WeeklyActionEffect 
   };
 }
 
+function createAutoFilledIdleAction(day: PlannedWeekdayState): PlannedAction {
+  return {
+    action: "idle",
+    optionId: "idle:auto-fill",
+    label: "摆烂 / 发呆",
+    time: day.effectiveDayType === "night_only" ? "night" : "day",
+    weekday: day.weekday,
+    skipClass: false,
+    autoFilled: true,
+  };
+}
+
 function applyWeeklyEffectToTurn(
   turnSummary: ActionTurnSummary,
   effect: WeeklyActionEffect | undefined,
@@ -968,6 +981,7 @@ export function selectWeekAttendanceStrategy(run: GameRun, attendanceStrategy: C
       "本周课程态度已确定",
       "接下来逐天点击这一周的每天，给每一天排一个行动。",
     ),
+  lastPlannedWeekday: undefined,
   };
   nextWeekState.readyToConfirm = isWeekReadyToConfirm(nextWeekState);
 
@@ -1082,6 +1096,7 @@ export function planWeeklyDayAction(input: {
       `${getWeeklyDayLabel(day.weekday)}先定成了“${chosenOption.label}”，这一步只是排进周历，等本周确认后再统一结算。`,
     ),
     lastSelectedOptionId: chosenOption.optionId,
+    lastPlannedWeekday: day.weekday,
   };
   nextWeekState.readyToConfirm = isWeekReadyToConfirm(nextWeekState);
 
@@ -1102,7 +1117,7 @@ export function confirmPlannedWeek(run: GameRun): {
   const activeMonth = ensureActiveMonth(run);
   const weekState = activeMonth.currentWeekState;
 
-  if (!isWeekReadyToConfirm(weekState) || !weekState.days) {
+  if (!weekState.attendanceLocked || !weekState.days || weekState.days.length === 0) {
     return {
       run: {
         ...run,
@@ -1130,11 +1145,7 @@ export function confirmPlannedWeek(run: GameRun): {
   let resumeAdded = 0;
 
   for (const day of weekState.days) {
-    const plannedAction = day.plannedAction;
-
-    if (!plannedAction) {
-      continue;
-    }
+    const plannedAction = day.plannedAction ?? createAutoFilledIdleAction(day);
 
     const option =
       resolveAvailableWeeklyActions({
@@ -1143,6 +1154,16 @@ export function confirmPlannedWeek(run: GameRun): {
         skipClassSelected: day.skipClassSelected,
         run: projectedRun,
       }).find((item) => item.optionId === plannedAction.optionId) ??
+      (plannedAction.action === "idle"
+        ? {
+            optionId: plannedAction.optionId ?? "idle:auto-fill",
+            action: "idle" as const,
+            label: plannedAction.label ?? "摆烂 / 发呆",
+            description: "系统自动补成了没有特意安排的一天。",
+            availability: ["night", "half_day", "full_day"],
+            source: "default" as const,
+          }
+        : undefined) ??
       findWeeklyActionOption(plannedAction.optionId ?? plannedAction.action);
 
     if (!option) {
@@ -1248,7 +1269,7 @@ export function confirmPlannedWeek(run: GameRun): {
         statsDelta,
         moneyDelta: statsDelta.money,
         flags: baseResolution.flags,
-        notableFacts: [],
+        notableFacts: plannedAction.autoFilled ? ["auto-filled-idle"] : [],
         allowanceApplied: false,
         course: createInstantCourseResolution(weekState.attendanceStrategy),
         weekday: day.weekday,
@@ -1290,6 +1311,7 @@ export function confirmPlannedWeek(run: GameRun): {
       currentWeekState: {
         ...projectedRun.activeMonth!.currentWeekState,
         plannerFeedback: undefined,
+        lastPlannedWeekday: undefined,
       },
     },
     attendanceStrategy: weekState.attendanceStrategy,

@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import {
   createInitialGameRun,
+  confirmPlannedWeek,
   createMonthlySchedule,
   evaluateGraduationOutcome,
+  planWeeklyDayAction,
   resolveActionTurn,
   resolveMonthlyTurn,
   resolveWeekEnd,
+  selectWeekAttendanceStrategy,
   settleSemester,
 } from "@/core/game-engine";
 import {
@@ -752,5 +755,26 @@ describe("semester and ending evaluation", () => {
     };
 
     expect(["eligible", "borderline"]).toContain(evaluateRecommendationQualification(strongRun));
+  });
+
+  it("auto-fills missing weekdays as default loafing when confirming a planned week", () => {
+    const baseRun = createInitialGameRun({
+      id: "auto-fill-idle-run",
+      randomValues: [0.31, 0.28, 0.4, 0.55, 0.73, 0.51, 0.22, 0.44],
+    });
+    const withAttendance = selectWeekAttendanceStrategy(baseRun, "mixed");
+    const partiallyPlanned = planWeeklyDayAction({
+      run: withAttendance,
+      weekday: "mon",
+      optionId: "study",
+    });
+
+    const result = confirmPlannedWeek(partiallyPlanned);
+    const settlement = result.run.activeMonth?.latestWeekSettlement;
+
+    expect(result.monthCompleted).toBe(false);
+    expect(settlement?.dailyResults).toHaveLength(7);
+    expect(settlement?.dailyResults.filter((day) => day.resolvedAction.action === "idle")).toHaveLength(6);
+    expect(settlement?.dailyResults.some((day) => day.resolvedAction.autoFilled)).toBe(true);
   });
 });

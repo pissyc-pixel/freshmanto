@@ -21,6 +21,8 @@ import {
   formatActionType,
   formatPlayerFacingFact,
   formatPlayerFacingFlag,
+  formatTimeBlockKind,
+  formatWeeklyDayType,
 } from "@/lib/demo/options";
 import {
   renderEndingReportFallback,
@@ -334,6 +336,11 @@ describe("player-facing narrative helpers", () => {
       "周三白天",
       "周五白天",
     ]);
+  });
+
+  it("uses the unified 白天满课 wording in planner-facing schedule labels", () => {
+    expect(formatTimeBlockKind("busy_day")).toContain("白天满课");
+    expect(formatWeeklyDayType("night_only")).toContain("白天满课");
   });
 
   it("keeps truancy out of weekly attendance strategy options", () => {

@@ -32,6 +32,7 @@ export type ActionType =
   | "part_time"
   | "social"
   | "relax"
+  | "idle"
   | "big_meal"
   | "student_activity"
   | "remedy"
@@ -186,6 +187,7 @@ export type PlannedAction = {
   weekday?: Weekday;
   skipClass?: boolean;
   sourceEventId?: string;
+  autoFilled?: boolean;
 };
 
 export type ResolvedAction = PlannedAction & {
@@ -215,6 +217,7 @@ export type ActiveWeekState = {
   readyToConfirm?: boolean;
   plannerFeedback?: PlannerFeedback;
   lastSelectedOptionId?: string;
+  lastPlannedWeekday?: Weekday;
 };
 
 export type PlannerFeedback = {

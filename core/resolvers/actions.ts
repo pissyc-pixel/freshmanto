@@ -175,7 +175,7 @@ function isProductiveAction(action: SupportedAction): boolean {
 }
 
 function shouldApplyWeeklySettlement(run: GameRun, action: SupportedAction): boolean {
-  if (action === "big_meal" || action === "ask_family" || action === "skip_class") {
+  if (action === "big_meal" || action === "ask_family" || action === "skip_class" || action === "idle") {
     return false;
   }
 
@@ -408,6 +408,10 @@ export function resolveActionPlan(
         actionStatsDelta.money -= 80;
         actionStatsDelta.mood += 6;
         actionStatsDelta.stress -= 5;
+        break;
+      case "idle":
+        actionStatsDelta.mood += 2;
+        actionStatsDelta.stress -= 2;
         break;
       case "big_meal":
         actionStatsDelta.money -= 180;

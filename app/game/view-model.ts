@@ -137,6 +137,7 @@ export function buildPlannerDaysView(currentWeekState: ActiveWeekState, run?: Ga
       label: weekdayLabels[day.weekday],
       status: day.plannedAction ? "已安排" : "待安排",
       plannedActionLabel: day.plannedAction?.label ?? (day.plannedAction ? formatActionType(day.plannedAction.action) : null),
+      justPlanned: currentWeekState.lastPlannedWeekday === day.weekday,
       baseTypeLabel: formatWeeklyDayType(day.baseDayType),
       effectiveTypeLabel: formatWeeklyDayType(day.effectiveDayType),
       skipClassAvailable: day.skipClassAvailable,
@@ -206,7 +207,7 @@ export function buildPlannerStatusText(currentWeekState: ActiveWeekState) {
   }
 
   if (plannedCount < 7) {
-    return `这周已经排了 ${plannedCount} / 7 天，还不能确认。`;
+    return `\u8fd9\u5468\u5df2\u7ecf\u6392\u4e86 ${plannedCount} / 7 \u5929\uff0c\u6ca1\u70b9\u5230\u7684\u5929\u6570\u4f1a\u5728\u786e\u8ba4\u65f6\u81ea\u52a8\u8865\u6210\u6446\u70c2 / \u53d1\u5446\u3002`;
   }
 
   return "这一周已经排满，可以确认本周安排并统一结算。";
@@ -220,6 +221,7 @@ export function buildPlannerFeedbackLines(currentWeekState: ActiveWeekState) {
     currentWeekState.releasedClassDays.length > 0
       ? `这周已经决定翘掉的白天课程：${formatReleasedClassDayList(currentWeekState.releasedClassDays)}。`
       : "",
+    "\u5982\u679c\u67d0\u5929\u6ca1\u70b9\u884c\u52a8\uff0c\u7cfb\u7edf\u4f1a\u5728\u786e\u8ba4\u65f6\u81ea\u52a8\u8865\u6210\u201c\u6446\u70c2 / \u53d1\u5446\u201d\uff0c\u4e0d\u4f1a\u5361\u6b7b\uff0c\u4e5f\u4e0d\u4f1a\u5077\u5077\u8df3\u5468\u3002",
   ];
 
   return uniqueLines(lines);
