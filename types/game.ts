@@ -253,8 +253,11 @@ export type WeeklyEventActionBoost = {
   effect: WeeklyActionEffect;
 };
 
+export type WeeklyEventCategory = "A" | "B" | "D" | "E";
+
 export type WeeklyEventInstance = {
   id: string;
+  category?: WeeklyEventCategory;
   title: string;
   summary: string;
   weekday: Weekday;

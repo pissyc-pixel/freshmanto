@@ -36,6 +36,7 @@ export function resolveWeeklyEvent(run: GameRun, week: number): WeeklyEventInsta
 
   return {
     id: template.id,
+    category: template.category,
     title: template.title,
     summary: template.summary,
     weekday,

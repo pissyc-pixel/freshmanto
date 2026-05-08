@@ -48,6 +48,23 @@ function uniqueLines(lines: string[]): string[] {
   return [...new Set(lines.filter((line) => line.trim().length > 0))];
 }
 
+function formatPlannerWeeklyEventFact(fact: string): string {
+  const extraFacts: Record<string, string> = {
+    "weekly-event:strict-roll-call": "这周有一天课程签到查得特别紧，学业这条线因此被拉回了前台。",
+    "weekly-event:postgraduate-briefing": "这周去听了一场深造说明会，考研和保研这两条线终于没那么虚了。",
+    "weekly-event:public-exam-lecture": "这周去听了场公考讲座，公考这条线第一次更像一条现实路径。",
+    "weekly-event:competition-invite": "这周接住了一条比赛或项目入口，后面终于有了能持续投入的长期线。",
+    "weekly-event:intern-referral": "这周顺着内推机会把就业线往前接了一下，求职不再只是空想。",
+    "weekly-event:engineering-sprint": "这周学院的气氛很工科，实验和项目味都更重，做项目也更顺手了一点。",
+    "weekly-event:business-case": "这周学院活动更偏案例赛和汇报，履历和求职这条线被自然抬起来了一点。",
+    "weekly-event:humanities-workshop": "这周的调研和写作活动，把表达和公考这条线都往前轻轻推了一下。",
+    "weekly-event:science-training": "这周更像在往建模和科研训练上靠，深造的方向感也更明显了。",
+    "weekly-event:medical-observation": "这周的见习和实践机会，让医学线的履历和深造味道都更真实了一点。",
+  };
+
+  return extraFacts[fact] ?? formatWeeklyEventFact(fact);
+}
+
 export function resolveCurrentWeekState(
   weeklyCalendar: ScheduledWeek[],
   activeMonth?: ActiveMonthState,
@@ -153,7 +170,7 @@ export function buildWeeklySettlementView(settlement?: WeeklySettlementSummary) 
     actionLabel: turn.resolvedAction.label ?? formatActionType(turn.resolvedAction.action),
     summary: turn.resolvedAction.accepted
       ? uniqueLines([
-          ...turn.notableFacts.map((fact) => fact.startsWith("weekly-event:") ? formatWeeklyEventFact(fact) : formatPlayerFacingFact(fact)),
+          ...turn.notableFacts.map((fact) => fact.startsWith("weekly-event:") ? formatPlannerWeeklyEventFact(fact) : formatPlayerFacingFact(fact)),
           ...turn.flags.map(formatPlayerFacingFlag),
         ])[0] ?? "这一天按计划落地了。"
       : formatPlannerReason(turn.resolvedAction.reason),
@@ -220,7 +237,7 @@ export function buildCurrentActionFeedback(input: {
 
   const eventLines = uniqueLines([
     turn.resolvedAction.reason ? formatPlannerReason(turn.resolvedAction.reason) : "",
-    ...turn.notableFacts.map((fact) => fact.startsWith("weekly-event:") ? formatWeeklyEventFact(fact) : formatPlayerFacingFact(fact)),
+    ...turn.notableFacts.map((fact) => fact.startsWith("weekly-event:") ? formatPlannerWeeklyEventFact(fact) : formatPlayerFacingFact(fact)),
     ...turn.flags.map(formatPlayerFacingFlag),
   ]);
 
