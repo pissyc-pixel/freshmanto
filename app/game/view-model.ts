@@ -224,6 +224,7 @@ export function buildPlannerFeedbackLines(currentWeekState: ActiveWeekState) {
     currentWeekState.releasedClassDays.length > 0
       ? `这周已经决定翘掉的白天课程：${formatReleasedClassDayList(currentWeekState.releasedClassDays)}。`
       : "",
+    ...(currentWeekState.planningWarnings ?? []),
     "如果某天没点行动，系统会在确认时自动补成“摆烂 / 发呆”，不会卡死，也不会偷偷跳周。",
   ];
 

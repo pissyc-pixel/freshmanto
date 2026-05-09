@@ -278,9 +278,7 @@ export function countResumeEntriesByCategory(run: GameRun, category: string): nu
 
 export function getLeadCompetitionProject(run: GameRun): CompetitionProject | null {
   const ensuredRun = ensureProgressionState(run);
-  return ensuredRun.competitionProjects!.find((project) => project.status === "active")
-    ?? ensuredRun.competitionProjects!.find((project) => project.status === "open")
-    ?? null;
+  return ensuredRun.competitionProjects!.find((project) => project.status === "active") ?? null;
 }
 
 export function getOpenCompetitionProjects(run: GameRun): CompetitionProject[] {

@@ -216,6 +216,7 @@ export type ActiveWeekState = {
   days?: PlannedWeekdayState[];
   readyToConfirm?: boolean;
   plannerFeedback?: PlannerFeedback;
+  planningWarnings?: string[];
   lastSelectedOptionId?: string;
   lastPlannedWeekday?: Weekday;
 };

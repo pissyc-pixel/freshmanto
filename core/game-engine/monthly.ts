@@ -148,6 +148,32 @@ function createPlannerFeedback(
   return { kind, title, message };
 }
 
+function hasWeeklyCashPlan(weekState: ActiveWeekState): boolean {
+  return (weekState.days ?? []).some((day) => {
+    const action = day.plannedAction?.action;
+    return action === "part_time" || action === "ask_family";
+  });
+}
+
+function buildWeeklyCashWarnings(run: GameRun, weekState: ActiveWeekState): string[] {
+  const weeklyLivingExpense = getWeeklyLivingExpense(run);
+  const warnings: string[] = [];
+
+  if (run.stats.money < 0) {
+    warnings.push("当前现金已经是负数了，下周固定生活开销会继续把压力往上推。");
+  }
+
+  if (!hasWeeklyCashPlan(weekState) && run.stats.money < weeklyLivingExpense) {
+    warnings.push(`按你现在的现金，下周 ${weeklyLivingExpense} 元左右的固定开销会很吃紧；如果这周不安排赚钱或找家里要钱，现金会继续恶化。`);
+  }
+
+  if (!hasWeeklyCashPlan(weekState) && run.stats.money <= weeklyLivingExpense + 300) {
+    warnings.push("手头现金已经贴近危险线了，这周最好至少留一个补现金的动作。");
+  }
+
+  return warnings;
+}
+
 function getCurrentWeekTurns(activeMonth: ActiveMonthState): ActionTurnSummary[] {
   return activeMonth.turns.filter((turn) => turn.week === activeMonth.currentWeek);
 }
@@ -260,6 +286,15 @@ function buildWeekPlanningState(
     plannerFeedback: input?.plannerFeedback,
     event,
     days: mergedDays,
+    planningWarnings: buildWeeklyCashWarnings(run, {
+      ...baseState,
+      attendanceStrategy,
+      attendanceLocked: input?.attendanceLocked ?? false,
+      releasedClassDays: input?.releasedClassDays ?? [],
+      plannerFeedback: input?.plannerFeedback,
+      event,
+      days: mergedDays,
+    }),
     readyToConfirm: Boolean(input?.attendanceLocked) && mergedDays.length > 0,
     lastSelectedOptionId: input?.lastSelectedOptionId,
     lastPlannedWeekday: input?.existingDays?.find((day) => day.plannedAction)?.weekday,
@@ -270,12 +305,17 @@ function ensurePlanningWeekState(run: GameRun, activeMonth: ActiveMonthState): A
   const current = activeMonth.currentWeekState;
 
   if (current.days && current.days.length > 0 && current.event) {
+    const hydratedDays = hydrateLegacyPlannerDays(current, activeMonth);
     return {
       ...current,
-      days: hydrateLegacyPlannerDays(current, activeMonth),
+      days: hydratedDays,
+      planningWarnings: buildWeeklyCashWarnings(run, {
+        ...current,
+        days: hydratedDays,
+      }),
       readyToConfirm: isWeekReadyToConfirm({
         ...current,
-        days: hydrateLegacyPlannerDays(current, activeMonth),
+        days: hydratedDays,
       }),
     };
   }
@@ -291,6 +331,10 @@ function ensurePlanningWeekState(run: GameRun, activeMonth: ActiveMonthState): A
   return {
     ...rebuilt,
     days: hydrateLegacyPlannerDays(rebuilt, activeMonth),
+    planningWarnings: buildWeeklyCashWarnings(run, {
+      ...rebuilt,
+      days: hydrateLegacyPlannerDays(rebuilt, activeMonth),
+    }),
   };
 }
 
@@ -754,6 +798,20 @@ function createDefaultPlannedActionForDay(day: PlannedWeekdayState, weekEvent: A
   return createAutoFilledSpecialAction(day, weekEvent) ?? createAutoFilledIdleAction(day);
 }
 
+function createOptionFromPlannedAction(plannedAction: PlannedAction): WeeklyActionOption {
+  return {
+    optionId: plannedAction.optionId ?? plannedAction.action,
+    action: plannedAction.action,
+    label: plannedAction.label ?? plannedAction.action,
+    description: plannedAction.autoFilled
+      ? "系统自动补成了没有特意安排的一天。"
+      : "这是你在本周排程时已经选好的动作，会直接进入统一周结算。",
+    availability: ["night", "half_day", "full_day"],
+    source: plannedAction.sourceEventId ? "weekly_event" : "default",
+    sourceEventId: plannedAction.sourceEventId,
+  };
+}
+
 function distributeWeeklyLivingCost(total: number, daysCount: number): number[] {
   if (daysCount <= 0) {
     return [];
@@ -820,40 +878,6 @@ function buildWeeklyOpportunities(input: {
   }
 
   return opportunities;
-}
-
-function createRejectedPlanningTurn(input: {
-  activeMonth: ActiveMonthState;
-  attendanceStrategy: CourseAttendanceStrategy;
-  day: PlannedWeekdayState;
-  plannedAction: PlannedAction;
-  reason: string;
-  statsBefore: DynamicStats;
-}): ActionTurnSummary {
-  return {
-    turn: input.activeMonth.turns.length + 1,
-    week: input.activeMonth.currentWeek,
-    slotLabel: input.activeMonth.weeklyCalendar[input.activeMonth.currentWeek - 1]?.label ?? `第 ${input.activeMonth.currentWeek} 周`,
-    advancesCalendar: false,
-    attendanceStrategy: input.attendanceStrategy,
-    chosenAction: input.plannedAction,
-    resolvedAction: {
-      ...input.plannedAction,
-      accepted: false,
-      reason: input.reason,
-    },
-    statsBefore: input.statsBefore,
-    statsAfter: input.statsBefore,
-    statsDelta: emptyStatsDelta(),
-    moneyDelta: 0,
-    flags: [input.reason],
-    notableFacts: [],
-    allowanceApplied: false,
-    course: createInstantCourseResolution(input.attendanceStrategy),
-    weekday: input.day.weekday,
-    dayLabel: getWeeklyDayLabel(input.day.weekday),
-    weekCompleted: false,
-  };
 }
 
 function finalizePlannedWeek(input: {
@@ -1014,7 +1038,7 @@ function finalizePlannedWeek(input: {
 
 export function selectWeekAttendanceStrategy(run: GameRun, attendanceStrategy: CourseAttendanceStrategy): GameRun {
   const activeMonth = ensureActiveMonth(run);
-  const nextWeekState: ActiveWeekState = {
+  let nextWeekState: ActiveWeekState = {
     ...activeMonth.currentWeekState,
     attendanceStrategy,
     attendanceLocked: true,
@@ -1025,7 +1049,11 @@ export function selectWeekAttendanceStrategy(run: GameRun, attendanceStrategy: C
     ),
   lastPlannedWeekday: undefined,
   };
-  nextWeekState.readyToConfirm = isWeekReadyToConfirm(nextWeekState);
+  nextWeekState = {
+    ...nextWeekState,
+    readyToConfirm: isWeekReadyToConfirm(nextWeekState),
+    planningWarnings: buildWeeklyCashWarnings(run, nextWeekState),
+  };
 
   return {
     ...run,
@@ -1128,7 +1156,7 @@ export function planWeeklyDayAction(input: {
       : item,
   );
   const releasedClassDays = nextDays.filter((item) => item.skipClassSelected).map((item) => item.weekday);
-  const nextWeekState: ActiveWeekState = {
+  let nextWeekState: ActiveWeekState = {
     ...weekState,
     releasedClassDays,
     days: nextDays,
@@ -1140,7 +1168,11 @@ export function planWeeklyDayAction(input: {
     lastSelectedOptionId: chosenOption.optionId,
     lastPlannedWeekday: day.weekday,
   };
-  nextWeekState.readyToConfirm = isWeekReadyToConfirm(nextWeekState);
+  nextWeekState = {
+    ...nextWeekState,
+    readyToConfirm: isWeekReadyToConfirm(nextWeekState),
+    planningWarnings: buildWeeklyCashWarnings(input.run, nextWeekState),
+  };
 
   return {
     ...input.run,
@@ -1169,8 +1201,8 @@ export function confirmPlannedWeek(run: GameRun): {
             ...weekState,
             plannerFeedback: createPlannerFeedback(
               "error",
-              "这周还没排完",
-              "要先把这一周 7 天都点完，才能确认并统一结算本周安排。",
+              "这周还没开始排",
+              "要先把这 7 天的周排程建起来，系统才能统一结算本周安排。",
             ),
           },
         },
@@ -1189,46 +1221,17 @@ export function confirmPlannedWeek(run: GameRun): {
 
   for (const [dayIndex, day] of weekState.days.entries()) {
     const plannedAction = day.plannedAction ?? createDefaultPlannedActionForDay(day, weekState.event);
-
+    const optionId = plannedAction.optionId ?? plannedAction.action;
+    const availableOptions = resolveAvailableWeeklyActions({
+      day,
+      event: weekState.event,
+      skipClassSelected: day.skipClassSelected,
+      run: projectedRun,
+    });
     const option =
-      resolveAvailableWeeklyActions({
-        day,
-        event: weekState.event,
-        skipClassSelected: day.skipClassSelected,
-        run: projectedRun,
-      }).find((item) => item.optionId === plannedAction.optionId) ??
-      (plannedAction.action === "idle"
-        ? {
-            optionId: plannedAction.optionId ?? "idle:auto-fill",
-            action: "idle" as const,
-            label: plannedAction.label ?? "摆烂 / 发呆",
-            description: "系统自动补成了没有特意安排的一天。",
-            availability: ["night", "half_day", "full_day"],
-            source: "default" as const,
-          }
-        : undefined) ??
-      findWeeklyActionOption(plannedAction.optionId ?? plannedAction.action);
-
-    if (!option) {
-      const rejectedTurn = createRejectedPlanningTurn({
-        activeMonth,
-        attendanceStrategy: weekState.attendanceStrategy,
-        day,
-        plannedAction,
-        reason: "action-daytype-mismatch",
-        statsBefore: projectedRun.stats,
-      });
-      dayTurns.push(rejectedTurn);
-      projectedRun = {
-        ...projectedRun,
-        activeMonth: {
-          ...projectedRun.activeMonth!,
-          turns: [...projectedRun.activeMonth!.turns, rejectedTurn],
-          lastResolvedTurn: rejectedTurn,
-        },
-      };
-      continue;
-    }
+      availableOptions.find((item) => item.optionId === optionId) ??
+      findWeeklyActionOption(optionId) ??
+      createOptionFromPlannedAction(plannedAction);
 
     const baseResolution = resolveActionPlan(
       projectedRun,

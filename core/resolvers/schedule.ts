@@ -93,7 +93,7 @@ function isOptionUnlocked(run: GameRun | undefined, option: WeeklyActionOption):
   }
 
   if (option.action === "competition_project") {
-    return (run.competitionProjects ?? []).some((project) => project.status === "open" || project.status === "active");
+    return (run.competitionProjects ?? []).some((project) => project.status === "active");
   }
 
   return true;
@@ -198,9 +198,22 @@ export function resolveAvailableWeeklyActions(input: {
   run?: GameRun;
 }): WeeklyActionOption[] {
   const effectiveDayType = resolveEffectiveDayType(input);
-  const limitedActions = input.event?.weekday === input.day.weekday
-    ? new Set(input.event?.limitedActions ?? [])
-    : null;
+  const eventApplies = input.event?.weekday === input.day.weekday;
+  const linkedProjectStillOpen = !eventApplies || !input.event?.linkedProjectId || !input.run
+    ? true
+    : (input.run.competitionProjects ?? []).some(
+        (project) =>
+          project.id === input.event!.linkedProjectId &&
+          (project.status === "open" || project.status === "active"),
+      );
+  const shouldShowSpecialAction = eventApplies && Boolean(input.event?.specialAction) && linkedProjectStillOpen;
+  const limitedActions =
+    eventApplies &&
+    input.event?.limitedActions &&
+    input.event.limitedActions.length > 0 &&
+    !(input.event.skipClosesProjectLine && shouldShowSpecialAction)
+      ? new Set(input.event.limitedActions)
+      : null;
 
   const allowedByDayType = weeklyActionCatalog.filter((option) => {
     if (!isOptionUnlocked(input.run, option)) {
@@ -223,7 +236,7 @@ export function resolveAvailableWeeklyActions(input: {
     : allowedByDayType;
 
   const eventOption =
-    input.event?.weekday === input.day.weekday && input.event.specialAction
+    shouldShowSpecialAction && input.event?.specialAction
       ? [input.event.specialAction]
       : [];
 

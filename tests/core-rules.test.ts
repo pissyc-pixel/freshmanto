@@ -14,11 +14,13 @@ import {
 } from "@/core/game-engine";
 import {
   ensureProgressionState,
+  closeCompetitionProject,
   evaluateRecommendationQualification,
   settleLongTermProgression,
 } from "@/core/resolvers/progression";
 import { evaluateSemesterFeedback } from "@/core/resolvers";
 import { getMonthlyEventWeight } from "@/core/resolvers/events";
+import { resolveAvailableWeeklyActions } from "@/core/resolvers/schedule";
 import { getWeeklyAllowance, getWeeklyLivingExpense } from "@/data/events";
 import type {
   CourseAttendanceStrategy,
@@ -779,6 +781,37 @@ describe("semester and ending evaluation", () => {
     expect(settlement?.dailyResults.some((day) => day.resolvedAction.autoFilled)).toBe(true);
   });
 
+  it("uses the player-selected weekday actions in weekly settlement instead of replacing everything with idle", () => {
+    const baseRun = createInitialGameRun({
+      id: "selected-weekday-settlement-run",
+      randomValues: [0.22, 0.31, 0.48, 0.57, 0.61, 0.19, 0.26, 0.4],
+    });
+    const withAttendance = selectWeekAttendanceStrategy(baseRun, "mixed");
+    const mondayPlanned = planWeeklyDayAction({
+      run: withAttendance,
+      weekday: "mon",
+      optionId: "study",
+    });
+    const tuesdayPlanned = planWeeklyDayAction({
+      run: mondayPlanned,
+      weekday: "tue",
+      optionId: "social",
+    });
+    const saturdayPlanned = planWeeklyDayAction({
+      run: tuesdayPlanned,
+      weekday: "sat",
+      optionId: "job_prep",
+    });
+
+    const result = confirmPlannedWeek(saturdayPlanned);
+    const settlement = result.run.activeMonth?.latestWeekSettlement;
+
+    expect(settlement?.dailyResults.find((day) => day.weekday === "mon")?.resolvedAction.action).toBe("study");
+    expect(settlement?.dailyResults.find((day) => day.weekday === "tue")?.resolvedAction.action).toBe("social");
+    expect(settlement?.dailyResults.find((day) => day.weekday === "sat")?.resolvedAction.action).toBe("job_prep");
+    expect(settlement?.dailyResults.filter((day) => day.resolvedAction.action === "idle")).toHaveLength(4);
+  });
+
   it("explains weekly allowance and fixed living costs in weekly settlement", () => {
     const baseRun = createInitialGameRun({
       id: "weekly-budget-run",
@@ -791,6 +824,94 @@ describe("semester and ending evaluation", () => {
     expect(settlement?.budgetLines?.some((line) => line.includes("生活费到账"))).toBe(true);
     expect(settlement?.budgetLines?.some((line) => line.includes(`${getWeeklyLivingExpense(withAttendance)} 元`))).toBe(true);
     expect(settlement?.dailyResults.every((day) => day.notableFacts.some((fact) => fact.startsWith("daily-living-cost:")))).toBe(true);
+  });
+
+  it("keeps competition project actions hidden before the project line is actually activated", () => {
+    const baseRun = createInitialGameRun({
+      id: "competition-locked-run",
+      randomValues: [0.38, 0.27, 0.44, 0.52, 0.67, 0.18, 0.23, 0.31],
+    });
+    const withAttendance = selectWeekAttendanceStrategy(baseRun, "mixed");
+    const saturday = withAttendance.activeMonth?.currentWeekState.days?.find((day) => day.weekday === "sat");
+
+    const options = resolveAvailableWeeklyActions({
+      day: saturday!,
+      event: withAttendance.activeMonth?.currentWeekState.event,
+      run: withAttendance,
+    });
+
+    expect(options.some((option) => option.action === "competition_project")).toBe(false);
+  });
+
+  it("still offers normal actions on the event day after skipping a competition invite line", () => {
+    const baseRun = createInitialGameRun({
+      id: "competition-skip-options-run",
+      randomValues: [0.44, 0.2, 0.36, 0.58, 0.62, 0.48, 0.21, 0.39],
+    });
+    const withAttendance = selectWeekAttendanceStrategy(baseRun, "mixed");
+    const project = withAttendance.competitionProjects?.find((item) => item.status === "open");
+
+    expect(project).toBeDefined();
+
+    const runWithEvent = {
+      ...withAttendance,
+      activeMonth: {
+        ...withAttendance.activeMonth!,
+        currentWeekState: {
+          ...withAttendance.activeMonth!.currentWeekState,
+          event: {
+            id: "weekly-competition-invite",
+            title: `《${project!.title}》说明会 / 招募会`,
+            summary: `这周会接触到“${project!.title}”这条长期比赛 / 项目线。`,
+            weekday: "sat" as const,
+            effectDescription: "周六会撞上一场项目说明会。",
+            specialAction: {
+              optionId: `weekly-competition-invite-attend:${project!.id}`,
+              action: "student_activity" as const,
+              label: `参加《${project!.title}》说明会`,
+              description: "先去听说明会，把这条项目线接起来。",
+              availability: ["night", "half_day", "full_day"] as WeeklyActionOption["availability"],
+              source: "weekly_event" as const,
+              sourceEventId: "weekly-competition-invite",
+            },
+            linkedProjectId: project!.id,
+            linkedProjectTitle: project!.title,
+            skipClosesProjectLine: true,
+            defaultAttendIfUnplanned: true,
+          },
+        },
+      },
+    };
+    const closedRun = closeCompetitionProject(runWithEvent, project!.id);
+    const saturday = closedRun.activeMonth?.currentWeekState.days?.find((day) => day.weekday === "sat");
+    const options = resolveAvailableWeeklyActions({
+      day: saturday!,
+      event: closedRun.activeMonth?.currentWeekState.event,
+      run: closedRun,
+    });
+
+    expect(options.some((option) => option.optionId === `weekly-competition-invite-attend:${project!.id}`)).toBe(false);
+    expect(options.some((option) => option.optionId === "study")).toBe(true);
+    expect(options.some((option) => option.optionId === "social")).toBe(true);
+  });
+
+  it("warns about weekly cash risk before planning when the next fixed costs are unaffordable", () => {
+    const baseRun = createInitialGameRun({
+      id: "weekly-cash-warning-run",
+      randomValues: [0.14, 0.24, 0.33, 0.42, 0.55, 0.61, 0.72, 0.18],
+    });
+    const lowCashRun: GameRun = {
+      ...baseRun,
+      stats: {
+        ...baseRun.stats,
+        money: 120,
+      },
+    };
+    const withAttendance = selectWeekAttendanceStrategy(lowCashRun, "mixed");
+    const warnings = withAttendance.activeMonth?.currentWeekState.planningWarnings ?? [];
+
+    expect(warnings.length).toBeGreaterThan(0);
+    expect(warnings.join(" ")).toMatch(/固定开销|现金|赚钱|危险线/);
   });
 
   it("keeps exactly four weekly settlements in the monthly summary after four planned weeks", () => {
