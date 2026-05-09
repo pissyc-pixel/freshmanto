@@ -480,6 +480,8 @@ function buildMonthlySummary(input: {
     turns.at(-1)?.attendanceStrategy ??
     "mixed";
   const turnResumeAdditions = input.runAfterTurns.resume.slice(input.runBeforeMonth.resume.length);
+  const weeklySettlements = input.activeMonth.weeklySettlements
+    ?? (input.activeMonth.latestWeekSettlement ? [input.activeMonth.latestWeekSettlement] : undefined);
 
   return {
     month: input.runBeforeMonth.currentMonth,
@@ -508,12 +510,7 @@ function buildMonthlySummary(input: {
     cooldowns: input.runAfterTurns.cooldowns,
     course: aggregateCourse(input.activeMonth.completedWeeks),
     turns,
-    weeklySettlements: input.activeMonth.latestWeekSettlement
-      ? [
-          ...(input.activeMonth.weeklySettlements ?? []),
-          input.activeMonth.latestWeekSettlement,
-        ]
-      : input.activeMonth.weeklySettlements,
+    weeklySettlements,
   };
 }
 

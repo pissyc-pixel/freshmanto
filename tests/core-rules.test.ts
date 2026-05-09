@@ -793,6 +793,28 @@ describe("semester and ending evaluation", () => {
     expect(settlement?.dailyResults.every((day) => day.notableFacts.some((fact) => fact.startsWith("daily-living-cost:")))).toBe(true);
   });
 
+  it("keeps exactly four weekly settlements in the monthly summary after four planned weeks", () => {
+    let run = createInitialGameRun({
+      id: "weekly-settlement-summary-run",
+      randomValues: [0.27, 0.34, 0.41, 0.52, 0.68, 0.19, 0.28, 0.41],
+    });
+    let monthlySummary: ReturnType<typeof resolveMonthlyTurn>["summary"] | undefined;
+
+    for (let week = 0; week < 4; week += 1) {
+      const withAttendance = selectWeekAttendanceStrategy(run, "mixed");
+      const result = confirmPlannedWeek(withAttendance);
+
+      if (result.monthCompleted) {
+        monthlySummary = result.monthlySummary;
+      }
+
+      run = result.run;
+    }
+
+    expect(monthlySummary?.weeklySettlements).toHaveLength(4);
+    expect(monthlySummary?.weeklySettlements?.map((settlement) => settlement.week)).toEqual([1, 2, 3, 4]);
+  });
+
   it("closes a competition project line after skipping its briefing day", () => {
     const baseRun = createInitialGameRun({
       id: "competition-skip-run",
