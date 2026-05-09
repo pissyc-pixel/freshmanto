@@ -52,13 +52,13 @@ function formatPlannerWeeklyEventFact(fact: string): string {
   const extraFacts: Record<string, string> = {
     "weekly-event:strict-roll-call": "这周有一天课程签到查得特别紧，学业这条线因此被拉回了前台。",
     "weekly-event:postgraduate-briefing": "这周去听了一场深造说明会，考研和保研这两条线终于没那么虚了。",
-    "weekly-event:public-exam-lecture": "这周去听了场公考讲座，公考这条线第一次更像一条现实路径。",
+    "weekly-event:public-exam-lecture": "这周去听了一场公考讲座，公考这条线第一次更像一条现实路径。",
     "weekly-event:competition-invite": "这周接住了一条比赛或项目入口，后面终于有了能持续投入的长期线。",
     "weekly-event:intern-referral": "这周顺着内推机会把就业线往前接了一下，求职不再只是空想。",
     "weekly-event:engineering-sprint": "这周学院的气氛很工科，实验和项目味都更重，做项目也更顺手了一点。",
     "weekly-event:business-case": "这周学院活动更偏案例赛和汇报，履历和求职这条线被自然抬起来了一点。",
     "weekly-event:humanities-workshop": "这周的调研和写作活动，把表达和公考这条线都往前轻轻推了一下。",
-    "weekly-event:science-training": "这周更像在往建模和科研训练上靠，深造的方向感也更明显了。",
+    "weekly-event:science-training": "这周更像在往建模和科研训练上面走，深造的方向感也更明显了。",
     "weekly-event:medical-observation": "这周的见习和实践机会，让医学线的履历和深造味道都更真实了一点。",
   };
 
@@ -90,7 +90,7 @@ export function buildWeeklyScheduleBlocks(input: {
       week.week === input.currentWeek
         ? input.currentWeekState.attendanceLocked
           ? `本周课程态度已定为“${formatAttendanceStrategy(input.currentWeekState.attendanceStrategy)}”，目前已经排了 ${plannedCount} / 7 天。`
-          : "这一周先定课程态度，再逐天点击每天安排行动。"
+          : "这一周先定课程态度，再逐天点击每一天安排行动。"
         : week.week < input.currentWeek
           ? "这一周已经结算完成。"
           : "还没轮到这一周。",
@@ -167,11 +167,13 @@ export function buildWeeklySettlementView(settlement?: WeeklySettlementSummary) 
 
   const dayLines = settlement.dailyResults.map((turn) => ({
     id: `${settlement.week}-${turn.weekday ?? turn.turn}`,
-    label: turn.dayLabel ?? `第 ${turn.turn} 项`,
+    label: turn.dayLabel ?? `第 ${turn.turn} 次`,
     actionLabel: turn.resolvedAction.label ?? formatActionType(turn.resolvedAction.action),
     summary: turn.resolvedAction.accepted
       ? uniqueLines([
-          ...turn.notableFacts.map((fact) => fact.startsWith("weekly-event:") ? formatPlannerWeeklyEventFact(fact) : formatPlayerFacingFact(fact)),
+          ...turn.notableFacts.map((fact) =>
+            fact.startsWith("weekly-event:") ? formatPlannerWeeklyEventFact(fact) : formatPlayerFacingFact(fact),
+          ),
           ...turn.flags.map(formatPlayerFacingFlag),
         ])[0] ?? "这一天按计划落地了。"
       : formatPlannerReason(turn.resolvedAction.reason),
@@ -208,7 +210,7 @@ export function buildPlannerStatusText(currentWeekState: ActiveWeekState) {
   }
 
   if (plannedCount < 7) {
-    return `\u8fd9\u5468\u5df2\u7ecf\u6392\u4e86 ${plannedCount} / 7 \u5929\uff0c\u6ca1\u70b9\u5230\u7684\u5929\u6570\u4f1a\u5728\u786e\u8ba4\u65f6\u81ea\u52a8\u8865\u6210\u6446\u70c2 / \u53d1\u5446\u3002`;
+    return `这周已经排了 ${plannedCount} / 7 天，没点到的天数会在确认时自动补成摆烂 / 发呆。`;
   }
 
   return "这一周已经排满，可以确认本周安排并统一结算。";
@@ -222,7 +224,7 @@ export function buildPlannerFeedbackLines(currentWeekState: ActiveWeekState) {
     currentWeekState.releasedClassDays.length > 0
       ? `这周已经决定翘掉的白天课程：${formatReleasedClassDayList(currentWeekState.releasedClassDays)}。`
       : "",
-    "\u5982\u679c\u67d0\u5929\u6ca1\u70b9\u884c\u52a8\uff0c\u7cfb\u7edf\u4f1a\u5728\u786e\u8ba4\u65f6\u81ea\u52a8\u8865\u6210\u201c\u6446\u70c2 / \u53d1\u5446\u201d\uff0c\u4e0d\u4f1a\u5361\u6b7b\uff0c\u4e5f\u4e0d\u4f1a\u5077\u5077\u8df3\u5468\u3002",
+    "如果某天没点行动，系统会在确认时自动补成“摆烂 / 发呆”，不会卡死，也不会偷偷跳周。",
   ];
 
   return uniqueLines(lines);
@@ -240,7 +242,9 @@ export function buildCurrentActionFeedback(input: {
 
   const eventLines = uniqueLines([
     turn.resolvedAction.reason ? formatPlannerReason(turn.resolvedAction.reason) : "",
-    ...turn.notableFacts.map((fact) => fact.startsWith("weekly-event:") ? formatPlannerWeeklyEventFact(fact) : formatPlayerFacingFact(fact)),
+    ...turn.notableFacts.map((fact) =>
+      fact.startsWith("weekly-event:") ? formatPlannerWeeklyEventFact(fact) : formatPlayerFacingFact(fact),
+    ),
     ...turn.flags.map(formatPlayerFacingFlag),
   ]);
 

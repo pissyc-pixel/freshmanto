@@ -37,7 +37,7 @@ export const actionOptions: Array<{
   { value: "part_time", label: "兼职 / 赚钱", description: "补充现金流，但不能安排在夜间。" },
   { value: "social", label: "社交 / 关系", description: "花点钱换心情和人脉，后面可能派上用场。" },
   { value: "relax", label: "娱乐 / 放松", description: "快速降压，但通常也要花钱。" },
-  { value: "idle", label: "\u6446\u70c2 / \u53d1\u5446", description: "\u6ca1\u6709\u7279\u610f\u5b89\u6392\u7684\u4e00\u5929\uff0c\u7167\u5e38\u628a\u65e5\u5b50\u6df7\u8fc7\u53bb\u3002" },
+  { value: "idle", label: "摆烂 / 发呆", description: "没有特意安排的一天，照常把日子混过去。" },
   { value: "big_meal", label: "吃大餐", description: "即时消费，不推进周历，花钱换心情和喘息感。" },
   { value: "student_activity", label: "学生活动 / 讲座 / 社团", description: "更有生活感，也有机会留下履历痕迹。" },
   { value: "remedy", label: "补救 / 应急处理", description: "优先止损，把已经堆起来的风险往回拉。" },
@@ -110,11 +110,11 @@ const feedbackLabels: Record<SemesterFeedback, string> = {
 const timeBlockLabels: Record<TimeBlockKind, string> = {
   free: "全天都能自己安排",
   half_free: "只有半天空档",
-  busy_day: "\u767d\u5929\u6ee1\u8bfe",
+  busy_day: "白天满课",
 };
 
 const weeklyDayTypeLabels: Record<WeeklyDayType, string> = {
-  night_only: "\u767d\u5929\u6ee1\u8bfe\uff0c\u9ed8\u8ba4\u53ea\u6709\u591c\u91cc\u53ef\u4ee5\u5b89\u6392",
+  night_only: "白天满课，默认只有夜里可以安排",
   half_day: "这天只有半天空档",
   full_day: "这天基本能自己支配",
 };
@@ -306,12 +306,12 @@ function describeNotableFact(fact: string): string | undefined {
   }
 
   if (fact === "auto-filled-idle") {
-    return "\u8fd9\u4e00\u5929\u6ca1\u6709\u624b\u52a8\u5b89\u6392\uff0c\u7cfb\u7edf\u81ea\u52a8\u8865\u6210\u4e86\u201c\u6446\u70c2 / \u53d1\u5446\u201d\u3002";
+    return "这一天没有手动安排，系统自动补成了“摆烂 / 发呆”。";
   }
 
   if (fact.startsWith("weekly-event:competition-skipped:")) {
     const projectTitle = fact.split(":").slice(2).join(":");
-    return `???${projectTitle || "?????"}????????????????????????`;
+    return `你这次把“${projectTitle || "这条比赛线"}”的说明会翘掉了，所以这学期这条项目线先关上了。`;
   }
 
   if (fact.startsWith("skip_class released ")) {
