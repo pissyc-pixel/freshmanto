@@ -65,7 +65,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
       <AppShell
         eyebrow="主游戏"
         title="先开一局新的大学生活"
-        description="这里会承载每周课程态度、逐日排周历、统一周结算，以及月底的成长日志和月记。"
+        description="这里会承载每周课程态度、逐日排周历、统一周结算，以及月末的成长日志和月记。"
         actions={
           <Link
             href="/"
@@ -117,7 +117,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
     <AppShell
       eyebrow="主游戏"
       title={`${formatMonthLabel(bundle.run.currentYear, bundle.run.currentMonth)} 的周历安排`}
-      description="这一轮周历会先让你定课程态度，再逐天给这一周的每一天排一个行动；等 7 天都排完，点一次“确认本周安排”，系统再统一结算。"
+      description="这轮周历会先让你定课程态度，再逐天给这一周的每一天排一个行动；等 7 天都排完，点一次“确认本周安排”，系统再统一结算。"
       actions={
         <>
           <Link
@@ -166,14 +166,16 @@ export default async function GamePage({ searchParams }: GamePageProps) {
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">近期趋势</p>
               <p className="mt-3 text-lg font-semibold text-stone-900">
                 你最近最像在往“{directionPerception.primary.label}”这条路靠
-                {directionPerception.secondary ? `，同时也还带着一点 ${directionPerception.secondary.label} 的可能。` : "。"}
+                {directionPerception.secondary
+                  ? `，同时也还带着一点 ${directionPerception.secondary.label} 的可能。`
+                  : "。"}
               </p>
               <p className="mt-2 text-sm leading-6 text-stone-600">{directionPerception.summary}</p>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
               <article className="rounded-2xl border border-[var(--border)] bg-white/65 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">为什么会往这边偏</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">为什么会往这边靠</p>
                 <div className="mt-3 space-y-2">
                   {directionPerception.reasons.map((reason) => (
                     <p key={reason}>{reason}</p>
@@ -199,11 +201,14 @@ export default async function GamePage({ searchParams }: GamePageProps) {
           </div>
         </SectionCard>
 
-                {weeklySettlement ? (
+        {weeklySettlement ? (
           <>
             <ScrollIntoView targetId="weekly-settlement" active={focusParam === "weekly-settlement"} />
             <div id="weekly-settlement">
-              <SectionCard title="\u4e0a\u5468\u7ed3\u7b97" description="\u8fd9\u4e00\u5468\u5df2\u7ecf\u7edf\u4e00\u7ed3\u7b97\u5b8c\uff0c\u53ef\u4ee5\u76f4\u63a5\u770b\u9010\u65e5\u53cd\u9988\u548c\u672c\u5468\u603b\u53d8\u5316\u3002">
+              <SectionCard
+                title="上周结算"
+                description="这一周已经统一结算完，可以直接看逐日反馈和本周总变化。"
+              >
                 <WeeklySettlementCard {...weeklySettlement} />
               </SectionCard>
             </div>
@@ -211,15 +216,8 @@ export default async function GamePage({ searchParams }: GamePageProps) {
         ) : null}
 
         <SectionCard
-          title="\u672c\u6708\u6982\u89c8"
-          description="\u8fd9\u91cc\u5148\u770b\u8fd9\u4e2a\u6708 4 \u5468\u7684\u6574\u4f53\u8282\u594f\u548c\u5f53\u524d\u5468\u4f4d\u7f6e\uff1b\u771f\u6b63\u7684\u9010\u5929\u70b9\u9009\u5165\u53e3\u653e\u5728\u4e0b\u4e00\u5757\u3002"
-        >
-          <TimeBlockStrip blocks={schedule} />
-        </SectionCard>
-
-        <SectionCard
-          title="\u5b89\u6392\u8fd9\u4e00\u5468"
-          description="\u8fd9\u91cc\u624d\u662f\u672c\u5468\u7684\u5b9e\u9645\u64cd\u4f5c\u5165\u53e3\u3002\u5148\u5b9a\u8bfe\u7a0b\u6001\u5ea6\uff0c\u518d\u9010\u5929\u70b9\u9009\uff1b\u5468\u4e00 / \u4e09 / \u4e94\u9ed8\u8ba4\u767d\u5929\u6ee1\u8bfe\uff0c\u7fd8\u8bfe\u624d\u4f1a\u91ca\u653e\u767d\u5929\u3002"
+          title="安排这一周"
+          description="这里才是本周的实际操作入口。先定课程态度，再逐天点选；周一 / 周三 / 周五默认白天满课，翘课才会释放白天。"
         >
           <ActionPlanForm
             runId={bundle.run.id}
@@ -232,6 +230,23 @@ export default async function GamePage({ searchParams }: GamePageProps) {
             plannerFeedback={currentWeekState.plannerFeedback}
             days={plannerDays}
           />
+        </SectionCard>
+
+        <SectionCard
+          title="本月概览"
+          description="这里只保留节奏概览，真正的操作入口已经收拢到上面的“安排这一周”。"
+        >
+          <details className="rounded-2xl border border-[var(--border)] bg-white/65 p-4">
+            <summary className="cursor-pointer list-none text-sm font-semibold text-stone-900">
+              展开看本月 4 周节奏和当前周位置
+            </summary>
+            <p className="mt-2 text-sm leading-6 text-stone-600">
+              这一块只负责帮你快速回看月份节奏，不再承担逐天操作。
+            </p>
+            <div className="mt-4">
+              <TimeBlockStrip blocks={schedule} />
+            </div>
+          </details>
         </SectionCard>
 
         {latestGrowthLog ? (

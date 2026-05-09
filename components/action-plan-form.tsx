@@ -12,7 +12,7 @@ type PlannerDayOptionView = {
   selected: boolean;
 };
 
-type PlannerDayView = {
+export type PlannerDayView = {
   weekday: string;
   label: string;
   status: string;
@@ -94,6 +94,82 @@ function FeedbackBanner({ feedback }: { feedback: PlannerFeedback }) {
   );
 }
 
+export function countUnplannedDays(days: PlannerDayView[]) {
+  return days.filter((day) => !day.plannedActionLabel).length;
+}
+
+type OptimisticPlan = {
+  optionLabel: string;
+  skipClassSelected: boolean;
+};
+
+function clonePlannerDay(day: PlannerDayView): PlannerDayView {
+  return {
+    ...day,
+    normalOptions: day.normalOptions.map((option) => ({ ...option })),
+    skipOptions: day.skipOptions.map((option) => ({ ...option })),
+  };
+}
+
+export function applyOptimisticPlan(
+  days: PlannerDayView[],
+  weekday: string,
+  optionLabel: string,
+  skipClassSelected: boolean,
+): PlannerDayView[] {
+  return days.map((day) => {
+    if (day.weekday !== weekday) {
+      return {
+        ...day,
+        justPlanned: false,
+      };
+    }
+
+    const effectiveTypeLabel =
+      skipClassSelected && day.skipClassAvailable ? "翘课后释放白天，可安排白天行动" : day.effectiveTypeLabel;
+
+    return {
+      ...day,
+      status: "已安排",
+      plannedActionLabel: optionLabel,
+      justPlanned: true,
+      skipClassSelected: skipClassSelected && day.skipClassAvailable,
+      effectiveTypeLabel,
+      normalOptions: day.normalOptions.map((option) => ({
+        ...option,
+        selected: option.label === optionLabel,
+      })),
+      skipOptions: day.skipOptions.map((option) => ({
+        ...option,
+        selected: option.label === optionLabel,
+      })),
+    };
+  });
+}
+
+function applyOptimisticPlans(
+  days: PlannerDayView[],
+  optimisticPlans: Record<string, OptimisticPlan>,
+): PlannerDayView[] {
+  return days.map((sourceDay) => {
+    const optimisticPlan = optimisticPlans[sourceDay.weekday];
+    const day = clonePlannerDay(sourceDay);
+
+    if (!optimisticPlan) {
+      return day;
+    }
+
+    const [updatedDay] = applyOptimisticPlan(
+      [day],
+      sourceDay.weekday,
+      optimisticPlan.optionLabel,
+      optimisticPlan.skipClassSelected,
+    );
+
+    return updatedDay ?? day;
+  });
+}
+
 export function ActionPlanForm({
   runId,
   currentWeek,
@@ -109,19 +185,24 @@ export function ActionPlanForm({
   const [skipClassDraft, setSkipClassDraft] = useState(false);
   const [localFeedback, setLocalFeedback] = useState<PlannerFeedback | null>(null);
   const [pendingPlan, setPendingPlan] = useState<{ weekday: string; label: string } | null>(null);
-  const selectedDay = days.find((day) => day.weekday === selectedWeekday) ?? null;
+  const [optimisticPlans, setOptimisticPlans] = useState<Record<string, OptimisticPlan>>({});
+
+  const plannerDays = useMemo(
+    () => applyOptimisticPlans(days, optimisticPlans),
+    [days, optimisticPlans],
+  );
+
+  const selectedDay = plannerDays.find((day) => day.weekday === selectedWeekday) ?? null;
   const currentOptions = selectedDay
     ? skipClassDraft && selectedDay.skipClassAvailable
       ? selectedDay.skipOptions
       : selectedDay.normalOptions
     : [];
   const activeFeedback = localFeedback ?? plannerFeedback ?? null;
-  const missingCount = useMemo(
-    () => days.filter((day) => !day.plannedActionLabel).length,
-    [days],
-  );
+  const missingCount = useMemo(() => countUnplannedDays(plannerDays), [plannerDays]);
+  const readyToConfirmNow = attendanceLocked && (readyToConfirm || plannerDays.length > 0);
   const highlightedWeekday =
-    pendingPlan?.weekday ?? days.find((day) => day.justPlanned)?.weekday ?? null;
+    pendingPlan?.weekday ?? plannerDays.find((day) => day.justPlanned)?.weekday ?? null;
 
   function openDayPlanner(day: PlannerDayView) {
     if (!attendanceLocked) {
@@ -154,7 +235,11 @@ export function ActionPlanForm({
             </span>
           )}
         </div>
-        <p className="mt-2">{plannerStatusText}</p>
+        <p className="mt-2">
+          {attendanceLocked
+            ? `这周已经排了 ${7 - missingCount} / 7 天，顶部计数、当天卡片和确认状态现在都会同步更新。`
+            : plannerStatusText}
+        </p>
         {plannerLines.length > 0 ? (
           <ul className="mt-3 space-y-2 text-sm text-stone-600">
             {plannerLines.map((line) => (
@@ -168,8 +253,10 @@ export function ActionPlanForm({
 
       {pendingPlan ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-          <p className="font-semibold">{days.find((day) => day.weekday === pendingPlan.weekday)?.label} 正在保存</p>
-          <p className="mt-1">这一天已经点成“{pendingPlan.label}”，页面刷新后会立刻在当天卡片上显示。</p>
+          <p className="font-semibold">
+            {plannerDays.find((day) => day.weekday === pendingPlan.weekday)?.label} 已点上
+          </p>
+          <p className="mt-1">已经把“{pendingPlan.label}”排到这一天，正在保存并回填本周排程。</p>
         </div>
       ) : null}
 
@@ -207,7 +294,7 @@ export function ActionPlanForm({
       </form>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {days.map((day) => {
+        {plannerDays.map((day) => {
           const isHighlighted = highlightedWeekday === day.weekday;
           const isPlanned = Boolean(day.plannedActionLabel);
 
@@ -265,7 +352,7 @@ export function ActionPlanForm({
           <SubmitButton
             label="确认本周安排"
             pendingLabel="正在结算本周安排 / 生成 AI 月记..."
-            disabled={!readyToConfirm}
+            disabled={!readyToConfirmNow}
             className="rounded-full bg-stone-900 px-5 py-3 font-semibold text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-400"
           />
           {attendanceLocked ? (
@@ -284,11 +371,16 @@ export function ActionPlanForm({
           <div className="w-full max-w-2xl rounded-[2rem] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[0_24px_80px_rgba(28,25,23,0.22)]">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-amber-700">{selectedDay.label}</p>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-amber-700">
+                  {selectedDay.label}
+                </p>
                 <h3 className="mt-2 text-2xl font-semibold text-stone-900">给这一天排一个行动</h3>
                 <p className="mt-2 text-sm leading-6 text-stone-600">
                   默认节奏：{selectedDay.baseTypeLabel}。当前可排：
-                  {skipClassDraft && selectedDay.skipClassAvailable ? "翘课后释放白天" : selectedDay.effectiveTypeLabel}。
+                  {skipClassDraft && selectedDay.skipClassAvailable
+                    ? "翘课后释放白天，可安排白天行动"
+                    : selectedDay.effectiveTypeLabel}
+                  。
                 </p>
                 {selectedDay.eventTitle ? (
                   <p className="mt-2 text-sm leading-6 text-amber-700">
@@ -313,7 +405,7 @@ export function ActionPlanForm({
                   onChange={(event) => setSkipClassDraft(event.target.checked)}
                   className="mt-1 h-4 w-4 rounded border-stone-300 text-amber-600"
                 />
-                <span>这天翘课，释放白天时间。代价是学业会掉一点、压力会上来一点。</span>
+                <span>这天翘课，释放白天时间。代价是学业会掉一点、压力会再上来一点。</span>
               </label>
             ) : null}
 
@@ -328,6 +420,7 @@ export function ActionPlanForm({
                   <input type="hidden" name="intent" value="plan_day" />
                   <input type="hidden" name="attendanceStrategy" value={defaultAttendanceStrategy} />
                   <input type="hidden" name="weekday" value={selectedDay.weekday} />
+                  <input type="hidden" name="optionId" value={option.optionId} />
                   <input
                     type="hidden"
                     name="skipClass"
@@ -337,7 +430,7 @@ export function ActionPlanForm({
                     <div>
                       <h4 className="text-base font-semibold text-stone-900">{option.label}</h4>
                       {option.selected ? (
-                        <p className="mt-1 text-xs font-medium text-amber-700">上一次你排过类似行动</p>
+                        <p className="mt-1 text-xs font-medium text-amber-700">你上次排过类似行动</p>
                       ) : null}
                     </div>
                     <SubmitButton
@@ -345,6 +438,13 @@ export function ActionPlanForm({
                       pendingLabel="正在保存..."
                       className="rounded-full bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700"
                       onClick={() => {
+                        setOptimisticPlans((currentPlans) => ({
+                          ...currentPlans,
+                          [selectedDay.weekday]: {
+                            optionLabel: option.label,
+                            skipClassSelected: skipClassDraft && selectedDay.skipClassAvailable,
+                          },
+                        }));
                         setPendingPlan({
                           weekday: selectedDay.weekday,
                           label: option.label,
@@ -352,7 +452,7 @@ export function ActionPlanForm({
                         setLocalFeedback({
                           kind: "success",
                           title: `${selectedDay.label} 已点上`,
-                          message: `已经把“${option.label}”排到这一天，正在保存并刷新这周安排。`,
+                          message: `已经把“${option.label}”排到这一天，顶部剩余天数和当天卡片会立刻同步更新。`,
                         });
                         setSelectedWeekday(null);
                       }}

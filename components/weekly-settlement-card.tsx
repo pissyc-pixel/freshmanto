@@ -36,7 +36,9 @@ export function WeeklySettlementCard(props: WeeklySettlementCardProps) {
     <article className="rounded-[2rem] border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,247,237,0.94),rgba(255,255,255,0.98))] p-6 shadow-[0_20px_60px_rgba(84,51,16,0.12)]">
       <div className="flex flex-wrap items-center gap-3">
         <span className="rounded-full bg-amber-600 px-3 py-1 text-xs font-semibold text-white">本周结算</span>
-        <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-stone-700">{props.subtitle}</span>
+        <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-stone-700">
+          {props.subtitle}
+        </span>
       </div>
       <h3 className="mt-4 text-2xl font-semibold text-stone-900">{props.title}</h3>
       {props.eventTitle ? (
@@ -75,16 +77,16 @@ export function WeeklySettlementCard(props: WeeklySettlementCardProps) {
             </div>
           ))}
         </div>
-      {props.budgetLines.length > 0 ? (
-        <div className="mt-6 rounded-2xl border border-[var(--border)] bg-white/90 p-4 text-sm leading-6 text-stone-700">
-          <p className="font-semibold text-stone-900">\u672c\u5468\u6536\u652f\u62c6\u89e3</p>
-          <ul className="mt-2 space-y-2">
-            {props.budgetLines.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+        {props.budgetLines.length > 0 ? (
+          <div className="mt-6 rounded-2xl border border-[var(--border)] bg-white/90 p-4 text-sm leading-6 text-stone-700">
+            <p className="font-semibold text-stone-900">本周收支拆解</p>
+            <ul className="mt-2 space-y-2">
+              {props.budgetLines.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </div>
 
       {props.riskLines.length > 0 ? (
