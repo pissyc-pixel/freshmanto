@@ -15,6 +15,7 @@
 - `OPENAI_API_KEY`：OpenAI 兼容接口 key，服务端使用，不能暴露到前端。
 - `OPENAI_BASE_URL`：OpenAI 兼容接口地址，可选。
 - `OPENAI_MODEL`：月记和结局报告使用的模型名，可选。
+- `AI_REPORT_TIMEOUT_MS`：AI 月记 / 结局报告请求超时，默认 8000ms；超时会使用本地 fallback。
 
 ## 生产部署
 
@@ -41,5 +42,6 @@ AI 相关变量可选。如果缺少 `OPENAI_API_KEY`，系统会使用本地 fa
 - `OPENAI_API_KEY`
 - `OPENAI_BASE_URL`
 - `OPENAI_MODEL`
+- `AI_REPORT_TIMEOUT_MS`
 
 上线前请确认页面和组件没有直接读取服务端专用变量。

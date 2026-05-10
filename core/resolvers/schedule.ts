@@ -60,7 +60,7 @@ const WEEKDAY_LABELS: Record<Weekday, string> = {
   sun: "周日",
 };
 
-const COURSE_LOCKED_DAYTIME_WEEKDAYS: Weekday[] = ["mon", "wed", "fri"];
+const COURSE_LOCKED_DAYTIME_WEEKDAYS: Weekday[] = ["mon", "tue", "wed", "thu", "fri"];
 
 const ACTION_TIME_COSTS: Record<ActionType, number> = {
   study: 1,

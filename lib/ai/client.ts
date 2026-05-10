@@ -8,7 +8,6 @@ export function createAiClient() {
 
   return new OpenAI({
     apiKey: aiConfig.apiKey,
-    baseURL: aiConfig.baseUrl
+    ...(aiConfig.baseUrl ? { baseURL: aiConfig.baseUrl } : {}),
   });
 }
-

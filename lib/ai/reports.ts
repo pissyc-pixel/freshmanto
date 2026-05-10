@@ -1,7 +1,7 @@
 import { buildEndingReportPrompt } from "@/core/prompts/ending-report";
 import { buildMonthlyJournalPrompt } from "@/core/prompts/monthly-journal";
 import { createAiClient } from "@/lib/ai/client";
-import { aiConfig, isAiConfigured } from "@/lib/ai/config";
+import { aiConfig, getAiReportTimeoutMs, isAiConfigured } from "@/lib/ai/config";
 import { buildGrowthJournalEntry, buildMonthlyDiaryDigest } from "@/lib/demo/monthly-digest";
 import {
   formatAttendanceStrategy,
@@ -94,13 +94,11 @@ export function renderMonthlyJournalFallback(input: MonthlyJournalPromptInput): 
     markdown: [
       `# ${formatMonthlyHeading(year, month)}`,
       "",
-      `这个月我主要把时间放在${digest.mainActions.join("、") || "把节奏稳住"}上，上课这边基本按“${formatAttendanceStrategy(attendanceStrategy)}”的节奏往前走。`,
-      digest.emotionalArc,
-      `月底再看账和状态，我手里还剩 ${digest.endState.money}，心情在 ${digest.endState.mood}，压力到 ${digest.endState.stress}，学业线停在 ${digest.endState.semesterAcademics}。`,
-      `和月初比起来，${buildStatDeltaLine(statsDelta)}。如果非要用一句话概括这个月的学业状态，大概就是“${formatSemesterFeedback(summary.academicFeedback ?? "stable")}”。`,
+      `这个月我主要把时间放在${digest.mainActions.join("、") || "把节奏稳住"}上。上课这边走的是“${formatAttendanceStrategy(attendanceStrategy)}”，不算特别漂亮，但至少是我这个月真实过出来的节奏。${digest.emotionalArc}`,
+      `月底再看账和状态，手里还剩 ${digest.endState.money} 元，心情在 ${digest.endState.mood}，压力到 ${digest.endState.stress}，学业线停在 ${digest.endState.semesterAcademics}。和月初比起来，${buildStatDeltaLine(statsDelta)}。如果只说学业体感，大概就是“${formatSemesterFeedback(summary.academicFeedback ?? "stable")}”。`,
       groundedFacts,
-      resumeText,
-      `写到这里，这个月差不多也算真的翻过去了一页。${growthLog.title}`,
+      `${resumeText}${digest.directionSignal} ${digest.futureSignals.slice(0, 2).join(" ")}`,
+      `写到这里，我能确定的不是自己突然想明白了什么，而是这个月确实把一些倾向留下来了。${growthLog.title}。下个月还是得先照着这些已经发生的事往前走，别替自己编一段更体面的剧情。`,
     ].join("\n\n"),
   };
 }
@@ -159,12 +157,44 @@ function extractTextFromResponse(response: unknown): string | undefined {
   return typeof firstChoice === "string" && firstChoice.trim() ? firstChoice.trim() : undefined;
 }
 
+class AiReportTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`AI report request timed out after ${timeoutMs}ms.`);
+    this.name = "AiReportTimeoutError";
+  }
+}
+
 async function requestModelMarkdown(payload: AiPromptPayload): Promise<{ markdown?: string; model?: string }> {
   const client = createAiClient();
-  const response = await client.responses.create({
-    model: defaultModel,
-    input: payload.messages,
+  const timeoutMs = getAiReportTimeoutMs();
+  const controller = new AbortController();
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const requestPromise = client.responses.create(
+    {
+      model: defaultModel,
+      input: payload.messages,
+    },
+    {
+      signal: controller.signal,
+    },
+  );
+  requestPromise.catch(() => undefined);
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      controller.abort();
+      reject(new AiReportTimeoutError(timeoutMs));
+    }, timeoutMs);
   });
+
+  let response: Awaited<typeof requestPromise>;
+
+  try {
+    response = await Promise.race([requestPromise, timeoutPromise]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
 
   return {
     markdown: extractTextFromResponse(response),
@@ -204,9 +234,16 @@ export async function generateAiReport(input: AiReportRequest): Promise<AiReport
 }
 
 export function getAiPresentationDebugInfo(input: AiReportRequest) {
+  const payload = getPromptPayload(input);
+
   return {
     configured: isAiConfigured(),
-    baseUrl: aiConfig.baseUrl,
-    prompt: getPromptPayload(input),
+    customBaseUrlConfigured: Boolean(aiConfig.baseUrl),
+    model: defaultModel,
+    timeoutMs: aiConfig.reportTimeoutMs,
+    prompt: {
+      contract: payload.contract,
+      messages: payload.messages,
+    },
   };
 }

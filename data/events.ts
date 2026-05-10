@@ -51,24 +51,18 @@ export type EventRuleTemplate = {
 
 const ALL_MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
-const LIVING_EXPENSE_BY_CITY = {
-  tier_1: 1080,
-  tier_2: 920,
-  tier_3: 780,
+const CITY_EXPENSE_RATIO_ADJUSTMENT = {
+  tier_1: 0.05,
+  tier_2: 0.02,
+  tier_3: -0.03,
 } as const;
 
-const WEEKLY_BACKGROUND_SPEND = {
-  struggling: 20,
-  ordinary: 40,
-  stable: 80,
-  "well-connected": 120,
-  affluent: 170,
-} as const;
-
-const WEEKLY_SUPPLY_EXPENSE_BY_CITY = {
-  tier_1: 120,
-  tier_2: 100,
-  tier_3: 80,
+const OPTIONAL_MONTHLY_SPEND_BY_BACKGROUND = {
+  struggling: 0,
+  ordinary: 0,
+  stable: 40,
+  "well-connected": 70,
+  affluent: 110,
 } as const;
 
 const SCHOLARSHIP_BY_SCHOOL = {
@@ -84,8 +78,64 @@ function roundToNearestTen(value: number): number {
   return Math.round(value / 10) * 10;
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function getNecessaryExpenseRatio(monthlyAllowance: number): number {
+  if (monthlyAllowance <= 900) {
+    return 0.91;
+  }
+
+  if (monthlyAllowance <= 1300) {
+    return 0.84;
+  }
+
+  if (monthlyAllowance <= 1800) {
+    return 0.73;
+  }
+
+  if (monthlyAllowance <= 2500) {
+    return 0.64;
+  }
+
+  return 0.55;
+}
+
+function getNecessaryExpenseRatioCap(monthlyAllowance: number): number {
+  if (monthlyAllowance <= 900) {
+    return 0.94;
+  }
+
+  if (monthlyAllowance <= 1300) {
+    return 0.88;
+  }
+
+  if (monthlyAllowance <= 1800) {
+    return 0.78;
+  }
+
+  if (monthlyAllowance <= 2500) {
+    return 0.7;
+  }
+
+  return 0.62;
+}
+
 export function getMonthlyLivingExpense(run: GameRun): number {
-  return LIVING_EXPENSE_BY_CITY[run.profile.cityTier];
+  const allowance = Math.max(0, run.profile.monthlyAllowance);
+  const ratio = clamp(
+    getNecessaryExpenseRatio(allowance) + CITY_EXPENSE_RATIO_ADJUSTMENT[run.profile.cityTier],
+    0.48,
+    getNecessaryExpenseRatioCap(allowance),
+  );
+  const optionalSpend = allowance > 1300
+    ? OPTIONAL_MONTHLY_SPEND_BY_BACKGROUND[run.profile.familyBackground]
+    : 0;
+  const rawExpense = allowance * ratio + optionalSpend;
+  const lowAllowanceCap = allowance <= 1300 ? Math.max(0, allowance - 60) : allowance * 0.92;
+
+  return roundToNearestTen(Math.min(rawExpense, lowAllowanceCap));
 }
 
 export function getWeeklyAllowance(run: GameRun): number {
@@ -93,11 +143,7 @@ export function getWeeklyAllowance(run: GameRun): number {
 }
 
 export function getWeeklyLivingExpense(run: GameRun): number {
-  return roundToNearestTen(
-    getMonthlyLivingExpense(run) / 4 +
-      WEEKLY_BACKGROUND_SPEND[run.profile.familyBackground] +
-      WEEKLY_SUPPLY_EXPENSE_BY_CITY[run.profile.cityTier],
-  );
+  return Math.round(getMonthlyLivingExpense(run) / 4);
 }
 
 export function getMoneyPressureLine(run: GameRun): number {
@@ -334,13 +380,13 @@ export const actionEventTemplates: EventRuleTemplate[] = [
     triggerMonths: ALL_MONTHS,
     actionTypes: ["study", "job_prep", "part_time", "student_activity", "remedy"],
     conditions: ["stress_high"],
-    baseWeight: 7,
+    baseWeight: 5,
     summary: "Carrying too much stress makes even normal actions spill into extra strain.",
     supportsRemedy: true,
     effect: {
       stats: {
         mood: -2,
-        stress: 3,
+        stress: 2,
       },
       risk: {
         burnout: 1,

@@ -741,6 +741,52 @@ describe("demo run service", () => {
     expect(settlement?.dailyResults.filter((day) => day.resolvedAction.action === "idle")).toHaveLength(4);
   });
 
+  it("confirms four completely empty planned weeks without crashing and writes monthly artifacts", async () => {
+    const store = createStore();
+    const run = createInitialGameRun({
+      id: "run-four-empty-weeks",
+      randomValues: [0.29, 0.41, 0.52, 0.63, 0.17, 0.38, 0.49, 0.58],
+    });
+    store.run = {
+      id: run.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      status: "active",
+      current_year: run.currentYear,
+      current_month: run.currentMonth,
+      profile_json: run.profile,
+      current_state_json: run,
+    };
+    const repository = createRepository(store);
+    let latestRun = run;
+    let finalResult: Awaited<ReturnType<typeof confirmDemoWeek>> | undefined;
+
+    for (let week = 0; week < 4; week += 1) {
+      await setDemoWeekAttendance({
+        repository,
+        runId: latestRun.id,
+        attendanceStrategy: "mixed",
+      });
+      finalResult = await confirmDemoWeek({
+        repository,
+        runId: latestRun.id,
+        generateReport: fakeAiReport,
+      });
+      latestRun = finalResult.run;
+    }
+
+    expect(finalResult?.monthCompleted).toBe(true);
+    expect(finalResult?.monthlySummary?.weeklySettlements).toHaveLength(4);
+    expect(finalResult?.monthlySummary?.weeklySettlements?.[0]?.dailyResults).toHaveLength(7);
+    expect(
+      finalResult?.monthlySummary?.weeklySettlements?.every((settlement) =>
+        settlement.dailyResults.every((day) => day.resolvedAction.action === "idle" && day.resolvedAction.autoFilled),
+      ),
+    ).toBe(true);
+    expect(store.monthlyStates).toHaveLength(1);
+    expect(store.aiReports[0]?.report_type).toBe("monthly_journal");
+  });
+
   it("finalizes the month after the fourth week is actually completed and then writes the monthly artifacts", async () => {
     const store = createStore();
     const run = createInitialGameRun({

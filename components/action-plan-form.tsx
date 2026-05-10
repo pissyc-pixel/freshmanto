@@ -153,7 +153,11 @@ export function applyOptimisticPlan(
     }
 
     const effectiveTypeLabel =
-      skipClassSelected && day.skipClassAvailable ? "翘课后释放白天，可安排白天行动" : day.effectiveTypeLabel;
+      skipClassSelected && day.skipClassAvailable
+        ? day.baseTypeLabel.includes("半天")
+          ? "翘掉半天课后补成完整白天，可安排白天行动"
+          : "翘掉白天课后释放白天，可安排白天行动"
+        : day.effectiveTypeLabel;
 
     return {
       ...day,
@@ -424,7 +428,9 @@ export function ActionPlanForm({
                 <p className="mt-2 text-sm leading-6 text-stone-600">
                   默认节奏：{selectedDay.baseTypeLabel}。当前可排：
                   {skipClassDraft && selectedDay.skipClassAvailable
-                    ? "翘课后释放白天，可安排白天行动"
+                    ? selectedDay.baseTypeLabel.includes("半天")
+                      ? "翘掉半天课，把半天空挡补成完整白天"
+                      : "翘掉白天课，释放白天时间"
                     : selectedDay.effectiveTypeLabel}
                   。
                 </p>
@@ -451,7 +457,11 @@ export function ActionPlanForm({
                   onChange={(event) => setSkipClassDraft(event.target.checked)}
                   className="mt-1 h-4 w-4 rounded border-stone-300 text-amber-600"
                 />
-                <span>这天翘课，释放白天时间。代价是学业会掉一点、压力会再上来一点。</span>
+                <span>
+                  {selectedDay.baseTypeLabel.includes("半天")
+                    ? "这天翘掉半天课，把半天空挡补成完整白天。代价较轻，学业、压力和风险都会小幅波动。"
+                    : "这天翘掉白天课，释放白天时间。代价是学业会掉一点、压力会再上来一点。"}
+                </span>
               </label>
             ) : null}
 
@@ -463,6 +473,7 @@ export function ActionPlanForm({
                   className="rounded-2xl border border-[var(--border)] bg-white/90 p-4"
                   onSubmit={() => {
                     markPlanAsPending(selectedDay, option);
+                    setSelectedWeekday(null);
                   }}
                 >
                   <input type="hidden" name="runId" value={runId} />

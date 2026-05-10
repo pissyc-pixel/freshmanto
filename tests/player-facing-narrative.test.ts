@@ -535,4 +535,16 @@ describe("player-facing narrative helpers", () => {
       /不要出现.*规则层|不要出现.*系统判定|不要原样复述.*机器字段/,
     );
   });
+
+  it("builds monthly journal prompts from compact monthly facts instead of raw turn history", () => {
+    const monthlyPrompt = buildMonthlyJournalPrompt(monthlyInput);
+    const promptText = monthlyPrompt.messages.map((message) => message.content).join("\n");
+
+    expect(promptText).toContain("每周结算摘要");
+    expect(promptText).toContain("主要行动分布");
+    expect(promptText).not.toContain("\"turns\"");
+    expect(promptText).not.toContain("\"resolvedActions\"");
+    expect(promptText).not.toContain("\"runId\"");
+    expect(promptText).not.toContain("OPENAI_API_KEY");
+  });
 });

@@ -170,6 +170,8 @@ const flagLabels: Record<string, string> = {
   "instant-event:study-group-help": "身边同学顺手拉了一把，资料和节奏都被接上了一点。",
   "instant-event:teacher-nudge": "前面攒下的学习势头被老师看见了，这次得到了一点及时提醒和肯定。",
   "insufficient-week-time": "这周剩下的可用时间不够，这一步只能先放下。",
+  "skip-class-penalty": "翘课确实换来了白天时间，但学业、压力和风险也留下了代价。",
+  "high-stress-relief": "因为压力已经很高，这次调整状态比平时更能把压力往下拉。",
 };
 
 const eventNarratives: Record<string, string> = {
@@ -307,6 +309,16 @@ function describeNotableFact(fact: string): string | undefined {
 
   if (fact === "auto-filled-idle") {
     return "这一天没有手动安排，系统自动补成了“摆烂 / 发呆”。";
+  }
+
+  if (fact.startsWith("skip-class:")) {
+    const weekday = fact.split(":")[1] as Weekday | undefined;
+    const label = weekday && weekday in weekdayClassDayLabels ? weekdayClassDayLabels[weekday] : "这天";
+    const halfDay = weekday === "tue" || weekday === "thu";
+
+    return halfDay
+      ? `${label}翘掉了半天课，把原本的半天空挡补成了完整白天。`
+      : `${label}翘掉了白天课，换出了一整段白天时间。`;
   }
 
   if (fact.startsWith("weekly-event:competition-skipped:")) {

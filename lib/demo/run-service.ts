@@ -11,6 +11,7 @@ import {
   settleSemester,
 } from "@/core/game-engine";
 import { deriveAcademicProfile, settleLongTermProgression } from "@/core/resolvers/progression";
+import { renderEndingReportFallback, renderMonthlyJournalFallback } from "@/lib/ai/reports";
 import type { AiReportRequest, AiReportResult } from "@/types/ai";
 import type {
   ActionTurnPlan,
@@ -131,6 +132,25 @@ export type UpdateDemoWeekPlanResult = {
 };
 
 type ReportGenerator = (input: AiReportRequest) => Promise<AiReportResult>;
+
+async function generateReportWithFallback(
+  input: AiReportRequest,
+  generateReport: ReportGenerator,
+): Promise<AiReportResult> {
+  try {
+    const report = await generateReport(input);
+
+    if (report.markdown.trim().length > 0) {
+      return report;
+    }
+  } catch {
+    // The rules and monthly snapshot are already deterministic; report writing must degrade locally.
+  }
+
+  return input.kind === "monthly_journal"
+    ? renderMonthlyJournalFallback(input)
+    : renderEndingReportFallback(input);
+}
 
 function createRunLog(run: GameRun) {
   return {
@@ -345,20 +365,30 @@ async function persistMonthArtifacts(input: {
     scholarshipAwarded: longTermSettlement.scholarshipAwarded,
   };
 
-  const monthlyReport = await input.generateReport({
-    kind: "monthly_journal",
-    runId: input.runId,
-    year: input.playedYear,
-    month: input.playedMonth,
-    summary: monthlySummary,
-  });
-
   await input.repository.saveMonthlyState({
     runId: input.runId,
     year: input.playedYear,
     month: input.playedMonth,
     snapshot: monthlySummary,
   });
+
+  if (monthlySummary.resumeAdditions.length > 0) {
+    await input.repository.saveResumeItems(
+      mapResumeItems(settledRun, input.playedMonth, monthlySummary.resumeAdditions),
+    );
+  }
+
+  const monthlyReport = await generateReportWithFallback(
+    {
+      kind: "monthly_journal",
+      runId: input.runId,
+      year: input.playedYear,
+      month: input.playedMonth,
+      summary: monthlySummary,
+    },
+    input.generateReport,
+  );
+
   await input.repository.saveAiReport({
     runId: input.runId,
     year: input.playedYear,
@@ -369,22 +399,19 @@ async function persistMonthArtifacts(input: {
     model: monthlyReport.model ?? null,
   });
 
-  if (monthlySummary.resumeAdditions.length > 0) {
-    await input.repository.saveResumeItems(
-      mapResumeItems(settledRun, input.playedMonth, monthlySummary.resumeAdditions),
-    );
-  }
-
   let endingSummary: StructuredEndingSummary | undefined;
   let endingReport: AiReportResult | undefined;
 
   if (input.playedYear === 4 && input.playedMonth === 12) {
     endingSummary = evaluateGraduationOutcome(settledRun);
-    endingReport = await input.generateReport({
-      kind: "ending_report",
-      runId: input.runId,
-      summary: endingSummary,
-    });
+    endingReport = await generateReportWithFallback(
+      {
+        kind: "ending_report",
+        runId: input.runId,
+        summary: endingSummary,
+      },
+      input.generateReport,
+    );
     settledRun = {
       ...settledRun,
       status: "completed",

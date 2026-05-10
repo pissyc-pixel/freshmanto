@@ -174,6 +174,43 @@ function isProductiveAction(action: SupportedAction): boolean {
   );
 }
 
+function createHighStressReliefAdjustment(run: GameRun, action: SupportedAction): {
+  stressDelta: number;
+  burnoutDelta: number;
+} {
+  const isReliefAction =
+    action === "relax" ||
+    action === "social" ||
+    action === "big_meal" ||
+    action === "remedy";
+
+  if (!isReliefAction || run.stats.stress < 70) {
+    return {
+      stressDelta: 0,
+      burnoutDelta: 0,
+    };
+  }
+
+  if (action === "relax") {
+    return {
+      stressDelta: run.stats.stress >= 85 ? -5 : -3,
+      burnoutDelta: run.stats.stress >= 85 ? -2 : -1,
+    };
+  }
+
+  if (action === "remedy") {
+    return {
+      stressDelta: run.stats.stress >= 85 ? -4 : -3,
+      burnoutDelta: run.stats.stress >= 85 ? -2 : -1,
+    };
+  }
+
+  return {
+    stressDelta: -2,
+    burnoutDelta: run.stats.stress >= 85 ? -1 : 0,
+  };
+}
+
 function shouldApplyWeeklySettlement(run: GameRun, action: SupportedAction): boolean {
   if (action === "big_meal" || action === "ask_family" || action === "skip_class" || action === "idle") {
     return false;
@@ -402,12 +439,12 @@ export function resolveActionPlan(
         actionStatsDelta.money -= 120;
         actionStatsDelta.mood += 4;
         actionStatsDelta.social += 6;
-        actionStatsDelta.stress -= 1;
+        actionStatsDelta.stress -= 3;
         break;
       case "relax":
         actionStatsDelta.money -= 80;
         actionStatsDelta.mood += 6;
-        actionStatsDelta.stress -= 5;
+        actionStatsDelta.stress -= 4;
         break;
       case "idle":
         actionStatsDelta.mood += 2;
@@ -435,6 +472,13 @@ export function resolveActionPlan(
         break;
       default:
         break;
+    }
+
+    const highStressRelief = createHighStressReliefAdjustment(projectedRun, action);
+    if (highStressRelief.stressDelta !== 0 || highStressRelief.burnoutDelta !== 0) {
+      actionStatsDelta.stress += highStressRelief.stressDelta;
+      actionRiskDelta.burnout += highStressRelief.burnoutDelta;
+      flags.push("high-stress-relief");
     }
 
     stats.money += actionStatsDelta.money;

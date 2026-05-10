@@ -21,7 +21,7 @@ import {
 import { evaluateSemesterFeedback } from "@/core/resolvers";
 import { getMonthlyEventWeight } from "@/core/resolvers/events";
 import { resolveAvailableWeeklyActions } from "@/core/resolvers/schedule";
-import { getWeeklyAllowance, getWeeklyLivingExpense } from "@/data/events";
+import { getMonthlyLivingExpense, getWeeklyAllowance, getWeeklyLivingExpense } from "@/data/events";
 import type {
   CourseAttendanceStrategy,
   GameRun,
@@ -321,7 +321,7 @@ describe("monthly resolution", () => {
     expect(studyActionGain(firstMonth.summary)).toBeGreaterThan(studyActionGain(stressedMonth.summary));
   });
 
-  it("keeps weekly living costs above a basic ordinary allowance so money pressure persists", () => {
+  it("keeps fixed living costs below a 1090 allowance while preserving cash pressure", () => {
     const baseRun = withMonth(
       createInitialGameRun({
         id: "weekly-money-pressure-run",
@@ -342,19 +342,55 @@ describe("monthly resolution", () => {
         money: 1400,
       },
     };
-    let nextRun = pressuredRun;
+    const lowAllowanceRun: GameRun = {
+      ...pressuredRun,
+      profile: {
+        ...pressuredRun.profile,
+        cityTier: "tier_2",
+        familyBackground: "ordinary",
+        monthlyAllowance: 1090,
+      },
+    };
+    const monthlyExpense = getMonthlyLivingExpense(lowAllowanceRun);
+    const weeklyExpense = getWeeklyLivingExpense(lowAllowanceRun);
 
-    for (let week = 0; week < 4; week += 1) {
-      const actionResult = resolveActionTurn(nextRun, {
-        attendanceStrategy: "mixed",
-        action: { action: "study", time: "night" },
-      });
-      const weekEndResult = resolveWeekEnd(actionResult.run, "mixed");
-      nextRun = weekEndResult.run;
-    }
+    expect(monthlyExpense).toBeLessThan(1090);
+    expect(monthlyExpense).toBeGreaterThanOrEqual(850);
+    expect(monthlyExpense).toBeLessThanOrEqual(980);
+    expect(weeklyExpense).toBe(Math.round(monthlyExpense / 4));
+    expect(weeklyExpense).toBeLessThan(getWeeklyAllowance(lowAllowanceRun));
+  });
 
-    expect(getWeeklyLivingExpense(pressuredRun)).toBeGreaterThan(getWeeklyAllowance(pressuredRun));
-    expect(nextRun.stats.money).toBeLessThan(pressuredRun.stats.money);
+  it("makes stress relief noticeably stronger when the player is already highly stressed", () => {
+    const baseRun = withMonth(
+      createInitialGameRun({
+        id: "high-stress-relief-run",
+        randomValues: [0.24, 0.34, 0.41, 0.52, 0.68, 0.19, 0.28, 0.41],
+      }),
+      4,
+    );
+    const stressedRun: GameRun = {
+      ...baseRun,
+      stats: {
+        ...baseRun.stats,
+        money: 5000,
+        stress: 82,
+      },
+    };
+
+    const relaxResult = resolveActionTurn(stressedRun, {
+      attendanceStrategy: "mixed",
+      action: { action: "relax", time: "night" },
+    });
+    const mealResult = resolveActionTurn(stressedRun, {
+      attendanceStrategy: "mixed",
+      action: { action: "big_meal", time: "night" },
+    });
+
+    expect(relaxResult.turnSummary.statsDelta.stress).toBeLessThanOrEqual(-7);
+    expect(relaxResult.turnSummary.flags).toContain("high-stress-relief");
+    expect(mealResult.turnSummary.statsDelta.stress).toBeLessThanOrEqual(-8);
+    expect(mealResult.turnSummary.flags).toContain("high-stress-relief");
   });
 
   it("still settles weekly allowance and living costs when the player ends a week after only zero-time actions", () => {
@@ -779,6 +815,61 @@ describe("semester and ending evaluation", () => {
     expect(settlement?.dailyResults).toHaveLength(7);
     expect(settlement?.dailyResults.filter((day) => day.resolvedAction.action === "idle")).toHaveLength(6);
     expect(settlement?.dailyResults.some((day) => day.resolvedAction.autoFilled)).toBe(true);
+  });
+
+  it("lets half-free weekdays skip a half day of class to unlock full-day actions with a lighter penalty", () => {
+    const baseRun = createInitialGameRun({
+      id: "half-day-skip-run",
+      randomValues: [0.31, 0.28, 0.4, 0.55, 0.73, 0.51, 0.22, 0.44],
+    });
+    const withAttendance = selectWeekAttendanceStrategy(
+      {
+        ...baseRun,
+        stats: {
+          ...baseRun.stats,
+          semesterAcademics: 20,
+        },
+      },
+      "mixed",
+    );
+    const tuesday = withAttendance.activeMonth?.currentWeekState.days?.find((day) => day.weekday === "tue");
+
+    expect(tuesday?.baseDayType).toBe("half_day");
+    expect(tuesday?.skipClassAvailable).toBe(true);
+    expect(
+      resolveAvailableWeeklyActions({
+        day: tuesday!,
+        event: withAttendance.activeMonth?.currentWeekState.event,
+        skipClassSelected: false,
+        run: withAttendance,
+      }).some((option) => option.optionId === "part_time"),
+    ).toBe(false);
+    expect(
+      resolveAvailableWeeklyActions({
+        day: tuesday!,
+        event: withAttendance.activeMonth?.currentWeekState.event,
+        skipClassSelected: true,
+        run: withAttendance,
+      }).some((option) => option.optionId === "part_time"),
+    ).toBe(true);
+
+    const planned = planWeeklyDayAction({
+      run: withAttendance,
+      weekday: "tue",
+      optionId: "part_time",
+      skipClass: true,
+    });
+    const plannedTuesday = planned.activeMonth?.currentWeekState.days?.find((day) => day.weekday === "tue");
+    const result = confirmPlannedWeek(planned);
+    const tuesdayResult = result.run.activeMonth?.latestWeekSettlement?.dailyResults.find(
+      (day) => day.weekday === "tue",
+    );
+
+    expect(plannedTuesday?.effectiveDayType).toBe("full_day");
+    expect(plannedTuesday?.plannedAction?.action).toBe("part_time");
+    expect(tuesdayResult?.flags).toContain("skip-class-penalty");
+    expect(tuesdayResult?.notableFacts).toContain("skip-class:tue");
+    expect(tuesdayResult?.statsDelta.semesterAcademics).toBe(-1);
   });
 
   it("uses the player-selected weekday actions in weekly settlement instead of replacing everything with idle", () => {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   applyOptimisticPlan,
   countUnplannedDays,
@@ -145,5 +146,13 @@ describe("weekly planner state helpers", () => {
         },
       ),
     ).toBe("rejected");
+  });
+
+  it("closes the day-planning modal immediately after marking the plan as pending", () => {
+    const source = readFileSync("components/action-plan-form.tsx", "utf-8");
+
+    expect(source).toMatch(
+      /onSubmit=\{\(\) => \{\s*markPlanAsPending\(selectedDay, option\);\s*setSelectedWeekday\(null\);/s,
+    );
   });
 });

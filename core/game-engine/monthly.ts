@@ -752,13 +752,15 @@ function createSkipClassDayEffect(day: PlannedWeekdayState): WeeklyActionEffect 
     return {};
   }
 
+  const isHalfDaySkip = day.baseDayType === "half_day";
+
   return {
     stats: {
-      stress: 2,
-      semesterAcademics: -2,
+      stress: isHalfDaySkip ? 1 : 2,
+      semesterAcademics: isHalfDaySkip ? -1 : -2,
     },
     risk: {
-      academicRisk: 2,
+      academicRisk: isHalfDaySkip ? 1 : 2,
     },
     flags: ["skip-class-penalty"],
     notableFact: `skip-class:${day.weekday}`,
@@ -1287,19 +1289,15 @@ export function confirmPlannedWeek(run: GameRun): {
         }
       : livingCostEffect;
     const statsBefore = projectedRun.stats;
-    const statsDelta: DynamicStats = {
-      money:
-        baseResolution.moneyDelta +
-        baseResolution.stats.money +
-        (combinedEffect.money ?? 0) +
-        (combinedEffect.stats?.money ?? 0),
-      mood: baseResolution.stats.mood + (combinedEffect.stats?.mood ?? 0),
-      stress: baseResolution.stats.stress + (combinedEffect.stats?.stress ?? 0),
-      fulfillment: baseResolution.stats.fulfillment + (combinedEffect.stats?.fulfillment ?? 0),
-      social: baseResolution.stats.social + (combinedEffect.stats?.social ?? 0),
-      semesterAcademics: baseResolution.stats.semesterAcademics + (combinedEffect.stats?.semesterAcademics ?? 0),
+    const baseStatsDelta: DynamicStats = {
+      money: baseResolution.moneyDelta + baseResolution.stats.money,
+      mood: baseResolution.stats.mood,
+      stress: baseResolution.stats.stress,
+      fulfillment: baseResolution.stats.fulfillment,
+      social: baseResolution.stats.social,
+      semesterAcademics: baseResolution.stats.semesterAcademics,
     };
-    const statsAfter = addStats(statsBefore, statsDelta);
+    const statsAfter = addStats(statsBefore, baseStatsDelta);
     const riskAfter = mergeRisk(
       projectedRun.risk,
       sumRisk(baseResolution.risk, combinedEffect.risk),
@@ -1322,8 +1320,8 @@ export function confirmPlannedWeek(run: GameRun): {
         },
         statsBefore,
         statsAfter,
-        statsDelta,
-        moneyDelta: statsDelta.money,
+        statsDelta: baseStatsDelta,
+        moneyDelta: baseStatsDelta.money,
         flags: baseResolution.flags,
         notableFacts: plannedAction.autoFilled ? ["auto-filled-idle"] : [],
         allowanceApplied: false,
@@ -1339,6 +1337,7 @@ export function confirmPlannedWeek(run: GameRun): {
       notableFacts: dedupe([
         ...turnSummary.notableFacts,
         `daily-living-cost:${dailyLivingCosts[dayIndex] ?? 0}`,
+        skipClassEffect.notableFact ?? "",
       ]),
     };
     const skippedCompetitionLine =
