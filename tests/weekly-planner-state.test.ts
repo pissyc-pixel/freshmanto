@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyOptimisticPlan,
   countUnplannedDays,
+  resolvePendingPlanStatus,
   type PlannerDayView,
 } from "@/components/action-plan-form";
 import { buildPlannerFeedbackLines, buildPlannerStatusText } from "@/app/game/view-model";
@@ -108,5 +109,41 @@ describe("weekly planner state helpers", () => {
     expect(status).not.toContain("\\u");
     expect(feedbackLines).toContain("自动补成");
     expect(feedbackLines).not.toContain("\\u");
+  });
+
+  it("marks a pending plan as confirmed when the server echoes the same weekday action back", () => {
+    const days = [
+      createPlannerDay({
+        weekday: "mon",
+        status: "已安排",
+        plannedActionLabel: "复习 / 学习",
+      }),
+    ];
+
+    expect(
+      resolvePendingPlanStatus(days, {
+        weekday: "mon",
+        label: "复习 / 学习",
+      }),
+    ).toBe("confirmed");
+  });
+
+  it("marks a pending plan as rejected when the server returns an error without persisting it", () => {
+    const days = [createPlannerDay()];
+
+    expect(
+      resolvePendingPlanStatus(
+        days,
+        {
+          weekday: "mon",
+          label: "复习 / 学习",
+        },
+        {
+          kind: "error",
+          title: "这一天排不进这个行动",
+          message: "这一天默认只剩夜间可安排，白天行动放不进去。",
+        },
+      ),
+    ).toBe("rejected");
   });
 });

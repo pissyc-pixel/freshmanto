@@ -17,7 +17,15 @@ import type {
   StructuredEndingSummary,
   StructuredMonthlySummary,
 } from "@/types/game";
-import { advanceDemoMonth, advanceDemoTurn, createDemoRun, endDemoWeek } from "@/lib/demo/run-service";
+import {
+  advanceDemoMonth,
+  advanceDemoTurn,
+  confirmDemoWeek,
+  createDemoRun,
+  endDemoWeek,
+  planDemoWeekday,
+  setDemoWeekAttendance,
+} from "@/lib/demo/run-service";
 
 type InMemoryStore = {
   run: RunRecord | null;
@@ -662,6 +670,75 @@ describe("demo run service", () => {
     expect(store.aiReports[0]?.report_type).toBe("monthly_journal");
     expect(store.logs.length).toBeGreaterThanOrEqual(2);
     expect(store.run?.current_state_json.currentMonth).toBe(2);
+  });
+
+  it("persists planned weekday actions through the service layer and settles only missing days as idle", async () => {
+    const store = createStore();
+    const run = createInitialGameRun({
+      id: "run-weekly-plan-service-chain",
+      randomValues: [0.29, 0.41, 0.52, 0.63, 0.17, 0.38, 0.49, 0.58],
+    });
+    store.run = {
+      id: run.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      status: "active",
+      current_year: run.currentYear,
+      current_month: run.currentMonth,
+      profile_json: run.profile,
+      current_state_json: run,
+    };
+
+    const repository = createRepository(store);
+
+    await setDemoWeekAttendance({
+      repository,
+      runId: run.id,
+      attendanceStrategy: "mixed",
+    });
+
+    await planDemoWeekday({
+      repository,
+      runId: run.id,
+      weekday: "mon",
+      optionId: "study",
+    });
+    await planDemoWeekday({
+      repository,
+      runId: run.id,
+      weekday: "tue",
+      optionId: "social",
+    });
+    await planDemoWeekday({
+      repository,
+      runId: run.id,
+      weekday: "wed",
+      optionId: "relax",
+    });
+
+    const persistedWeekState = store.run?.current_state_json.activeMonth?.currentWeekState;
+
+    expect(
+      persistedWeekState?.days?.find((day) => day.weekday === "mon")?.plannedAction?.action,
+    ).toBe("study");
+    expect(
+      persistedWeekState?.days?.find((day) => day.weekday === "tue")?.plannedAction?.action,
+    ).toBe("social");
+    expect(
+      persistedWeekState?.days?.find((day) => day.weekday === "wed")?.plannedAction?.action,
+    ).toBe("relax");
+
+    const result = await confirmDemoWeek({
+      repository,
+      runId: run.id,
+      generateReport: fakeAiReport,
+    });
+    const settlement = result.run.activeMonth?.latestWeekSettlement;
+
+    expect(settlement?.dailyResults.find((day) => day.weekday === "mon")?.resolvedAction.action).toBe("study");
+    expect(settlement?.dailyResults.find((day) => day.weekday === "tue")?.resolvedAction.action).toBe("social");
+    expect(settlement?.dailyResults.find((day) => day.weekday === "wed")?.resolvedAction.action).toBe("relax");
+    expect(settlement?.dailyResults.filter((day) => day.resolvedAction.action === "idle")).toHaveLength(4);
   });
 
   it("finalizes the month after the fourth week is actually completed and then writes the monthly artifacts", async () => {

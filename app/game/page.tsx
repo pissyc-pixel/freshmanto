@@ -54,6 +54,31 @@ function formatDirectionStage(stage: "undecided" | "forming" | "clear") {
   }
 }
 
+function buildPlannerFormKey(
+  runId: string,
+  currentWeek: number,
+  currentWeekState: ReturnType<typeof resolveCurrentWeekState>,
+) {
+  const daySignature = (currentWeekState.days ?? [])
+    .map((day) =>
+      [
+        day.weekday,
+        day.planningStatus,
+        day.plannedAction?.action ?? "none",
+        day.skipClassSelected ? "skip" : "keep",
+      ].join(":"),
+    )
+    .join("|");
+
+  return [
+    runId,
+    currentWeek,
+    currentWeekState.attendanceLocked ? "locked" : "open",
+    currentWeekState.attendanceStrategy,
+    daySignature,
+  ].join("::");
+}
+
 export default async function GamePage({ searchParams }: GamePageProps) {
   const params = await searchParams;
   const runId = readSearchParam(params.runId);
@@ -97,6 +122,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
   const plannerDays = buildPlannerDaysView(currentWeekState, hydratedRun);
   const plannerStatusText = buildPlannerStatusText(currentWeekState);
   const plannerLines = buildPlannerFeedbackLines(currentWeekState);
+  const plannerFormKey = buildPlannerFormKey(bundle.run.id, currentWeek, currentWeekState);
   const weeklySettlement = buildWeeklySettlementView(activeMonth?.latestWeekSettlement);
   const latestMonthlyState = bundle.monthlyStates.at(-1);
   const latestGrowthLog = latestMonthlyState
@@ -219,7 +245,9 @@ export default async function GamePage({ searchParams }: GamePageProps) {
           title="安排这一周"
           description="这里才是本周的实际操作入口。先定课程态度，再逐天点选；周一 / 周三 / 周五默认白天满课，翘课才会释放白天。"
         >
+          {/* Same-route server redirects preserve client state unless we remount the planner. */}
           <ActionPlanForm
+            key={plannerFormKey}
             runId={bundle.run.id}
             currentWeek={Math.min(currentWeek, 4)}
             attendanceLocked={Boolean(currentWeekState.attendanceLocked)}

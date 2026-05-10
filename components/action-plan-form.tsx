@@ -34,6 +34,11 @@ type PlannerFeedback = {
   message: string;
 };
 
+type PendingPlannerSubmission = {
+  weekday: string;
+  label: string;
+};
+
 type ActionPlanFormProps = {
   runId: string;
   currentWeek: number;
@@ -96,6 +101,28 @@ function FeedbackBanner({ feedback }: { feedback: PlannerFeedback }) {
 
 export function countUnplannedDays(days: PlannerDayView[]) {
   return days.filter((day) => !day.plannedActionLabel).length;
+}
+
+export function resolvePendingPlanStatus(
+  days: PlannerDayView[],
+  pendingPlan: PendingPlannerSubmission | null,
+  plannerFeedback?: PlannerFeedback,
+) {
+  if (!pendingPlan) {
+    return "idle" as const;
+  }
+
+  const serverDay = days.find((day) => day.weekday === pendingPlan.weekday);
+
+  if (serverDay?.plannedActionLabel === pendingPlan.label) {
+    return "confirmed" as const;
+  }
+
+  if (plannerFeedback?.kind === "error") {
+    return "rejected" as const;
+  }
+
+  return "waiting" as const;
 }
 
 type OptimisticPlan = {
@@ -184,7 +211,7 @@ export function ActionPlanForm({
   const [selectedWeekday, setSelectedWeekday] = useState<string | null>(null);
   const [skipClassDraft, setSkipClassDraft] = useState(false);
   const [localFeedback, setLocalFeedback] = useState<PlannerFeedback | null>(null);
-  const [pendingPlan, setPendingPlan] = useState<{ weekday: string; label: string } | null>(null);
+  const [pendingPlan, setPendingPlan] = useState<PendingPlannerSubmission | null>(null);
   const [optimisticPlans, setOptimisticPlans] = useState<Record<string, OptimisticPlan>>({});
 
   const plannerDays = useMemo(
@@ -218,6 +245,25 @@ export function ActionPlanForm({
     setPendingPlan(null);
     setSelectedWeekday(day.weekday);
     setSkipClassDraft(day.skipClassSelected);
+  }
+
+  function markPlanAsPending(day: PlannerDayView, option: PlannerDayOptionView) {
+    setOptimisticPlans((currentPlans) => ({
+      ...currentPlans,
+      [day.weekday]: {
+        optionLabel: option.label,
+        skipClassSelected: skipClassDraft && day.skipClassAvailable,
+      },
+    }));
+    setPendingPlan({
+      weekday: day.weekday,
+      label: option.label,
+    });
+    setLocalFeedback({
+      kind: "success",
+      title: `${day.label} 已点上`,
+      message: `已经把“${option.label}”排到这一天，顶部剩余天数和当天卡片会立刻同步更新。`,
+    });
   }
 
   return (
@@ -415,6 +461,9 @@ export function ActionPlanForm({
                   key={option.optionId}
                   action={submitActionTurnAction}
                   className="rounded-2xl border border-[var(--border)] bg-white/90 p-4"
+                  onSubmit={() => {
+                    markPlanAsPending(selectedDay, option);
+                  }}
                 >
                   <input type="hidden" name="runId" value={runId} />
                   <input type="hidden" name="intent" value="plan_day" />
@@ -437,25 +486,6 @@ export function ActionPlanForm({
                       label="排到这一天"
                       pendingLabel="正在保存..."
                       className="rounded-full bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700"
-                      onClick={() => {
-                        setOptimisticPlans((currentPlans) => ({
-                          ...currentPlans,
-                          [selectedDay.weekday]: {
-                            optionLabel: option.label,
-                            skipClassSelected: skipClassDraft && selectedDay.skipClassAvailable,
-                          },
-                        }));
-                        setPendingPlan({
-                          weekday: selectedDay.weekday,
-                          label: option.label,
-                        });
-                        setLocalFeedback({
-                          kind: "success",
-                          title: `${selectedDay.label} 已点上`,
-                          message: `已经把“${option.label}”排到这一天，顶部剩余天数和当天卡片会立刻同步更新。`,
-                        });
-                        setSelectedWeekday(null);
-                      }}
                     />
                   </div>
                   <p className="mt-3 text-sm leading-6 text-stone-600">{option.description}</p>
