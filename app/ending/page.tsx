@@ -174,7 +174,13 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
         </SectionCard>
 
         <SectionCard
-          title={savedReport ? "已保存的结局回望" : "结局回望尚未落地"}
+          title={
+            savedReport
+              ? "已保存的结局回望"
+              : bundle.run.status === "completed"
+                ? "正式结局回望暂未存档"
+                : "结局回望尚未落地"
+          }
           description={
             savedReport
               ? "这份回望来自已经保存的 ending_report 记录。"

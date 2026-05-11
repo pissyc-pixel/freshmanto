@@ -85,6 +85,8 @@ describe("ending page", () => {
     );
 
     expect(markup).toContain("当前学年位置：第4学年 · 第12月");
+    expect(markup).toContain("正式结局回望暂未存档");
     expect(markup).not.toContain("当前学年位置：第4学年 · 第1月");
+    expect(markup).not.toContain("结局回望尚未落地");
   });
 });
