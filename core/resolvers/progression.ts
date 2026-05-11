@@ -432,7 +432,7 @@ export function summarizeDirectionSignals(run: GameRun): string[] {
   const lines: string[] = [];
 
   if (ensuredRun.currentYear >= 3 && ensuredRun.progression!.dominantDirection !== "undecided") {
-    lines.push(`大三以后，你的重心已经更像在往“${ensuredRun.progression!.dominantDirection}”这条路走。`);
+    lines.push(`大三以后，你的重心已经更像在往“${formatDirectionLabel(ensuredRun.progression!.dominantDirection)}”这条路走。`);
   }
 
   if (ensuredRun.progression!.publicExam.progress >= 20) {
