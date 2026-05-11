@@ -4,11 +4,14 @@ import { createInitialGameRun } from "@/core/game-engine";
 import {
   buildDirectionPerception,
   buildPublicExamExplanation,
+  buildPublicExamExplanationFromSummary,
   buildRecommendationExplanation,
+  buildRecommendationExplanationFromSummary,
   buildScholarshipExplanation,
+  buildScholarshipExplanationFromSummary,
   ensureProgressionState,
 } from "@/core/resolvers/progression";
-import type { GameRun } from "@/types/game";
+import type { GameRun, StructuredMonthlySummary } from "@/types/game";
 
 function createBaseRun(id: string): GameRun {
   return ensureProgressionState(
@@ -176,5 +179,96 @@ describe("progression perception helpers", () => {
     expect(explanation.summary).toContain("公考");
     expect(explanation.signals.length).toBeGreaterThan(0);
     expect(explanation.progress).toBe(42);
+  });
+
+  it("keeps historical settlement explanations anchored to the monthly snapshot", () => {
+    const snapshot: StructuredMonthlySummary = {
+      month: 4,
+      actions: ["study"],
+      attendanceStrategy: "mixed",
+      schedule: [],
+      weeklyCalendar: [],
+      statsBefore: {
+        money: 520,
+        mood: 55,
+        stress: 40,
+        fulfillment: 42,
+        social: 38,
+        semesterAcademics: 68,
+      },
+      statsAfter: {
+        money: 410,
+        mood: 56,
+        stress: 43,
+        fulfillment: 45,
+        social: 38,
+        semesterAcademics: 72,
+      },
+      statsDelta: {
+        money: -110,
+        mood: 1,
+        stress: 3,
+        fulfillment: 3,
+        social: 0,
+        semesterAcademics: 4,
+      },
+      moneyDelta: -110,
+      academicFeedback: "stable",
+      eventIds: [],
+      resumeAdditions: [],
+      notableFacts: [],
+      resolvedActions: [],
+      flags: [],
+      cooldowns: { askFamilyMonths: 0 },
+      course: {
+        strategy: "mixed",
+        attendanceCounted: true,
+        directRollCallPenalty: 0,
+        rollCallRiskDelta: 0,
+        usualScoreRiskDelta: 0,
+        proxyCost: 0,
+        remedyPressure: 0,
+        academicRiskDelta: 0,
+        academicGain: 2,
+        moodDelta: 0,
+        stressDelta: 1,
+      },
+      turns: [],
+      academicProfile: {
+        gpa: 3.08,
+        rank: 41,
+        percentile: 59,
+        recommendationScore: 52,
+      },
+      progression: {
+        tendencies: {
+          employment: 10,
+          postgraduate: 16,
+          public_exam: 6,
+          recommendation: 8,
+          undecided: 14,
+        },
+        dominantDirection: "undecided",
+        publicExam: {
+          progress: 0,
+          aptitudePrep: 0,
+          essayPrep: 0,
+        },
+        postgraduateProgress: 10,
+        employmentReadiness: 8,
+        recommendationReadiness: 7,
+        recommendationQualification: "pending",
+        latestHints: [],
+      },
+    };
+
+    const recommendation = buildRecommendationExplanationFromSummary(snapshot);
+    const scholarship = buildScholarshipExplanationFromSummary(snapshot);
+    const publicExam = buildPublicExamExplanationFromSummary(snapshot);
+
+    expect(recommendation.status).toBe("pending");
+    expect(scholarship).toBeNull();
+    expect(publicExam.progress).toBe(0);
+    expect(publicExam.summary).not.toContain("后期路线");
   });
 });

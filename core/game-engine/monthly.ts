@@ -155,6 +155,7 @@ function hasWeeklyCashPlan(weekState: ActiveWeekState): boolean {
   });
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function buildWeeklyCashWarnings(run: GameRun, weekState: ActiveWeekState): string[] {
   const weeklyLivingExpense = getWeeklyLivingExpense(run);
   const warnings: string[] = [];
@@ -169,6 +170,30 @@ function buildWeeklyCashWarnings(run: GameRun, weekState: ActiveWeekState): stri
 
   if (!hasWeeklyCashPlan(weekState) && run.stats.money <= weeklyLivingExpense + 300) {
     warnings.push("手头现金已经贴近危险线了，这周最好至少留一个补现金的动作。");
+  }
+
+  return warnings;
+}
+
+function buildDetailedWeeklyCashWarnings(run: GameRun, weekState: ActiveWeekState): string[] {
+  const weeklyLivingExpense = getWeeklyLivingExpense(run);
+  const warnings: string[] = [];
+  const shortfall = Math.max(0, weeklyLivingExpense - run.stats.money);
+
+  if (run.stats.money < 0) {
+    warnings.push(
+      `当前现金 ${run.stats.money} 元，已经是负数；下周固定生活开销约 ${weeklyLivingExpense} 元，现金压力会继续往上推。建议优先安排兼职 / 赚钱、控制支出，或者尽快寻求家里支持。`,
+    );
+  }
+
+  if (!hasWeeklyCashPlan(weekState) && run.stats.money < weeklyLivingExpense) {
+    warnings.push(
+      `当前现金 ${run.stats.money} 元，下周固定生活开销约 ${weeklyLivingExpense} 元，缺口大约 ${shortfall} 元。如果这周不提前安排兼职 / 赚钱、控制支出，或者寻求家里支持，现金风险会继续恶化。`,
+    );
+  }
+
+  if (!hasWeeklyCashPlan(weekState) && run.stats.money <= weeklyLivingExpense + 300) {
+    warnings.push("手头现金已经贴近危险线了，这周最好至少留一个补现金的动作，别等到周结算后才发现下周固定开销扛不住。");
   }
 
   return warnings;
@@ -286,7 +311,7 @@ function buildWeekPlanningState(
     plannerFeedback: input?.plannerFeedback,
     event,
     days: mergedDays,
-    planningWarnings: buildWeeklyCashWarnings(run, {
+    planningWarnings: buildDetailedWeeklyCashWarnings(run, {
       ...baseState,
       attendanceStrategy,
       attendanceLocked: input?.attendanceLocked ?? false,
@@ -309,7 +334,7 @@ function ensurePlanningWeekState(run: GameRun, activeMonth: ActiveMonthState): A
     return {
       ...current,
       days: hydratedDays,
-      planningWarnings: buildWeeklyCashWarnings(run, {
+      planningWarnings: buildDetailedWeeklyCashWarnings(run, {
         ...current,
         days: hydratedDays,
       }),
@@ -331,7 +356,7 @@ function ensurePlanningWeekState(run: GameRun, activeMonth: ActiveMonthState): A
   return {
     ...rebuilt,
     days: hydrateLegacyPlannerDays(rebuilt, activeMonth),
-    planningWarnings: buildWeeklyCashWarnings(run, {
+    planningWarnings: buildDetailedWeeklyCashWarnings(run, {
       ...rebuilt,
       days: hydrateLegacyPlannerDays(rebuilt, activeMonth),
     }),
@@ -779,27 +804,6 @@ function createAutoFilledIdleAction(day: PlannedWeekdayState): PlannedAction {
   };
 }
 
-function createAutoFilledSpecialAction(day: PlannedWeekdayState, weekEvent: ActiveWeekState["event"]): PlannedAction | null {
-  if (!weekEvent?.specialAction || weekEvent.weekday !== day.weekday || !weekEvent.defaultAttendIfUnplanned) {
-    return null;
-  }
-
-  return {
-    action: weekEvent.specialAction.action,
-    optionId: weekEvent.specialAction.optionId,
-    label: weekEvent.specialAction.label,
-    time: day.effectiveDayType === "night_only" ? "night" : "day",
-    weekday: day.weekday,
-    skipClass: false,
-    sourceEventId: weekEvent.specialAction.sourceEventId ?? weekEvent.id,
-    autoFilled: true,
-  };
-}
-
-function createDefaultPlannedActionForDay(day: PlannedWeekdayState, weekEvent: ActiveWeekState["event"]): PlannedAction {
-  return createAutoFilledSpecialAction(day, weekEvent) ?? createAutoFilledIdleAction(day);
-}
-
 function createOptionFromPlannedAction(plannedAction: PlannedAction): WeeklyActionOption {
   return {
     optionId: plannedAction.optionId ?? plannedAction.action,
@@ -1054,7 +1058,7 @@ export function selectWeekAttendanceStrategy(run: GameRun, attendanceStrategy: C
   nextWeekState = {
     ...nextWeekState,
     readyToConfirm: isWeekReadyToConfirm(nextWeekState),
-    planningWarnings: buildWeeklyCashWarnings(run, nextWeekState),
+    planningWarnings: buildDetailedWeeklyCashWarnings(run, nextWeekState),
   };
 
   return {
@@ -1173,7 +1177,7 @@ export function planWeeklyDayAction(input: {
   nextWeekState = {
     ...nextWeekState,
     readyToConfirm: isWeekReadyToConfirm(nextWeekState),
-    planningWarnings: buildWeeklyCashWarnings(input.run, nextWeekState),
+    planningWarnings: buildDetailedWeeklyCashWarnings(input.run, nextWeekState),
   };
 
   return {
@@ -1222,7 +1226,7 @@ export function confirmPlannedWeek(run: GameRun): {
   const dailyLivingCosts = distributeWeeklyLivingCost(getWeeklyLivingExpense(projectedRun), weekState.days.length);
 
   for (const [dayIndex, day] of weekState.days.entries()) {
-    const plannedAction = day.plannedAction ?? createDefaultPlannedActionForDay(day, weekState.event);
+    const plannedAction = day.plannedAction ?? createAutoFilledIdleAction(day);
     const optionId = plannedAction.optionId ?? plannedAction.action;
     const availableOptions = resolveAvailableWeeklyActions({
       day,
