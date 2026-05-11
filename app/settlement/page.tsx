@@ -6,10 +6,9 @@ import { ReportPreview } from "@/components/report-preview";
 import { SectionCard } from "@/components/section-card";
 import { StatsGrid } from "@/components/stats-grid";
 import {
-  buildPublicExamExplanation,
-  buildRecommendationExplanation,
-  buildScholarshipExplanation,
-  ensureProgressionState,
+  buildPublicExamExplanationFromSummary,
+  buildRecommendationExplanationFromSummary,
+  buildScholarshipExplanationFromSummary,
 } from "@/core/resolvers/progression";
 import { buildGrowthJournalEntry, buildMonthlyDiaryDigest } from "@/lib/demo/monthly-digest";
 import { formatMonthLabel, formatStatLabel } from "@/lib/demo/options";
@@ -86,10 +85,9 @@ export default async function SettlementPage({ searchParams }: SettlementPagePro
   const summary = monthlyState.snapshot_json;
   const growthLog = buildGrowthJournalEntry(summary, monthlyState.year, monthlyState.month);
   const digest = buildMonthlyDiaryDigest(summary, monthlyState.year, monthlyState.month);
-  const progressedRun = ensureProgressionState(bundle.run);
-  const scholarshipExplanation = buildScholarshipExplanation(progressedRun);
-  const recommendationExplanation = buildRecommendationExplanation(progressedRun);
-  const publicExamExplanation = buildPublicExamExplanation(progressedRun);
+  const scholarshipExplanation = buildScholarshipExplanationFromSummary(summary);
+  const recommendationExplanation = buildRecommendationExplanationFromSummary(summary);
+  const publicExamExplanation = buildPublicExamExplanationFromSummary(summary);
   const systemLogs = bundle.logs
     .filter((item) => item.year === monthlyState.year && item.month === monthlyState.month)
     .map((item) => ({

@@ -68,7 +68,6 @@ function buildCompetitionInviteInstance(run: GameRun, week: number): WeeklyEvent
     linkedProjectId: project.id,
     linkedProjectTitle: project.title,
     skipClosesProjectLine: true,
-    defaultAttendIfUnplanned: true,
   };
 }
 

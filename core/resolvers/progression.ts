@@ -13,6 +13,7 @@ import type {
   ResumeItem,
   ScholarshipRecord,
   StarterProfile,
+  StructuredMonthlySummary,
 } from "@/types/game";
 
 const DIRECTION_KEYS: DirectionKey[] = [
@@ -678,6 +679,66 @@ export function buildRecommendationExplanation(run: GameRun): RecommendationExpl
   };
 }
 
+function countSnapshotCompetitionResults(summary: StructuredMonthlySummary): number {
+  if (summary.competitionProjects) {
+    return summary.competitionProjects.filter((project) => project.result).length;
+  }
+
+  return summary.resumeAdditions.filter((item) => item.category === "competition").length;
+}
+
+export function buildRecommendationExplanationFromSummary(
+  summary: StructuredMonthlySummary,
+): RecommendationExplanation {
+  const profile = summary.academicProfile;
+  const competitionCount = countSnapshotCompetitionResults(summary);
+  const scholarshipAwarded = summary.scholarshipAwarded;
+  const status = summary.progression?.recommendationQualification ?? "pending";
+  const strengths: string[] = [];
+  const gaps: string[] = [];
+
+  if (profile?.gpa !== undefined) {
+    if (profile.gpa >= 3.5) {
+      strengths.push(`这份月结算快照里的 GPA 约 ${profile.gpa}，学业基础已经在推免竞争线附近。`);
+    } else {
+      gaps.push(`这份月结算快照里的 GPA 约 ${profile.gpa}，学业上限还可以继续往上抬。`);
+    }
+  }
+
+  if ((profile?.rank ?? 99) <= 20 || (profile?.percentile ?? 0) >= 80) {
+    strengths.push("这份月结算快照里的排名已经比较接近推免会重点看的区间。");
+  } else if (profile) {
+    gaps.push("这份月结算快照里的排名还不算稳，推免更看持续性的前排表现。");
+  }
+
+  if (competitionCount > 0) {
+    strengths.push("这份月结算快照里已经有竞赛或项目结果，在给推免画像补综合证明。");
+  } else {
+    gaps.push("这份月结算快照里还看不到足够的竞赛或项目结果，综合支撑感偏弱。");
+  }
+
+  if (scholarshipAwarded && scholarshipAwarded.level !== "none") {
+    strengths.push("这个月结算快照里已经出现奖学金结果，说明阶段性稳定表现被看见了。");
+  }
+
+  const summaryMap: Record<RecommendationQualification, string> = {
+    pending: "这份月结算快照里，推免资格还没到正式判断的时候，当前更像是在继续积累画像。",
+    eligible: "按这份月结算快照看，你已经具备比较明确的推免竞争力，后面更像是在决定接不接受这条路。",
+    borderline: "按这份月结算快照看，你已经摸到推免边缘了，优势有了，但还需要补齐短板。",
+    unlikely: "按这份月结算快照看，离推免线还有距离，问题更像是整体画像还不够硬。",
+    accepted: "按这份月结算快照看，推免这条线已经落定，前期积累最终变成了明确结果。",
+    declined_to_postgraduate: "按这份月结算快照看，你本来有推免机会，但最后把方向转向了考研。",
+    declined_to_employment: "按这份月结算快照看，你本来有推免机会，但最后把方向转向了就业。",
+  };
+
+  return {
+    status,
+    summary: summaryMap[status],
+    strengths: strengths.slice(0, 3),
+    gaps: gaps.slice(0, 3),
+  };
+}
+
 export function buildScholarshipExplanation(run: GameRun): ScholarshipExplanation | null {
   const ensuredRun = ensureProgressionState(run);
   const latestScholarship = [...(ensuredRun.scholarships ?? [])].sort((left, right) => right.academicYear - left.academicYear)[0];
@@ -724,6 +785,53 @@ export function buildScholarshipExplanation(run: GameRun): ScholarshipExplanatio
   };
 }
 
+export function buildScholarshipExplanationFromSummary(
+  summary: StructuredMonthlySummary,
+): ScholarshipExplanation | null {
+  const scholarship = summary.scholarshipAwarded;
+
+  if (!scholarship) {
+    return null;
+  }
+
+  const competitionCount = countSnapshotCompetitionResults(summary);
+  const reasons: string[] = [];
+
+  if (summary.academicProfile?.gpa !== undefined) {
+    if (summary.academicProfile.gpa >= 3.3) {
+      reasons.push(`这份月结算快照里的 GPA 约 ${summary.academicProfile.gpa}，学业表现整体比较稳。`);
+    } else {
+      reasons.push(`这份月结算快照里的 GPA 约 ${summary.academicProfile.gpa}，学业基础还不算特别突出。`);
+    }
+  }
+
+  if ((summary.academicProfile?.rank ?? 99) <= 30) {
+    reasons.push("这份月结算快照里的排名没有掉出前排，这是奖学金最硬的一层底子。");
+  }
+
+  if (competitionCount > 0) {
+    reasons.push("这份月结算快照里已经有竞赛或项目结果，在帮你把这份结果往上托。");
+  }
+
+  if (scholarship.reason) {
+    reasons.push(scholarship.reason);
+  }
+
+  const explanationSummary =
+    scholarship.level === "high"
+      ? "这次奖学金更像是上一学年整体积累被看见了，学业、排名和额外成果都在加分。"
+      : scholarship.level === "standard"
+        ? "能拿到这笔奖学金，说明上一学年的整体表现至少是稳住了。"
+        : "这次没有等来奖学金，通常不是单个动作失误，而是学业和成果的综合竞争力还没到线。";
+
+  return {
+    level: scholarship.level,
+    title: scholarship.title,
+    summary: explanationSummary,
+    reasons: reasons.slice(0, 3),
+  };
+}
+
 export function buildPublicExamExplanation(run: GameRun): PublicExamExplanation {
   const ensuredRun = ensureProgressionState(run);
   const publicExam = ensuredRun.progression?.publicExam ?? createDefaultCareerRouteState().publicExam;
@@ -752,6 +860,39 @@ export function buildPublicExamExplanation(run: GameRun): PublicExamExplanation 
   return {
     progress: publicExam.progress,
     summary,
+    signals: signals.slice(0, 3),
+  };
+}
+
+export function buildPublicExamExplanationFromSummary(
+  summary: StructuredMonthlySummary,
+): PublicExamExplanation {
+  const publicExam = summary.progression?.publicExam ?? createDefaultCareerRouteState().publicExam;
+  const signals: string[] = [];
+
+  if (publicExam.progress >= 15) {
+    signals.push("按这份月结算快照看，你已经不只是偶尔看看信息，而是开始有持续准备。");
+  }
+  if (publicExam.aptitudePrep >= 12) {
+    signals.push("按这份月结算快照看，行测准备已经动起来了，这说明公考线不是一句空话。");
+  }
+  if (publicExam.essayPrep >= 12) {
+    signals.push("按这份月结算快照看，申论也开始跟上，这条线的投入正在变完整。");
+  }
+  if (signals.length === 0) {
+    signals.push("按这份月结算快照看，现在更像是在试探这条线，离稳定准备还有距离。");
+  }
+
+  const summaryText =
+    publicExam.progress >= 55
+      ? "按这份月结算快照看，公考已经从兴趣项变成比较实在的后期路线。"
+      : publicExam.progress >= 25
+        ? "按这份月结算快照看，公考准备已经形成连续性，正在从想法变成路径。"
+        : "按这份月结算快照看，公考进度刚起步，你已经开始把时间切给这条未来路线。";
+
+  return {
+    progress: publicExam.progress,
+    summary: summaryText,
     signals: signals.slice(0, 3),
   };
 }
