@@ -136,8 +136,16 @@ test("image2 weekly planner smoke flow", async ({ page }) => {
   await expect(weeklySettlement).toBeVisible();
   await saveShot(page, "06-weekly-settlement.png");
 
+  const settlementDayLines = weeklySettlement.getByTestId("weekly-settlement-day-line");
+  await expect(settlementDayLines).toHaveCount(7);
+
   const actionLabels = await weeklySettlement.getByTestId("weekly-settlement-action-label").allTextContents();
   expect(actionLabels.length).toBeGreaterThan(0);
-  expect(actionLabels.some((label) => chosenLabels.includes(label.trim()))).toBe(true);
-  expect(actionLabels.every((label) => !chosenLabels.includes(label.trim()))).toBe(false);
+  for (const chosenLabel of new Set(chosenLabels)) {
+    expect(actionLabels.some((label) => label.trim() === chosenLabel.trim())).toBe(true);
+  }
+
+  const idleLabels = actionLabels.filter((label) => label.includes("摆烂") || label.includes("发呆"));
+  expect(idleLabels.length).toBeGreaterThan(0);
+  expect(idleLabels.length).toBeLessThan(actionLabels.length);
 });

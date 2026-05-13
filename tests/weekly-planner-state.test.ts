@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import {
   applyOptimisticPlan,
+  buildPlannerDayAriaLabel,
   countUnplannedDays,
+  handlePlannerDayKeyDown,
   resolvePendingPlanStatus,
   type PlannerDayView,
 } from "@/components/action-plan-form";
@@ -148,11 +150,71 @@ describe("weekly planner state helpers", () => {
     ).toBe("rejected");
   });
 
+  it("opens planner day from keyboard on Enter and Space while preventing default scroll behavior", () => {
+    const activatedKeys: string[] = [];
+    const preventedKeys: string[] = [];
+
+    for (const key of ["Enter", " "]) {
+      handlePlannerDayKeyDown(
+        {
+          key,
+          preventDefault: () => {
+            preventedKeys.push(key);
+          },
+        },
+        () => {
+          activatedKeys.push(key);
+        },
+      );
+    }
+
+    handlePlannerDayKeyDown(
+      {
+        key: "Escape",
+        preventDefault: () => {
+          preventedKeys.push("Escape");
+        },
+      },
+      () => {
+        activatedKeys.push("Escape");
+      },
+    );
+
+    expect(activatedKeys).toEqual(["Enter", " "]);
+    expect(preventedKeys).toEqual(["Enter", " "]);
+  });
+
+  it("builds an aria label that describes the day status, planned action, and attendance requirement", () => {
+    const unlockedLabel = buildPlannerDayAriaLabel(createPlannerDay(), false);
+    const plannedLabel = buildPlannerDayAriaLabel(
+      createPlannerDay({
+        plannedActionLabel: "复习 / 学习",
+        effectiveTypeLabel: "这天基本能自己支配",
+        status: "已安排",
+      }),
+      true,
+    );
+
+    expect(unlockedLabel).toContain("需先确认本周课程态度");
+    expect(plannedLabel).toContain("已安排 复习 / 学习");
+    expect(plannedLabel).not.toContain("需先确认本周课程态度");
+  });
+
   it("closes the day-planning modal immediately after marking the plan as pending", () => {
     const source = readFileSync("components/action-plan-form.tsx", "utf-8");
 
     expect(source).toMatch(
       /onSubmit=\{\(\) => \{\s*markPlanAsPending\(selectedDay, option\);\s*setSelectedWeekday\(null\);/s,
     );
+  });
+
+  it("renders planner day cards as keyboard-focusable dialog buttons with aria metadata", () => {
+    const source = readFileSync("components/action-plan-form.tsx", "utf-8");
+
+    expect(source).toContain('role="button"');
+    expect(source).toContain("tabIndex={0}");
+    expect(source).toContain('aria-haspopup="dialog"');
+    expect(source).toContain("aria-disabled={!attendanceLocked}");
+    expect(source).toContain("aria-label={buildPlannerDayAriaLabel(day, attendanceLocked)}");
   });
 });

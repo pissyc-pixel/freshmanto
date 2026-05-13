@@ -219,13 +219,21 @@ function applyOptimisticPlans(days: PlannerDayView[], optimisticPlans: Record<st
   });
 }
 
-function handlePlannerDayKeyDown(event: KeyboardEvent<HTMLElement>, onActivate: () => void) {
+export function handlePlannerDayKeyDown(event: Pick<KeyboardEvent<HTMLElement>, "key" | "preventDefault">, onActivate: () => void) {
   if (event.key !== "Enter" && event.key !== " ") {
     return;
   }
 
   event.preventDefault();
   onActivate();
+}
+
+export function buildPlannerDayAriaLabel(day: PlannerDayView, attendanceLocked: boolean) {
+  const detail = day.plannedActionLabel ? `已安排 ${day.plannedActionLabel}` : day.effectiveTypeLabel;
+  const eventLabel = day.eventTitle ? `，事件 ${day.eventTitle}` : "";
+  const readinessLabel = attendanceLocked ? "" : "，需先确认本周课程态度";
+
+  return `${day.label}，${day.status}，${detail}${eventLabel}${readinessLabel}`;
 }
 
 export function ActionPlanForm({
@@ -387,6 +395,8 @@ export function ActionPlanForm({
               tabIndex={0}
               aria-haspopup="dialog"
               aria-expanded={selectedWeekday === day.weekday}
+              aria-disabled={!attendanceLocked}
+              aria-label={buildPlannerDayAriaLabel(day, attendanceLocked)}
               onClick={() => openDayPlanner(day)}
               onKeyDown={(event) => handlePlannerDayKeyDown(event, () => openDayPlanner(day))}
               data-testid={`planner-day-${day.weekday}`}

@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:e2e": "playwright test --reporter=line",
+    "test:e2e:smoke": "node scripts/run-e2e-smoke.mjs",
     "ui-lab:capture": "node scripts/capture-ui-lab.mjs"
   },
   "devDependencies": {
