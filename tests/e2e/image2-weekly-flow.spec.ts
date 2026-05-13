@@ -1,0 +1,143 @@
+import { mkdirSync } from "node:fs";
+import path from "node:path";
+
+import { expect, test, type Locator, type Page } from "playwright/test";
+
+const SCREENSHOT_DIR = path.join(
+  process.cwd(),
+  "docs",
+  "design-reference",
+  "image2-ui",
+  "__real-smoke__",
+);
+
+const preferredOptionIds = [
+  "study",
+  "job_prep",
+  "postgraduate_prep",
+  "public_exam_prep",
+  "competition_project",
+  "part_time",
+  "student_activity",
+  "social",
+];
+
+function ensureScreenshotDir() {
+  mkdirSync(SCREENSHOT_DIR, { recursive: true });
+}
+
+async function saveShot(page: Page, filename: string) {
+  ensureScreenshotDir();
+  await page.screenshot({
+    path: path.join(SCREENSHOT_DIR, filename),
+    fullPage: true,
+  });
+}
+
+async function openDayModal(page: Page, weekday: "mon" | "tue" | "wed") {
+  const modal = page.getByTestId("action-modal");
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await page.getByTestId(`planner-day-${weekday}`).click();
+    await page.waitForLoadState("networkidle");
+
+    if (await modal.isVisible().catch(() => false)) {
+      return modal;
+    }
+  }
+
+  await expect(modal).toBeVisible();
+  return modal;
+}
+
+async function planDay(page: Page, weekday: "mon" | "tue" | "wed") {
+  const modal = await openDayModal(page, weekday);
+  for (const optionId of preferredOptionIds) {
+    const option = modal.getByTestId(`action-option-${optionId}`);
+    if ((await option.count()) > 0) {
+      const label = (await option.getByTestId("action-option-label").textContent())?.trim();
+      await option.getByTestId("action-option-submit").click();
+      await page.waitForLoadState("networkidle");
+      await expect(page.getByTestId("action-modal")).toBeHidden();
+      await expect(page.getByTestId(`planner-day-action-${weekday}`)).toContainText(label ?? "");
+      return label ?? optionId;
+    }
+  }
+
+  throw new Error(`No non-default action option found for ${weekday}.`);
+}
+
+function linkByExactName(page: Page, name: string): Locator {
+  return page.getByRole("link", { name, exact: true });
+}
+
+test("image2 weekly planner smoke flow", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByTestId("start-page")).toBeVisible();
+  await expect(page.getByText("Freshmanto")).toBeVisible();
+  await saveShot(page, "01-home.png");
+
+  await page.getByTestId("start-new-run-submit").click();
+  await page.waitForURL(/\/admission\?runId=/);
+
+  const runId = page.url().match(/runId=([^&]+)/)?.[1];
+  expect(runId).toBeTruthy();
+
+  await expect(page.getByTestId("admission-page")).toBeVisible();
+  await expect(page.getByText("official document")).toBeVisible();
+  await expect(page.getByText("FIRST-YEAR STUDENT")).toHaveCount(0);
+  await expect(page.getByText("Daily Planner")).toHaveCount(0);
+  await saveShot(page, "02-admission.png");
+
+  await page.getByTestId("admission-confirm").click();
+  await page.waitForURL(new RegExp(`/game\\?runId=${runId}`));
+
+  await expect(page.getByTestId("game-page")).toBeVisible();
+  await expect(page.getByTestId("formal-sidebar-nav")).toBeVisible();
+  await expect(page.getByTestId("planner-client-ready")).toHaveAttribute("data-ready", "true");
+  await expect(linkByExactName(page, "Campus Map")).toHaveCount(0);
+  await expect(linkByExactName(page, "Social Circle")).toHaveCount(0);
+  await expect(linkByExactName(page, "Offer")).toHaveCount(0);
+  await expect(linkByExactName(page, "Interview")).toHaveCount(0);
+  await expect(linkByExactName(page, "考研择校")).toHaveCount(0);
+  await expect(linkByExactName(page, "考公岗位")).toHaveCount(0);
+  await expect(linkByExactName(page, "保研去向")).toHaveCount(0);
+  await saveShot(page, "03-game-weekly-planner.png");
+
+  await page.getByTestId("set-attendance-submit").click();
+  await expect(page.getByTestId("planner-attendance-locked")).toHaveAttribute("data-locked", "true");
+
+  const mondayActionCopy = (await page.getByTestId("planner-day-action-mon").textContent())?.trim() ?? "";
+  const thursdayActionCopy = (await page.getByTestId("planner-day-action-thu").textContent())?.trim() ?? "";
+
+  await openDayModal(page, "mon");
+  await saveShot(page, "04-action-modal-open.png");
+  await page.getByTestId("action-modal-cancel").click();
+  await expect(page.getByTestId("action-modal")).toBeHidden();
+  await expect(page.getByTestId("planner-day-action-mon")).toHaveText(mondayActionCopy);
+
+  const chosenLabels = [
+    await planDay(page, "mon"),
+    await planDay(page, "tue"),
+    await planDay(page, "wed"),
+  ];
+
+  await expect(page.getByTestId("planner-day-action-mon")).toContainText(chosenLabels[0] ?? "");
+  await expect(page.getByTestId("planner-day-action-tue")).toContainText(chosenLabels[1] ?? "");
+  await expect(page.getByTestId("planner-day-action-wed")).toContainText(chosenLabels[2] ?? "");
+  await expect(page.getByTestId("planner-day-action-thu")).toHaveText(thursdayActionCopy);
+  await saveShot(page, "05-action-selected.png");
+
+  await page.getByTestId("confirm-week-submit").click();
+  await page.waitForLoadState("networkidle");
+  await expect(page).toHaveURL(new RegExp(`/((game\\?runId=${runId}.*focus=weekly-settlement)|(settlement\\?runId=${runId}.*))`));
+
+  const weeklySettlement = page.getByTestId("weekly-settlement-card");
+  await expect(weeklySettlement).toBeVisible();
+  await saveShot(page, "06-weekly-settlement.png");
+
+  const actionLabels = await weeklySettlement.getByTestId("weekly-settlement-action-label").allTextContents();
+  expect(actionLabels.length).toBeGreaterThan(0);
+  expect(actionLabels.some((label) => chosenLabels.includes(label.trim()))).toBe(true);
+  expect(actionLabels.every((label) => !chosenLabels.includes(label.trim()))).toBe(false);
+});

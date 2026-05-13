@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { type KeyboardEvent, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { submitActionTurnAction } from "@/app/actions";
@@ -74,6 +74,7 @@ function SubmitButton(props: {
   className: string;
   disabled?: boolean;
   onClick?: () => void;
+  testId?: string;
 }) {
   const { pending } = useFormStatus();
 
@@ -83,6 +84,7 @@ function SubmitButton(props: {
       disabled={pending || props.disabled}
       className={props.className}
       onClick={props.onClick}
+      data-testid={props.testId}
     >
       {pending ? props.pendingLabel : props.label}
     </button>
@@ -217,6 +219,15 @@ function applyOptimisticPlans(days: PlannerDayView[], optimisticPlans: Record<st
   });
 }
 
+function handlePlannerDayKeyDown(event: KeyboardEvent<HTMLElement>, onActivate: () => void) {
+  if (event.key !== "Enter" && event.key !== " ") {
+    return;
+  }
+
+  event.preventDefault();
+  onActivate();
+}
+
 export function ActionPlanForm({
   runId,
   currentWeek,
@@ -284,6 +295,13 @@ export function ActionPlanForm({
 
   return (
     <div className="space-y-6">
+      <span
+        data-testid="planner-client-ready"
+        data-ready={typeof window === "undefined" ? "false" : "true"}
+        suppressHydrationWarning
+        hidden
+      />
+      <span data-testid="planner-attendance-locked" data-locked={attendanceLocked ? "true" : "false"} hidden />
       <div className="rounded-2xl border border-[var(--border)] bg-white/70 p-4 text-sm leading-6 text-stone-700">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="font-semibold text-stone-900">第 {currentWeek} 周操作</p>
@@ -325,6 +343,7 @@ export function ActionPlanForm({
       <form
         action={submitActionTurnAction}
         className="space-y-4 rounded-2xl border border-[var(--border)] bg-white/80 p-4"
+        data-testid="attendance-form"
       >
         <input type="hidden" name="runId" value={runId} />
         <input type="hidden" name="intent" value="set_attendance" />
@@ -350,6 +369,7 @@ export function ActionPlanForm({
             pendingLabel="正在保存课程态度..."
             disabled={attendanceLocked}
             className="rounded-full bg-amber-600 px-5 py-3 font-semibold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-stone-400"
+            testId="set-attendance-submit"
           />
           <PendingHint text="正在保存这周的课程态度..." />
         </div>
@@ -361,10 +381,15 @@ export function ActionPlanForm({
           const isPlanned = Boolean(day.plannedActionLabel);
 
           return (
-            <button
+            <div
               key={day.weekday}
-              type="button"
+              role="button"
+              tabIndex={0}
+              aria-haspopup="dialog"
+              aria-expanded={selectedWeekday === day.weekday}
               onClick={() => openDayPlanner(day)}
+              onKeyDown={(event) => handlePlannerDayKeyDown(event, () => openDayPlanner(day))}
+              data-testid={`planner-day-${day.weekday}`}
               className={`rounded-2xl border p-4 text-left transition ${
                 isHighlighted
                   ? "border-emerald-300 bg-emerald-50/90 shadow-[0_16px_32px_rgba(16,185,129,0.15)]"
@@ -390,7 +415,7 @@ export function ActionPlanForm({
                   {day.eventTitle ? "有事" : isPlanned ? "已安排" : "可排"}
                 </span>
               </div>
-              <p className="mt-3 text-sm leading-6 text-stone-700">
+              <p className="mt-3 text-sm leading-6 text-stone-700" data-testid={`planner-day-action-${day.weekday}`}>
                 {day.plannedActionLabel ? `已安排：${day.plannedActionLabel}` : day.effectiveTypeLabel}
               </p>
               <p className="mt-2 text-xs leading-5 text-stone-500">默认节奏：{day.baseTypeLabel}</p>
@@ -398,7 +423,7 @@ export function ActionPlanForm({
               {!attendanceLocked ? (
                 <p className="mt-3 text-xs leading-5 text-stone-500">先定课程态度，再点这一天。</p>
               ) : null}
-            </button>
+            </div>
           );
         })}
       </div>
@@ -406,6 +431,7 @@ export function ActionPlanForm({
       <form
         action={submitActionTurnAction}
         className="space-y-3 rounded-2xl border border-[var(--border)] bg-white/80 p-4"
+        data-testid="confirm-week-form"
       >
         <input type="hidden" name="runId" value={runId} />
         <input type="hidden" name="intent" value="confirm_week" />
@@ -416,6 +442,7 @@ export function ActionPlanForm({
             pendingLabel="正在结算本周安排 / 生成 AI 月记..."
             disabled={!readyToConfirmNow}
             className="rounded-full bg-stone-900 px-5 py-3 font-semibold text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-400"
+            testId="confirm-week-submit"
           />
           {attendanceLocked ? (
             <span className="text-sm text-stone-500">
@@ -430,7 +457,7 @@ export function ActionPlanForm({
 
       {selectedDay ? (
         <div className="fm-dialog-backdrop">
-          <div className="fm-dialog">
+          <div className="fm-dialog" data-testid="action-modal">
             <div className="fm-dialog__header">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--fm-brand-dark)]">
@@ -452,7 +479,12 @@ export function ActionPlanForm({
                   </p>
                 ) : null}
               </div>
-              <button type="button" onClick={() => setSelectedWeekday(null)} className="fm-dialog__close">
+              <button
+                type="button"
+                onClick={() => setSelectedWeekday(null)}
+                className="fm-dialog__close"
+                data-testid="action-modal-close"
+              >
                 <FmIcon name="chevron-right" className="h-4 w-4 rotate-180" />
               </button>
             </div>
@@ -483,6 +515,7 @@ export function ActionPlanForm({
                       key={option.optionId}
                       action={submitActionTurnAction}
                       className={`fm-option-card ${option.selected ? "is-selected" : ""}`}
+                      data-testid={`action-option-${option.optionId}`}
                       onSubmit={() => {
                         markPlanAsPending(selectedDay, option);
                         setSelectedWeekday(null);
@@ -504,7 +537,7 @@ export function ActionPlanForm({
                       <div className="min-w-0">
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <h3>{option.label}</h3>
+                            <h3 data-testid="action-option-label">{option.label}</h3>
                             {option.selected ? (
                               <p className="mt-1 text-xs font-medium text-amber-700">你上次排过类似行动</p>
                             ) : null}
@@ -513,6 +546,7 @@ export function ActionPlanForm({
                             label="安排"
                             pendingLabel="保存中"
                             className="rounded-full bg-[var(--fm-brand)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--fm-brand-dark)]"
+                            testId="action-option-submit"
                           />
                         </div>
                         <p>{option.description}</p>
@@ -524,7 +558,12 @@ export function ActionPlanForm({
             </div>
 
             <div className="fm-dialog__footer">
-              <button type="button" className="fm-outline-button" onClick={() => setSelectedWeekday(null)}>
+              <button
+                type="button"
+                className="fm-outline-button"
+                onClick={() => setSelectedWeekday(null)}
+                data-testid="action-modal-cancel"
+              >
                 取消
               </button>
               <button type="button" className="fm-solid-button" disabled>

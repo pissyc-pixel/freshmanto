@@ -9,6 +9,7 @@
     "start:local": "next start",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:e2e": "playwright test --reporter=line",
     "ui-lab:capture": "node scripts/capture-ui-lab.mjs"
   },
   "devDependencies": {

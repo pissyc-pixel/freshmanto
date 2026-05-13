@@ -218,7 +218,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
         </>
       }
     >
-      <div className="fm-stack">
+      <div className="fm-stack" data-testid="game-page">
         <FmMetricStrip items={buildMetricItems(hydratedRun.stats)} />
 
         <div className="fm-grid-2">

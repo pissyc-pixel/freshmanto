@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ReactNode } from "react";
+import { ComponentPropsWithoutRef, ReactNode } from "react";
 
 import { featureReadiness, isFeatureRoutedForPlayers, type FeatureKey } from "@/lib/feature-readiness";
 
@@ -183,11 +183,16 @@ export function FmIcon({
 export function FmAppRoot({
   children,
   centered = false,
+  ...props
 }: {
   children: ReactNode;
   centered?: boolean;
-}) {
-  return <main className={`fm-app-root ${centered ? "fm-app-root--centered" : ""}`}>{children}</main>;
+} & ComponentPropsWithoutRef<"main">) {
+  return (
+    <main className={`fm-app-root ${centered ? "fm-app-root--centered" : ""}`} {...props}>
+      {children}
+    </main>
+  );
 }
 
 export function FmBrandMark({
@@ -298,7 +303,7 @@ export function FmShellLayout({
             </p>
           </section>
 
-          <nav className="fm-sidebar__nav">
+          <nav className="fm-sidebar__nav" data-testid="formal-sidebar-nav">
             <Link href="/" className={`fm-nav-link ${active === "game" ? "" : ""}`.trim()}>
               <FmIcon name="home" />
               <span>开局页</span>
@@ -314,6 +319,7 @@ export function FmShellLayout({
                 <Link
                   href={link.href}
                   key={link.key}
+                  data-testid={`formal-nav-${link.key}`}
                   className={`fm-nav-link ${active === link.sidebarKey ? "is-active" : ""}`}
                 >
                   <FmIcon name={link.icon} />

@@ -53,7 +53,7 @@ export default async function AdmissionPage({ searchParams }: AdmissionPageProps
   const viewModel = buildAdmissionViewModel(bundle.run);
 
   return (
-    <FmAppRoot>
+    <FmAppRoot data-testid="admission-page">
       <div className="fm-page-center">
         <div className="fm-page-grid">
           <aside className="fm-side-sheet">
@@ -141,7 +141,11 @@ export default async function AdmissionPage({ searchParams }: AdmissionPageProps
             </div>
 
             <div className="fm-doc-actions">
-              <Link href={`/game?runId=${runId}`} className="fm-doc-button fm-doc-button--primary">
+              <Link
+                href={`/game?runId=${runId}`}
+                className="fm-doc-button fm-doc-button--primary"
+                data-testid="admission-confirm"
+              >
                 <FmIcon name="check" />
                 <span>确认入学</span>
               </Link>

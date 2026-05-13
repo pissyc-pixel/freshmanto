@@ -5,7 +5,7 @@ import { FmAppRoot, FmBrandMark, FmIcon } from "@/components/fm-ui/FmScaffold";
 
 export default function StartPage() {
   return (
-    <FmAppRoot centered>
+    <FmAppRoot centered data-testid="start-page">
       <section className="fm-start-scene">
         <FmBrandMark hero />
         <p className="mt-7 text-[2.8rem] font-semibold tracking-[0.24em] text-[#2a363b] md:text-[3rem]">
@@ -25,8 +25,8 @@ export default function StartPage() {
           </div>
           <div className="fm-start-help">每一次选择，都会慢慢把你的大学生活推成某一种样子。</div>
 
-          <form action={startNewRunAction}>
-            <button type="submit" className="fm-button-primary">
+          <form action={startNewRunAction} data-testid="start-new-run-form">
+            <button type="submit" className="fm-button-primary" data-testid="start-new-run-submit">
               <FmIcon name="chevron-right" className="h-7 w-7" />
               <span>开始新档</span>
             </button>
