@@ -1,14 +1,15 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { FmComingSoon } from "@/components/fm-ui/FmComingSoon";
+import { FmEmptyState } from "@/components/fm-ui/FmEmptyState";
+import { FmPartialNotice } from "@/components/fm-ui/FmPartialNotice";
+import { FmShellLayout } from "@/components/fm-ui/FmScaffold";
 import {
   featureReadiness,
   getFeatureReadiness,
   isFeatureRoutedForPlayers,
 } from "@/lib/feature-readiness";
-import { FmComingSoon } from "@/components/fm-ui/FmComingSoon";
-import { FmEmptyState } from "@/components/fm-ui/FmEmptyState";
-import { FmPartialNotice } from "@/components/fm-ui/FmPartialNotice";
 
 describe("feature readiness", () => {
   it("classifies current real and not-ready image2 features explicitly", () => {
@@ -39,28 +40,38 @@ describe("feature readiness", () => {
   it("returns metadata for known features", () => {
     expect(getFeatureReadiness("journal")).toMatchObject({
       status: "real",
-      label: "成长日志",
+      route: "/journal",
     });
   });
 });
 
 describe("fm ui feedback states", () => {
   it("renders grounded empty and readiness copy without hype", () => {
-    const emptyMarkup = renderToStaticMarkup(
-      <FmEmptyState title="还没有足够的履历证据。" body="这条线索还没有在你的大学生活中出现。" />,
-    );
+    const emptyMarkup = renderToStaticMarkup(<FmEmptyState title="No evidence yet" body="Wait for a real run." />);
     const comingSoonMarkup = renderToStaticMarkup(
-      <FmComingSoon title="后续开放" body="这个功能仍在原型阶段，暂未进入正式流程。" />,
+      <FmComingSoon title="Later" body="This feature is still outside the formal flow." />,
     );
     const partialMarkup = renderToStaticMarkup(
-      <FmPartialNotice title="当前阶段尚未形成明确方向。" body="只展示已有真实数据，未开放区域不会伪造结果。" />,
+      <FmPartialNotice title="Partial" body="Only real data is shown here." />,
     );
 
-    expect(emptyMarkup).toContain("这条线索还没有在你的大学生活中出现。");
-    expect(comingSoonMarkup).toContain("暂未进入正式流程");
-    expect(partialMarkup).toContain("未开放区域不会伪造结果");
+    expect(emptyMarkup).toContain("No evidence yet");
+    expect(emptyMarkup).toContain("Wait for a real run.");
+    expect(comingSoonMarkup).toContain("Later");
+    expect(comingSoonMarkup).toContain("formal flow");
+    expect(partialMarkup).toContain("Partial");
+    expect(partialMarkup).toContain("Only real data is shown here.");
+    expect(partialMarkup).toContain("partial");
+  });
 
-    expect(`${emptyMarkup}${comingSoonMarkup}${partialMarkup}`).not.toContain("敬请期待");
-    expect(`${emptyMarkup}${comingSoonMarkup}${partialMarkup}`).not.toContain("超强");
+  it("keeps not-ready features out of the formal player sidebar", () => {
+    const shellMarkup = renderToStaticMarkup(
+      <FmShellLayout active="game" title="Planner">
+        <div>planner</div>
+      </FmShellLayout>,
+    );
+
+    expect(shellMarkup).not.toContain("Campus Map");
+    expect(shellMarkup).not.toContain("Social Circle");
   });
 });

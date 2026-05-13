@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ReactNode } from "react";
 
-import { featureReadiness, type FeatureKey } from "@/lib/feature-readiness";
+import { featureReadiness, isFeatureRoutedForPlayers, type FeatureKey } from "@/lib/feature-readiness";
 
 type IconName =
   | "alert"
@@ -306,17 +306,7 @@ export function FmShellLayout({
 
             {sidebarLinks.map((link) => {
               const readiness = featureReadiness[link.readiness];
-              if (readiness.status === "not_ready" && !link.href) {
-                return (
-                  <div key={link.key} className="fm-nav-link--disabled">
-                    <FmIcon name={link.icon} />
-                    <span>{link.label}</span>
-                    <span className="fm-nav-link__meta">后续开放</span>
-                  </div>
-                );
-              }
-
-              if (!link.href) {
+              if (!link.href || !isFeatureRoutedForPlayers(link.readiness)) {
                 return null;
               }
 
