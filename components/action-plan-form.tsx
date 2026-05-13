@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
+
 import { submitActionTurnAction } from "@/app/actions";
+import { FmIcon } from "@/components/fm-ui/FmScaffold";
 import type { CourseAttendanceStrategy } from "@/types/game";
 
 type PlannerDayOptionView = {
@@ -49,6 +51,11 @@ type ActionPlanFormProps = {
   readyToConfirm: boolean;
   plannerFeedback?: PlannerFeedback;
   days: PlannerDayView[];
+};
+
+type OptimisticPlan = {
+  optionLabel: string;
+  skipClassSelected: boolean;
 };
 
 function PendingHint({ text }: { text: string }) {
@@ -125,10 +132,22 @@ export function resolvePendingPlanStatus(
   return "waiting" as const;
 }
 
-type OptimisticPlan = {
-  optionLabel: string;
-  skipClassSelected: boolean;
-};
+function optionVisual(optionId: string) {
+  if (optionId.includes("study") || optionId.includes("postgraduate")) {
+    return { icon: "book" as const, tone: "teal" };
+  }
+  if (optionId.includes("job") || optionId.includes("part_time")) {
+    return { icon: "chart" as const, tone: "amber" };
+  }
+  if (optionId.includes("social")) {
+    return { icon: "users" as const, tone: "mint" };
+  }
+  if (optionId.includes("relax") || optionId.includes("big_meal")) {
+    return { icon: "moon" as const, tone: "blue" };
+  }
+
+  return { icon: "spark" as const, tone: "teal" };
+}
 
 function clonePlannerDay(day: PlannerDayView): PlannerDayView {
   return {
@@ -178,10 +197,7 @@ export function applyOptimisticPlan(
   });
 }
 
-function applyOptimisticPlans(
-  days: PlannerDayView[],
-  optimisticPlans: Record<string, OptimisticPlan>,
-): PlannerDayView[] {
+function applyOptimisticPlans(days: PlannerDayView[], optimisticPlans: Record<string, OptimisticPlan>) {
   return days.map((sourceDay) => {
     const optimisticPlan = optimisticPlans[sourceDay.weekday];
     const day = clonePlannerDay(sourceDay);
@@ -218,11 +234,7 @@ export function ActionPlanForm({
   const [pendingPlan, setPendingPlan] = useState<PendingPlannerSubmission | null>(null);
   const [optimisticPlans, setOptimisticPlans] = useState<Record<string, OptimisticPlan>>({});
 
-  const plannerDays = useMemo(
-    () => applyOptimisticPlans(days, optimisticPlans),
-    [days, optimisticPlans],
-  );
-
+  const plannerDays = useMemo(() => applyOptimisticPlans(days, optimisticPlans), [days, optimisticPlans]);
   const selectedDay = plannerDays.find((day) => day.weekday === selectedWeekday) ?? null;
   const currentOptions = selectedDay
     ? skipClassDraft && selectedDay.skipClassAvailable
@@ -239,8 +251,8 @@ export function ActionPlanForm({
     if (!attendanceLocked) {
       setLocalFeedback({
         kind: "info",
-        title: "先确定这周课程态度",
-        message: "课程态度还没锁定前，这些天还不能真正排进去。先保存本周的上课态度，再逐天点选。",
+        title: "先确认这周课程态度",
+        message: "课程态度还没锁定前，这些天还不能真正排进去。先保存本周课程态度，再逐天点选。",
       });
       return;
     }
@@ -265,7 +277,7 @@ export function ActionPlanForm({
     });
     setLocalFeedback({
       kind: "success",
-      title: `${day.label} 已点上`,
+      title: `${day.label} 已点入`,
       message: `已经把“${option.label}”排到这一天，顶部剩余天数和当天卡片会立刻同步更新。`,
     });
   }
@@ -304,7 +316,7 @@ export function ActionPlanForm({
       {pendingPlan ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
           <p className="font-semibold">
-            {plannerDays.find((day) => day.weekday === pendingPlan.weekday)?.label} 已点上
+            {plannerDays.find((day) => day.weekday === pendingPlan.weekday)?.label} 已点入
           </p>
           <p className="mt-1">已经把“{pendingPlan.label}”排到这一天，正在保存并回填本周排程。</p>
         </div>
@@ -334,7 +346,7 @@ export function ActionPlanForm({
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <SubmitButton
-            label={attendanceLocked ? "本周课程态度已锁定" : "先确定本周课程态度"}
+            label={attendanceLocked ? "本周课程态度已锁定" : "先确认本周课程态度"}
             pendingLabel="正在保存课程态度..."
             disabled={attendanceLocked}
             className="rounded-full bg-amber-600 px-5 py-3 font-semibold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-stone-400"
@@ -417,20 +429,20 @@ export function ActionPlanForm({
       </form>
 
       {selectedDay ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/45 p-4">
-          <div className="w-full max-w-2xl rounded-[2rem] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[0_24px_80px_rgba(28,25,23,0.22)]">
-            <div className="flex items-start justify-between gap-4">
+        <div className="fm-dialog-backdrop">
+          <div className="fm-dialog">
+            <div className="fm-dialog__header">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-amber-700">
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--fm-brand-dark)]">
                   {selectedDay.label}
                 </p>
-                <h3 className="mt-2 text-2xl font-semibold text-stone-900">给这一天排一个行动</h3>
+                <h2 className="mt-2 text-2xl font-semibold text-stone-900">给这一天排一个行动</h2>
                 <p className="mt-2 text-sm leading-6 text-stone-600">
                   默认节奏：{selectedDay.baseTypeLabel}。当前可排：
                   {skipClassDraft && selectedDay.skipClassAvailable
                     ? selectedDay.baseTypeLabel.includes("半天")
-                      ? "翘掉半天课，把半天空挡补成完整白天"
-                      : "翘掉白天课，释放白天时间"
+                      ? "翘掉半天课后补成完整白天"
+                      : "翘掉白天课后释放白天时间"
                     : selectedDay.effectiveTypeLabel}
                   。
                 </p>
@@ -440,68 +452,84 @@ export function ActionPlanForm({
                   </p>
                 ) : null}
               </div>
-              <button
-                type="button"
-                onClick={() => setSelectedWeekday(null)}
-                className="rounded-full border border-[var(--border)] px-3 py-2 text-sm text-stone-700 transition hover:bg-stone-100"
-              >
-                关闭
+              <button type="button" onClick={() => setSelectedWeekday(null)} className="fm-dialog__close">
+                <FmIcon name="chevron-right" className="h-4 w-4 rotate-180" />
               </button>
             </div>
 
-            {selectedDay.skipClassAvailable ? (
-              <label className="mt-5 flex items-start gap-3 rounded-2xl border border-dashed border-[var(--border)] bg-stone-50/80 px-4 py-3 text-sm leading-6 text-stone-700">
-                <input
-                  type="checkbox"
-                  checked={skipClassDraft}
-                  onChange={(event) => setSkipClassDraft(event.target.checked)}
-                  className="mt-1 h-4 w-4 rounded border-stone-300 text-amber-600"
-                />
-                <span>
-                  {selectedDay.baseTypeLabel.includes("半天")
-                    ? "这天翘掉半天课，把半天空挡补成完整白天。代价较轻，学业、压力和风险都会小幅波动。"
-                    : "这天翘掉白天课，释放白天时间。代价是学业会掉一点、压力会再上来一点。"}
-                </span>
-              </label>
-            ) : null}
-
-            <div className="mt-5 grid gap-3 md:grid-cols-2">
-              {currentOptions.map((option) => (
-                <form
-                  key={option.optionId}
-                  action={submitActionTurnAction}
-                  className="rounded-2xl border border-[var(--border)] bg-white/90 p-4"
-                  onSubmit={() => {
-                    markPlanAsPending(selectedDay, option);
-                    setSelectedWeekday(null);
-                  }}
-                >
-                  <input type="hidden" name="runId" value={runId} />
-                  <input type="hidden" name="intent" value="plan_day" />
-                  <input type="hidden" name="attendanceStrategy" value={defaultAttendanceStrategy} />
-                  <input type="hidden" name="weekday" value={selectedDay.weekday} />
-                  <input type="hidden" name="optionId" value={option.optionId} />
+            <div className="fm-dialog__body">
+              {selectedDay.skipClassAvailable ? (
+                <label className="mt-3 flex items-start gap-3 rounded-2xl border border-dashed border-[var(--border)] bg-stone-50/80 px-4 py-3 text-sm leading-6 text-stone-700">
                   <input
-                    type="hidden"
-                    name="skipClass"
-                    value={String(skipClassDraft && selectedDay.skipClassAvailable)}
+                    type="checkbox"
+                    checked={skipClassDraft}
+                    onChange={(event) => setSkipClassDraft(event.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-stone-300 text-amber-600"
                   />
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h4 className="text-base font-semibold text-stone-900">{option.label}</h4>
-                      {option.selected ? (
-                        <p className="mt-1 text-xs font-medium text-amber-700">你上次排过类似行动</p>
-                      ) : null}
-                    </div>
-                    <SubmitButton
-                      label="排到这一天"
-                      pendingLabel="正在保存..."
-                      className="rounded-full bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700"
-                    />
-                  </div>
-                  <p className="mt-3 text-sm leading-6 text-stone-600">{option.description}</p>
-                </form>
-              ))}
+                  <span>
+                    {selectedDay.baseTypeLabel.includes("半天")
+                      ? "这天翘掉半天课，把半天空档补成完整白天。代价较轻，学业、压力和风险都会小幅波动。"
+                      : "这天翘掉白天课，释放白天时间。代价是学业会掉一点、压力会再上来一点。"}
+                  </span>
+                </label>
+              ) : null}
+
+              <div className="mt-4">
+                {currentOptions.map((option) => {
+                  const visual = optionVisual(option.optionId);
+
+                  return (
+                    <form
+                      key={option.optionId}
+                      action={submitActionTurnAction}
+                      className={`fm-option-card ${option.selected ? "is-selected" : ""}`}
+                      onSubmit={() => {
+                        markPlanAsPending(selectedDay, option);
+                        setSelectedWeekday(null);
+                      }}
+                    >
+                      <input type="hidden" name="runId" value={runId} />
+                      <input type="hidden" name="intent" value="plan_day" />
+                      <input type="hidden" name="attendanceStrategy" value={defaultAttendanceStrategy} />
+                      <input type="hidden" name="weekday" value={selectedDay.weekday} />
+                      <input type="hidden" name="optionId" value={option.optionId} />
+                      <input
+                        type="hidden"
+                        name="skipClass"
+                        value={String(skipClassDraft && selectedDay.skipClassAvailable)}
+                      />
+                      <div className={`fm-option-card__icon tone-${visual.tone}`}>
+                        <FmIcon name={visual.icon} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h3>{option.label}</h3>
+                            {option.selected ? (
+                              <p className="mt-1 text-xs font-medium text-amber-700">你上次排过类似行动</p>
+                            ) : null}
+                          </div>
+                          <SubmitButton
+                            label="安排"
+                            pendingLabel="保存中"
+                            className="rounded-full bg-[var(--fm-brand)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--fm-brand-dark)]"
+                          />
+                        </div>
+                        <p>{option.description}</p>
+                      </div>
+                    </form>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="fm-dialog__footer">
+              <button type="button" className="fm-outline-button" onClick={() => setSelectedWeekday(null)}>
+                取消
+              </button>
+              <button type="button" className="fm-solid-button" disabled>
+                点选卡片后立即保存
+              </button>
             </div>
           </div>
         </div>
