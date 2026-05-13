@@ -4,11 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --experimental-app-only",
     "start": "next start -H 0.0.0.0",
     "start:local": "next start",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:e2e": "playwright test --reporter=line",
+    "test:e2e:smoke": "node scripts/run-e2e-smoke.mjs",
     "ui-lab:capture": "node scripts/capture-ui-lab.mjs"
   },
   "devDependencies": {

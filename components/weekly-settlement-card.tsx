@@ -33,7 +33,10 @@ function formatSignedValue(value: number) {
 
 export function WeeklySettlementCard(props: WeeklySettlementCardProps) {
   return (
-    <article className="rounded-[2rem] border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,247,237,0.94),rgba(255,255,255,0.98))] p-6 shadow-[0_20px_60px_rgba(84,51,16,0.12)]">
+    <article
+      className="rounded-[2rem] border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,247,237,0.94),rgba(255,255,255,0.98))] p-6 shadow-[0_20px_60px_rgba(84,51,16,0.12)]"
+      data-testid="weekly-settlement-card"
+    >
       <div className="flex flex-wrap items-center gap-3">
         <span className="rounded-full bg-amber-600 px-3 py-1 text-xs font-semibold text-white">本周结算</span>
         <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-stone-700">
@@ -49,11 +52,17 @@ export function WeeklySettlementCard(props: WeeklySettlementCardProps) {
 
       <div className="mt-6 space-y-3">
         {props.dayLines.map((line) => (
-          <div key={line.id} className="rounded-2xl border border-[var(--border)] bg-white/90 p-4">
+          <div
+            key={line.id}
+            className="rounded-2xl border border-[var(--border)] bg-white/90 p-4"
+            data-testid="weekly-settlement-day-line"
+          >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-stone-900">{line.label}</p>
-                <p className="mt-1 text-base font-medium text-amber-800">{line.actionLabel}</p>
+                <p className="mt-1 text-base font-medium text-amber-800" data-testid="weekly-settlement-action-label">
+                  {line.actionLabel}
+                </p>
               </div>
               <div className="flex flex-wrap gap-2 text-xs font-semibold text-stone-700">
                 <span className="rounded-full bg-stone-100 px-3 py-1">钱 {formatSignedValue(line.statsDelta.money)}</span>

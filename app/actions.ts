@@ -62,7 +62,7 @@ function parseActionTurn(formData: FormData) {
 
 export async function startNewRunAction() {
   const result = await createServerDemoRun();
-  redirect(`/game?runId=${result.run.id}`);
+  redirect(`/admission?runId=${result.run.id}`);
 }
 
 export async function submitActionTurnAction(formData: FormData) {

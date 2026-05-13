@@ -1,0 +1,133 @@
+export function formatTalent(value: Talent): string {
+  return talentLabels[value];
+}
+
+export function formatFamilyBackground(value: FamilyBackground): string {
+  return familyLabels[value];
+}
+
+export function formatCollegeTrack(value: CollegeTrack): string {
+  return trackLabels[value];
+}
+
+export function formatSchoolTier(value: SchoolTier): string {
+  return schoolTierLabels[value];
+}
+
+export function formatCityTier(value: CityTier): string {
+  return cityTierLabels[value];
+}
+
+export function formatActionType(value: ActionType): string {
+  if (value === "postgraduate_prep") {
+    return "考研 / 深造准�?;
+  }
+
+  if (value === "public_exam_prep") {
+    return "公考准�?;
+  }
+
+  if (value === "competition_project") {
+    return "比赛 / 长期项目投入";
+  }
+
+  return actionOptions.find((item) => item.value === value)?.label ?? value;
+}
+
+export function formatAttendanceStrategy(value: CourseAttendanceStrategy): string {
+  return attendanceStrategyOptions.find((item) => item.value === value)?.label ?? value;
+}
+
+export function formatSemesterFeedback(value: SemesterFeedback): string {
+  return feedbackLabels[value];
+}
+
+export function formatGraduationOutcome(value: GraduationOutcome): string {
+  return outcomeLabels[value];
+}
+
+export function formatTimeBlockKind(value: TimeBlockKind): string {
+  return timeBlockLabels[value];
+}
+
+export function formatWeeklyDayType(value: WeeklyDayType): string {
+  return weeklyDayTypeLabels[value];
+}
+
+export function formatPlannerReason(reason?: string): string {
+  if (!reason) {
+    return "这一步最后没做成�?;
+  }
+
+  if (reason === "action-daytype-mismatch") {
+    return "这一步和当天能用的时间类型对不上，所以最后没真正排进去�?;
+  }
+
+  return formatPlayerFacingFlag(reason);
+}
+
+export function formatWeeklyEventFact(fact: string): string {
+  switch (fact) {
+    case "weekly-event:guest-lecture":
+      return "这周临时冒出来一场讲座，至少把日子从单纯赶课里拉开了一点�?;
+    case "weekly-event:recruitment-talk":
+      return "这周去听了场宣讲，虽然还谈不上结果，但方向感比之前清楚了一点�?;
+    case "weekly-event:job-prep-boost":
+      return "宣讲带来的信息马上接到了求职准备这条线上，做事时没那么发虚了�?;
+    case "weekly-event:class-meeting":
+      return "这周有一天被班会和通知切了一刀，节奏不算舒服，但至少先把它处理掉了�?;
+    case "weekly-event:quiet-recovery":
+      return "这周没什么额外插曲，反而让那点休息真的缓回来了一点�?;
+    default:
+      return formatPlayerFacingFact(fact);
+  }
+}
+
+export function formatReleasedClassDayList(days: Weekday[]): string {
+  return mapWeekdaysToClassDays(days);
+}
+
+export function formatStatLabel(key: keyof DynamicStats): string {
+  return statLabels[key];
+}
+
+export function formatMonthLabel(year: number, month: number): string {
+  return `�?{year}学年 · �?{month}月`;
+}
+
+export function formatSystemLogType(value: keyof typeof systemLogTypeLabels | string): string {
+  return systemLogTypeLabels[value as keyof typeof systemLogTypeLabels] ?? value;
+}
+
+export function formatPlayerFacingTurn(turn: ActionTurnSummary): string {
+  return describeTurn(turn);
+}
+
+export function formatPlayerFacingFact(fact: string): string {
+  return describeNotableFact(fact) ?? fact;
+}
+
+export function formatPlayerFacingFlag(flag: string): string {
+  return describeFlag(flag) ?? flag;
+}
+
+export function formatEndingNotableFact(fact: string): string {
+  return describeEndingNotableFact(fact);
+}
+
+export function buildPlayerFacingMonthlyLog(
+  summary: StructuredMonthlySummary,
+  year: number,
+  month: number,
+): PlayerFacingMonthlyLog {
+  const actionText = uniqueStrings((summary.actions ?? []).map(formatActionType)).join("�?);
+  const details = buildDetailLines(summary);
+
+  return {
+    badge: "本月回顾",
+    periodLabel: formatMonthLabel(year, month),
+    title: buildMonthlyTitle(summary),
+    message: `这个月我主要把时间放�?{actionText || "调整状�?}上，课程走的是�?{formatAttendanceStrategy(summary.attendanceStrategy)}”�?{buildMoodSentence(summary)} 月底手里还剩 ${summary.statsAfter.money} 元，心情 ${summary.statsAfter.mood}，压�?${summary.statsAfter.stress}，学业反馈是�?{formatSemesterFeedback(summary.academicFeedback)}”。`,
+    details,
+  };
+}

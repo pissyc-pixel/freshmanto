@@ -1,9 +1,12 @@
-import { AppShell } from "@/components/app-shell";
-import { HistoryTimeline } from "@/components/history-timeline";
-import { LogFeed } from "@/components/log-feed";
-import { ResumeItemList } from "@/components/resume-item-list";
-import { ResumePriorityPanel } from "@/components/resume-priority-panel";
-import { SectionCard } from "@/components/section-card";
+import { FmEmptyState } from "@/components/fm-ui/FmEmptyState";
+import { FmPartialNotice } from "@/components/fm-ui/FmPartialNotice";
+import {
+  FmIcon,
+  FmInlineStat,
+  FmPanel,
+  FmSectionHead,
+  FmShellLayout,
+} from "@/components/fm-ui/FmScaffold";
 import {
   buildDirectionPerception,
   buildPublicExamExplanation,
@@ -14,7 +17,7 @@ import {
   summarizeDirectionSignals,
 } from "@/core/resolvers/progression";
 import { buildGrowthJournalEntry } from "@/lib/demo/monthly-digest";
-import { formatMonthLabel } from "@/lib/demo/options";
+import { formatCityTier, formatCollegeTrack, formatMonthLabel, formatSchoolTier } from "@/lib/demo/options";
 import { getServerDemoBundle } from "@/lib/demo/server";
 import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
 
@@ -28,15 +31,32 @@ function hasKeyword(value: string, keywords: string[]) {
   return keywords.some((keyword) => value.includes(keyword));
 }
 
-function formatDirectionStage(stage: "undecided" | "forming" | "clear") {
-  switch (stage) {
-    case "clear":
-      return "方向已经越来越清楚";
-    case "forming":
-      return "方向正在成形";
-    default:
-      return "目前还偏未定";
+function buildCoreAbilityTags(items: {
+  competitionCount: number;
+  internshipCount: number;
+  scholarshipCount: number;
+  directionLabel: string;
+  gpa: number;
+}) {
+  const tags = [];
+
+  if (items.gpa >= 3) {
+    tags.push("学业积累");
   }
+  if (items.competitionCount > 0) {
+    tags.push("项目推进");
+  }
+  if (items.internshipCount > 0) {
+    tags.push("实务经历");
+  }
+  if (items.scholarshipCount > 0) {
+    tags.push("阶段回报");
+  }
+  if (items.directionLabel) {
+    tags.push(items.directionLabel);
+  }
+
+  return [...new Set(tags)];
 }
 
 export default async function ResumePage({ searchParams }: ResumePageProps) {
@@ -46,17 +66,30 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
 
   if (!runId || !bundle) {
     return (
-      <AppShell
-        eyebrow="履历"
-        title="这里会整理履历与成长日志"
-        description="履历页会优先展示 GPA、排名、百分比、比赛、实习、奖学金，并把这些东西和未来方向联系起来。"
+      <FmShellLayout
+        active="resume"
+        title="个人履历"
+        subtitle="这里会把真实形成的 GPA、排名、履历条目和成长痕迹整理出来。没有数据时，只展示空状态，不会直接报错。"
+        headerMeta={
+          <>
+            <FmInlineStat tone="teal" icon="chart" label="GPA" value="未形成" />
+            <FmInlineStat tone="amber" icon="file" label="履历证据" value="0 条" />
+          </>
+        }
       >
-        <SectionCard title="还没有可查询的 run" description="先回到首页创建一局，再回来查看履历页。">
-          <p className="text-sm leading-6 text-stone-600">
-            这页现在会对空状态做兼容处理，没有数据时也不会直接报错。
-          </p>
-        </SectionCard>
-      </AppShell>
+        <FmPanel>
+          <FmSectionHead
+            title="个人履历"
+            copy="只有规则层已经产出的履历证据才会出现，学校、排名和项目都不会被前端伪造。"
+          />
+          <div className="mt-6">
+            <FmEmptyState
+              title="还没有足够的履历证据"
+              body="这条线索还没有在你的大学生活中出现。先回到首页创建一局，再从真实流程里慢慢积累。"
+            />
+          </div>
+        </FmPanel>
+      </FmShellLayout>
     );
   }
 
@@ -67,6 +100,7 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
   const recommendationExplanation = buildRecommendationExplanation(hydratedRun);
   const publicExamExplanation = buildPublicExamExplanation(hydratedRun);
   const resumeEvidence = buildResumeEvidenceSummary(hydratedRun);
+
   const resumeItems = bundle.resumeItems.map((item) => ({
     id: item.id,
     category: item.category,
@@ -77,6 +111,7 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
       ? item.metadata_json.tags.filter((tag): tag is string => typeof tag === "string")
       : [],
   }));
+
   const competitionItems = resumeItems.filter(
     (item) => hasKeyword(item.title, ["比赛", "竞赛"]) || item.tags.some((tag) => hasKeyword(tag, ["比赛", "竞赛"])),
   );
@@ -91,180 +126,240 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
       hasKeyword(item.title.toLowerCase(), ["奖学金", "scholarship"]) ||
       item.tags.some((tag) => hasKeyword(tag.toLowerCase(), ["奖学金", "scholarship"])),
   );
-  const playerLogs = bundle.monthlyStates.slice(-6).reverse().map((state) => ({
-    id: `${state.id}-growth`,
-    ...buildGrowthJournalEntry(state.snapshot_json, state.year, state.month),
-  }));
-  const historyEntries = bundle.monthlyStates.slice(-6).map((state) => {
-    const log = buildGrowthJournalEntry(state.snapshot_json, state.year, state.month);
 
-    return {
-      monthLabel: formatMonthLabel(state.year, state.month),
-      title: log.title,
-      summary: log.message,
-      tone:
-        state.snapshot_json.statsDelta.semesterAcademics > 0
-          ? ("up" as const)
-          : state.snapshot_json.statsDelta.stress > 0
-            ? ("down" as const)
-            : ("flat" as const),
-    };
+  const playerLogs = bundle.monthlyStates
+    .slice()
+    .reverse()
+    .slice(0, 4)
+    .map((state) => ({
+      id: `${state.id}-growth`,
+      ...buildGrowthJournalEntry(state.snapshot_json, state.year, state.month),
+    }));
+
+  const coreAbilityTags = buildCoreAbilityTags({
+    competitionCount: competitionItems.length,
+    internshipCount: internshipItems.length,
+    scholarshipCount: scholarshipItems.length,
+    directionLabel: directionPerception.primary.label,
+    gpa: academicProfile.gpa,
   });
-  const systemLogs = bundle.logs.slice(-8).reverse().map((log) => ({
-    id: log.id,
-    logType: log.log_type,
-    message: log.message,
-    year: log.year,
-    month: log.month,
-  }));
-  const priorityItems = [
-    {
-      label: "GPA",
-      value: academicProfile.gpa.toFixed(2),
-      hint: `当前成绩画像换算后的 GPA 约为 ${academicProfile.gpa.toFixed(2)}，会直接影响深造和推免线。`,
-    },
-    {
-      label: "排名",
-      value: academicProfile.rank ? `前 ${academicProfile.rank}` : "暂未生成",
-      hint: academicProfile.rank ? "它不是精确教务排名，但已经能体现你当前大概处在什么位置。" : "还没有足够的学业数据来形成排名画像。",
-    },
-    {
-      label: "百分比",
-      value: academicProfile.percentile ? `${academicProfile.percentile}%` : "暂未生成",
-      hint: academicProfile.percentile ? "这个值越高，说明你越接近前排位置。" : "后续学期数据累积后，这里会更稳定。",
-    },
-    {
-      label: "比赛",
-      value: competitionItems.length > 0 ? `${competitionItems.length} 条` : "暂无",
-      hint: competitionItems[0]?.title ?? "竞赛和长期项目成果还在继续累积。",
-    },
-    {
-      label: "实习",
-      value: internshipItems.length > 0 ? `${internshipItems.length} 条` : "暂无",
-      hint: internshipItems[0]?.title ?? "实习与实践经历会更明显地推高就业方向。",
-    },
-    {
-      label: "奖学金",
-      value: scholarshipItems.length > 0 ? `${scholarshipItems.length} 条` : "暂无",
-      hint: scholarshipItems[0]?.title ?? "奖学金会同时影响学术竞争力和推免画像。",
-    },
-  ];
 
   return (
-    <AppShell
-      eyebrow="履历"
-      title="履历与成长日志"
-      description="这里会把能展示的履历信息、成长日志和系统留档整理出来，让你看清自己为什么越来越像在走某条路。"
+    <FmShellLayout
+      active="resume"
+      title="个人履历"
+      subtitle="履历页只整理已经形成的证据，帮助你看清现在这局真实地在往哪条路上偏。"
+      sidebarSummary="这里展示的是当前 run 的真实画像：GPA、履历条目、方向线索与阶段日志。"
+      headerMeta={
+        <>
+          <FmInlineStat tone="teal" icon="chart" label="GPA" value={academicProfile.gpa.toFixed(2)} />
+          <FmInlineStat
+            tone="amber"
+            icon="file"
+            label="履历证据"
+            value={`${resumeItems.length} 条`}
+          />
+          <FmInlineStat
+            tone="cyan"
+            icon="calendar"
+            label="月度记录"
+            value={`${bundle.monthlyStates.length} 月`}
+          />
+        </>
+      }
     >
-      <div className="space-y-6">
-        <SectionCard
-          title="履历优先摘要"
-          description="优先展示 GPA / 排名 / 百分比 / 比赛 / 实习 / 奖学金；暂时没有的字段也会给兼容占位。"
-        >
-          <ResumePriorityPanel items={priorityItems} />
-        </SectionCard>
+      <div className="fm-grid-2">
+        <div className="fm-stack">
+          <FmPanel padded={false}>
+            <section className="fm-resume-head">
+              <div className="fm-resume-name">个人履历</div>
+              <div className="fm-resume-meta">
+                <span>{formatCollegeTrack(hydratedRun.profile.collegeTrack)}</span>
+                <span>·</span>
+                <span>{formatSchoolTier(hydratedRun.profile.schoolTier)}</span>
+                <span>·</span>
+                <span>{formatCityTier(hydratedRun.profile.cityTier)}</span>
+                <span>·</span>
+                <span>Run #{hydratedRun.id.slice(0, 8)}</span>
+              </div>
 
-        <SectionCard
-          title="方向正在形成"
-          description="这块不是下结论，而是把你现在最像在靠近哪种未来，以及它背后的证据翻给你看。"
-          aside={
-            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
-              {formatDirectionStage(directionPerception.stage)}
-            </span>
-          }
-        >
-          <div className="space-y-4 text-sm leading-6 text-stone-700">
-            <div className="rounded-2xl border border-[var(--border)] bg-white/70 p-4">
-              <p className="text-lg font-semibold text-stone-900">
-                现在最像在往“{directionPerception.primary.label}”这条路走
-                {directionPerception.secondary ? `，同时也还留着一点 ${directionPerception.secondary.label} 的空间。` : "。"}
-              </p>
-              <p className="mt-2 text-sm leading-6 text-stone-600">{directionPerception.summary}</p>
+              <div className="fm-score-strip">
+                <div className="fm-score-box">
+                  <span className="fm-score-box__label">GPA</span>
+                  <span className="fm-score-box__value">{academicProfile.gpa.toFixed(2)}</span>
+                </div>
+                <div className="fm-score-box">
+                  <span className="fm-score-box__label">排名 / 百分位</span>
+                  <span className="fm-score-box__value">
+                    {academicProfile.rank ? `前 ${academicProfile.rank}` : "暂未形成"}
+                    {academicProfile.percentile ? ` · ${academicProfile.percentile}%` : ""}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                {coreAbilityTags.length > 0 ? (
+                  <div className="fm-tag-row">
+                    {coreAbilityTags.map((tag) => (
+                      <span key={tag} className="fm-tag">
+                        <FmIcon name="check" className="h-4 w-4" />
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <FmPartialNotice
+                    title="当前阶段尚未形成明确方向"
+                    body="目前只展示已经落地的真实证据，核心能力标签还需要更多月度结果来支撑。"
+                  />
+                )}
+              </div>
+            </section>
+          </FmPanel>
+
+          <FmPanel>
+            <FmSectionHead
+              title="个人履历时间线"
+              copy="履历条目按形成月份排列。没有的经历不会被前端补写进来。"
+            />
+            <div className="mt-6">
+              {resumeItems.length > 0 ? (
+                <div className="fm-resume-lines">
+                  {resumeItems.map((item) => (
+                    <article key={item.id} className="fm-resume-line">
+                      <div className="fm-resume-line__icon">
+                        <FmIcon name="file" className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <div className="fm-resume-line__title">{item.title}</div>
+                        <div className="fm-resume-line__body">{item.summary}</div>
+                        {item.tags.length > 0 ? (
+                          <div className="mt-4 fm-tag-row">
+                            {item.tags.map((tag) => (
+                              <span key={tag} className="fm-tag">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="fm-resume-line__date">M{item.month}</div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <FmEmptyState
+                  title="还没有足够的履历证据"
+                  body="比赛、项目、实习、奖学金和校内经历都必须先被规则层记录下来，这里才会出现。"
+                />
+              )}
             </div>
+          </FmPanel>
+        </div>
 
-            <div className="grid gap-3 lg:grid-cols-3">
-              <article className="rounded-2xl border border-[var(--border)] bg-white/65 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">学业类积累</p>
-                <div className="mt-3 space-y-2">
-                  {resumeEvidence.academic.map((line) => (
-                    <p key={line}>{line}</p>
-                  ))}
-                </div>
+        <div className="fm-stack">
+          <FmPanel>
+            <FmSectionHead
+              title="当前画像"
+              copy="这不是结论书，只是把当前已有的真实信号翻译成你能看懂的阶段描述。"
+              aside={<span className="fm-chip fm-chip--brand">{directionPerception.primary.label}</span>}
+            />
+
+            <div className="mt-6 fm-stat-grid">
+              <article className="fm-stat-card">
+                <div className="fm-stat-card__label">履历概况</div>
+                <div className="fm-stat-card__value">{resumeItems.length} 条</div>
+                <div className="fm-stat-card__copy">{directionPerception.summary}</div>
               </article>
-
-              <article className="rounded-2xl border border-[var(--border)] bg-white/65 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">履历类积累</p>
-                <div className="mt-3 space-y-2">
-                  {resumeEvidence.practice.map((line) => (
-                    <p key={line}>{line}</p>
-                  ))}
-                </div>
+              <article className="fm-stat-card">
+                <div className="fm-stat-card__label">推免线索</div>
+                <div className="fm-stat-card__value">{recommendationExplanation.summary}</div>
               </article>
-
-              <article className="rounded-2xl border border-[var(--border)] bg-white/65 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">机会类线索</p>
-                <div className="mt-3 space-y-2">
-                  {resumeEvidence.opportunities.map((line) => (
-                    <p key={line}>{line}</p>
-                  ))}
-                </div>
+              <article className="fm-stat-card">
+                <div className="fm-stat-card__label">公考线索</div>
+                <div className="fm-stat-card__value">{publicExamExplanation.summary}</div>
               </article>
             </div>
+          </FmPanel>
 
-            <div className="grid gap-3 md:grid-cols-2">
-              <article className="rounded-2xl border border-[var(--border)] bg-white/65 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">推免画像</p>
-                <p className="mt-3">{recommendationExplanation.summary}</p>
-                <div className="mt-3 space-y-2">
-                  {recommendationExplanation.strengths.map((line) => (
-                    <p key={line}>{line}</p>
-                  ))}
-                  {recommendationExplanation.gaps.map((line) => (
-                    <p key={line}>{line}</p>
-                  ))}
-                </div>
+          <FmPanel>
+            <FmSectionHead
+              title="证据拆分"
+              copy="三类证据都只来自当前 run 的真实累计，不从 PRD 或设计稿里借数据。"
+            />
+
+            <div className="mt-6 fm-stack">
+              <article className="fm-stat-card">
+                <div className="fm-stat-card__label">学业积累</div>
+                <div className="fm-stat-card__copy">{resumeEvidence.academic.join(" ")}</div>
               </article>
-
-              <article className="rounded-2xl border border-[var(--border)] bg-white/65 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">公考线索</p>
-                <p className="mt-3">{publicExamExplanation.summary}</p>
-                <div className="mt-3 space-y-2">
-                  {publicExamExplanation.signals.map((line) => (
-                    <p key={line}>{line}</p>
-                  ))}
-                  {directionSignals.map((line) => (
-                    <p key={line}>{line}</p>
-                  ))}
-                </div>
+              <article className="fm-stat-card">
+                <div className="fm-stat-card__label">履历积累</div>
+                <div className="fm-stat-card__copy">{resumeEvidence.practice.join(" ")}</div>
+              </article>
+              <article className="fm-stat-card">
+                <div className="fm-stat-card__label">机会线索</div>
+                <div className="fm-stat-card__copy">{resumeEvidence.opportunities.join(" ")}</div>
               </article>
             </div>
-          </div>
-        </SectionCard>
+          </FmPanel>
 
-        <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-          <SectionCard title="履历条目" description="已实装的数据会真实展示；没有条目时也不会报错。">
-            <ResumeItemList items={resumeItems} />
-          </SectionCard>
+          <FmPanel>
+            <FmSectionHead
+              title="阶段日志"
+              copy="最近几个月的成长记录会在这里给履历做旁证。"
+            />
+            <div className="mt-6">
+              {playerLogs.length > 0 ? (
+                <div className="fm-timeline">
+                  {playerLogs.map((log, index) => (
+                    <article key={log.id} className="fm-timeline-entry">
+                      <div className={`fm-timeline-node ${index % 2 === 0 ? "tone-teal" : "tone-mint"}`}>
+                        <FmIcon name="book" className="h-4 w-4" />
+                      </div>
+                      <div className="fm-journal-card">
+                        <div className="fm-journal-card__head">
+                          <div>
+                            <div className="fm-journal-card__month">{log.periodLabel}</div>
+                            <h3 className="fm-journal-card__title">{log.title}</h3>
+                          </div>
+                          <span className="fm-chip">{formatMonthLabel(bundle.run.currentYear, bundle.run.currentMonth)}</span>
+                        </div>
+                        <p className="fm-journal-card__copy">{log.message}</p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <FmEmptyState
+                  title="当前还没有月度日志"
+                  body="先把真实流程推进到月末，这里才会出现能给履历作证的阶段记录。"
+                />
+              )}
+            </div>
+          </FmPanel>
 
-          <div className="space-y-6">
-            <SectionCard title="阶段轨迹" description="把最近几个月串起来，更容易看出自己在往哪边走。">
-              <HistoryTimeline entries={historyEntries} />
-            </SectionCard>
-
-            <SectionCard title="成长日志" description="成长日志偏事实层，整理这个月到底发生了什么。">
-              <LogFeed
-                items={playerLogs}
-                variant="player"
-                emptyMessage="这局目前还没有足够的月度记录来整理成长日志。"
-              />
-            </SectionCard>
-
-            <SectionCard title="后台日志" description="这里保留动作、事件和结算的系统留档，主要用于追踪与排查。">
-              <LogFeed items={systemLogs} emptyMessage="目前还没有系统日志留档。" />
-            </SectionCard>
-          </div>
+          <FmPanel>
+            <FmSectionHead title="方向线索" copy="这些线索只反映当前 run 已有的倾向，不预示最终结果。" />
+            <div className="mt-6">
+              {directionSignals.length > 0 ? (
+                <div className="fm-tag-row">
+                  {directionSignals.map((signal) => (
+                    <span key={signal} className="fm-tag">
+                      {signal}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <FmPartialNotice
+                  title="当前阶段尚未形成明确方向"
+                  body="目前还没有足够的学业与履历证据去支撑更明确的路径判断。"
+                />
+              )}
+            </div>
+          </FmPanel>
         </div>
       </div>
-    </AppShell>
+    </FmShellLayout>
   );
 }
