@@ -22,6 +22,7 @@ import {
   FmShellLayout,
 } from "@/components/fm-ui/FmScaffold";
 import { createWeeklyCalendar } from "@/core/game-engine";
+import { isVacationMonth } from "@/core/resolvers/schedule";
 import {
   buildDirectionPerception,
   buildPublicExamExplanation,
@@ -32,7 +33,7 @@ import { buildRunHref, resolveActiveRunId } from "@/lib/demo/active-run";
 import { buildGrowthJournalEntry } from "@/lib/demo/monthly-digest";
 import { formatMonthLabel } from "@/lib/demo/options";
 import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
-import { getServerDemoBundle } from "@/lib/demo/server";
+import { getServerGameBundle } from "@/lib/demo/server";
 import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
 import type { DynamicStats, TimeBlockKind } from "@/types/game";
 
@@ -155,7 +156,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
     cookieRunId: await readActiveRunIdFromCookies(),
   });
   const focusParam = readSearchParam(params.focus);
-  const bundle = runId ? await getServerDemoBundle(runId) : null;
+  const bundle = runId ? await getServerGameBundle(runId) : null;
 
   if (!runId || !bundle) {
     return (
@@ -163,12 +164,12 @@ export default async function GamePage({ searchParams }: GamePageProps) {
         active="game"
         runId={runId}
         title="本周周历"
-        subtitle="先创建一局真实 run，再从这里进入逐天排周历和统一周结算。"
+        subtitle="先创建一局真实存档，再从这里进入逐天排周历和统一周结算。"
         headerMeta={<FmInlineStat tone="teal" icon="calendar" label="当前进度" value="未开局" />}
       >
         <FmPanel>
           <FmSectionHead
-            title="还没有进行中的 run"
+            title="还没有进行中的存档"
             copy="当前主流程已经换成“先定课程态度，再逐天安排一周，最后统一结算”。"
           />
           <div className="mt-6">
@@ -186,6 +187,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
   const weeklyCalendar = activeMonth?.weeklyCalendar ?? createWeeklyCalendar(hydratedRun.currentMonth);
   const currentWeek = activeMonth?.currentWeek ?? 1;
   const currentWeekState = resolveCurrentWeekState(weeklyCalendar, activeMonth);
+  const vacationMonth = isVacationMonth(bundle.run.currentMonth);
   const schedule = buildWeeklyScheduleBlocks({
     weeklyCalendar,
     currentWeek,
@@ -215,9 +217,13 @@ export default async function GamePage({ searchParams }: GamePageProps) {
     <FmShellLayout
       active="game"
       runId={runId}
-      title="本周周历"
-      subtitle={`${formatMonthLabel(bundle.run.currentYear, bundle.run.currentMonth)} 的周排程与统一周结算都在这里完成。`}
-      sidebarSummary="这里只承接当前 run 的真实周流程，不靠前端内存猜状态。"
+      title={vacationMonth ? "假期安排" : "本周周历"}
+      subtitle={
+        vacationMonth
+          ? `${formatMonthLabel(bundle.run.currentYear, bundle.run.currentMonth)} 处在假期阶段，这个月不再按普通上课周锁白天，主要安排休息、兼职、实践和后续准备。`
+          : `${formatMonthLabel(bundle.run.currentYear, bundle.run.currentMonth)} 的周排程与统一周结算都在这里完成。`
+      }
+      sidebarSummary="这里只承接当前存档的真实周流程，不靠前端内存猜状态。"
       headerMeta={
         <>
           <FmInlineStat tone="teal" icon="calendar" label="当前月份" value={formatMonthLabel(bundle.run.currentYear, bundle.run.currentMonth)} />
@@ -239,8 +245,12 @@ export default async function GamePage({ searchParams }: GamePageProps) {
           <div className="fm-stack">
             <FmPanel>
               <FmSectionHead
-                title="安排这一周"
-                copy="课程态度、逐天排程和确认本周都还是原来的状态管理与 payload，只把入口做得更稳、更易懂。"
+                title={vacationMonth ? "安排这个假期周" : "安排这一周"}
+                copy={
+                  vacationMonth
+                    ? "假期周不再按普通课表锁白天，但依然按周逐天安排，再统一确认这一周。"
+                    : "课程态度、逐天排程和确认本周都还是原来的状态管理与 payload，只把入口做得更稳、更易懂。"
+                }
               />
               <div className="mt-6">
                 <ActionPlanForm
@@ -278,8 +288,12 @@ export default async function GamePage({ searchParams }: GamePageProps) {
           <div className="fm-stack">
             <FmPanel>
               <FmSectionHead
-                title="本月周历"
-                copy="四周节奏做成总览卡，当前周会高亮；具体逐天选择仍在左侧操作区完成。"
+                title={vacationMonth ? "本月假期节奏" : "本月周历"}
+                copy={
+                  vacationMonth
+                    ? "假期月不再按普通上课周处理，四周都会以可自由支配时间为主。"
+                    : "四周节奏做成总览卡，当前周会高亮；具体逐天选择仍在左侧操作区完成。"
+                }
               />
               <div className="mt-6 fm-week-grid">
                 {schedule.map((week) => (
@@ -364,7 +378,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
             ) : null}
 
             <FmPanel>
-              <FmSectionHead title="后台日志" copy="这里保留动作、事件和结算留档，便于排查这局 run 的推进过程。" />
+              <FmSectionHead title="后台日志" copy="这里保留动作、事件和结算留档，便于排查这局存档的推进过程。" />
               <div className="mt-6">
                 <LogFeed items={latestSystemLogs} emptyMessage="目前还没有系统日志留档。" />
               </div>

@@ -55,7 +55,7 @@ async function stopServer(server) {
 
 const server = spawn(
   "node.exe",
-  ["node_modules/next/dist/bin/next", "start", "-H", host, "-p", String(port)],
+  ["node_modules/next/dist/bin/next", "dev", "-H", host, "-p", String(port)],
   {
     cwd,
     env: process.env,

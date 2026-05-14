@@ -87,6 +87,8 @@ export function annotatePlannerOptions(input: {
 export function buildPlannerEventNotice(input: {
   eventTitle?: string | null;
   eventSummary?: string | null;
+  eventAttendSummary?: string | null;
+  eventSkipSummary?: string | null;
   options: Array<Pick<PrioritizedPlannerOption, "isEventRelated">>;
 }) {
   if (!input.eventTitle) {
@@ -98,14 +100,14 @@ export function buildPlannerEventNotice(input: {
   if (hasEventRelatedAction) {
     return {
       title: "今天有事件相关行动",
-      body: "事件相关入口已经排在前面了，优先处理会更顺手。",
+      body: [input.eventAttendSummary, input.eventSkipSummary].filter(Boolean).join(" ").trim() || "事件相关入口已经排在前面了，优先处理会更顺手。",
       tone: "amber" as const,
     };
   }
 
   return {
-    title: "这是背景事件，不需要单独安排行动",
-    body: input.eventSummary ?? "今天这条事件更像背景氛围提示，不会额外生成单独入口。",
+    title: "今天这条事件会影响安排结果",
+    body: [input.eventSummary, input.eventSkipSummary].filter(Boolean).join(" ").trim() || "今天这条事件更像背景氛围提示，不会额外生成单独入口。",
     tone: "stone" as const,
   };
 }

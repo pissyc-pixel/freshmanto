@@ -214,7 +214,14 @@ describe("weekly planner state helpers", () => {
     expect(source).toContain('role="button"');
     expect(source).toContain("tabIndex={0}");
     expect(source).toContain('aria-haspopup="dialog"');
-    expect(source).toContain("aria-disabled={!attendanceLocked}");
+    expect(source).toContain("aria-disabled={!attendanceLocked || plannerSavePending}");
     expect(source).toContain("aria-label={buildPlannerDayAriaLabel(day, attendanceLocked)}");
+  });
+
+  it("renders the action picker as a real global dialog instead of a plain in-card panel", () => {
+    const source = readFileSync("components/action-plan-form.tsx", "utf-8");
+
+    expect(source).toContain('role="dialog"');
+    expect(source).toContain('aria-modal="true"');
   });
 });

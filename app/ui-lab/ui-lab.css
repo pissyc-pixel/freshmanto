@@ -799,8 +799,12 @@
 }
 
 .fm-dialog {
-  width: 470px;
-  max-height: 760px;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(470px, calc(100vw - 28px));
+  max-height: calc(100vh - 48px);
   display: flex;
   flex-direction: column;
   border-radius: 24px;
@@ -898,6 +902,13 @@
   grid-template-columns: 1fr 1fr;
   gap: 18px;
   padding: 10px 22px 18px;
+}
+
+@media (max-width: 640px) {
+  .fm-dialog {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 24px);
+  }
 }
 
 .fm-outline-button,

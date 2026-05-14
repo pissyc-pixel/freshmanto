@@ -1,7 +1,8 @@
 "use client";
 
-import { type KeyboardEvent, useMemo, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useMemo, useState, useSyncExternalStore } from "react";
 import { useFormStatus } from "react-dom";
+import { createPortal } from "react-dom";
 
 import { submitActionTurnAction } from "@/app/actions";
 import { FmIcon } from "@/components/fm-ui/FmScaffold";
@@ -34,6 +35,8 @@ export type PlannerDayView = {
   skipClassSelected: boolean;
   eventTitle: string | null;
   eventSummary: string | null;
+  eventAttendSummary?: string | null;
+  eventSkipSummary?: string | null;
   hasCashRisk: boolean;
   normalOptions: PlannerDayOptionView[];
   skipOptions: PlannerDayOptionView[];
@@ -262,6 +265,22 @@ function badgeClassName(badge: string) {
   return "bg-emerald-100 text-emerald-900";
 }
 
+function GlobalPlannerDialog(props: {
+  children: ReactNode;
+}) {
+  const mounted = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  );
+
+  if (!mounted) {
+    return null;
+  }
+
+  return createPortal(props.children, document.body);
+}
+
 export function ActionPlanForm({
   runId,
   currentWeek,
@@ -290,13 +309,16 @@ export function ActionPlanForm({
     : [];
   const activeFeedback = localFeedback ?? plannerFeedback ?? null;
   const missingCount = useMemo(() => countUnplannedDays(plannerDays), [plannerDays]);
-  const readyToConfirmNow = attendanceLocked && (readyToConfirm || plannerDays.length > 0);
+  const plannerSavePending = pendingPlan !== null;
+  const readyToConfirmNow = attendanceLocked && !plannerSavePending && (readyToConfirm || plannerDays.length > 0);
   const highlightedWeekday =
     pendingPlan?.weekday ?? plannerDays.find((day) => day.justPlanned)?.weekday ?? null;
   const eventNotice = selectedDay
     ? buildPlannerEventNotice({
         eventTitle: selectedDay.eventTitle,
         eventSummary: selectedDay.eventSummary,
+        eventAttendSummary: selectedDay.eventAttendSummary,
+        eventSkipSummary: selectedDay.eventSkipSummary,
         options: currentOptions,
       })
     : null;
@@ -306,6 +328,15 @@ export function ActionPlanForm({
   });
 
   function openDayPlanner(day: PlannerDayView) {
+    if (plannerSavePending) {
+      setLocalFeedback({
+        kind: "info",
+        title: "正在保存上一天安排",
+        message: "等这一天写回周排程后，再继续点下一天，能避免快速连点时把真实安排覆盖掉。",
+      });
+      return;
+    }
+
     if (!attendanceLocked) {
       setLocalFeedback({
         kind: "info",
@@ -407,7 +438,7 @@ export function ActionPlanForm({
             id="attendanceStrategy"
             name="attendanceStrategy"
             defaultValue={defaultAttendanceStrategy}
-            disabled={attendanceLocked}
+            disabled={attendanceLocked || plannerSavePending}
             className="w-full rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-stone-800 disabled:bg-stone-100"
           >
             <option value="serious">认真上课</option>
@@ -419,7 +450,7 @@ export function ActionPlanForm({
           <SubmitButton
             label={attendanceLocked ? "本周课程态度已锁定" : "先确认本周课程态度"}
             pendingLabel="正在保存课程态度..."
-            disabled={attendanceLocked}
+            disabled={attendanceLocked || plannerSavePending}
             className="rounded-full bg-amber-600 px-5 py-3 font-semibold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-stone-400"
             testId="set-attendance-submit"
           />
@@ -437,11 +468,11 @@ export function ActionPlanForm({
               key={day.weekday}
               role="button"
               tabIndex={0}
-              aria-haspopup="dialog"
-              aria-expanded={selectedWeekday === day.weekday}
-              aria-disabled={!attendanceLocked}
-              aria-label={buildPlannerDayAriaLabel(day, attendanceLocked)}
-              onClick={() => openDayPlanner(day)}
+               aria-haspopup="dialog"
+               aria-expanded={selectedWeekday === day.weekday}
+               aria-disabled={!attendanceLocked || plannerSavePending}
+               aria-label={buildPlannerDayAriaLabel(day, attendanceLocked)}
+               onClick={() => openDayPlanner(day)}
               onKeyDown={(event) => handlePlannerDayKeyDown(event, () => openDayPlanner(day))}
               data-testid={`planner-day-${day.weekday}`}
               className={`rounded-2xl border p-4 text-left transition ${
@@ -513,14 +544,23 @@ export function ActionPlanForm({
       </form>
 
       {selectedDay ? (
-        <div className="fm-dialog-backdrop">
-          <div className="fm-dialog" data-testid="action-modal">
+        <GlobalPlannerDialog>
+          <div className="fm-dialog-backdrop">
+            <div
+              className="fm-dialog"
+              data-testid="action-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="planner-action-dialog-title"
+            >
             <div className="fm-dialog__header">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--fm-brand-dark)]">
                   {selectedDay.label}
                 </p>
-                <h2 className="mt-2 text-2xl font-semibold text-stone-900">给这一天排一个行动</h2>
+                <h2 id="planner-action-dialog-title" className="mt-2 text-2xl font-semibold text-stone-900">
+                  给这一天排一个行动
+                </h2>
                 <p className="mt-2 text-sm leading-6 text-stone-600">
                   默认节奏：{selectedDay.baseTypeLabel}。当前可排：
                   {skipClassDraft && selectedDay.skipClassAvailable
@@ -627,6 +667,7 @@ export function ActionPlanForm({
                           <SubmitButton
                             label="安排"
                             pendingLabel="保存中..."
+                            disabled={plannerSavePending}
                             className="rounded-full bg-[var(--fm-brand)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--fm-brand-dark)]"
                             testId="action-option-submit"
                           />
@@ -643,7 +684,11 @@ export function ActionPlanForm({
               <button
                 type="button"
                 className="fm-outline-button"
-                onClick={() => setSelectedWeekday(null)}
+                onClick={() => {
+                  if (!plannerSavePending) {
+                    setSelectedWeekday(null);
+                  }
+                }}
                 data-testid="action-modal-cancel"
               >
                 取消
@@ -652,8 +697,9 @@ export function ActionPlanForm({
                 点选卡片后立即保存
               </button>
             </div>
+            </div>
           </div>
-        </div>
+        </GlobalPlannerDialog>
       ) : null}
     </div>
   );

@@ -18,7 +18,7 @@ export default defineConfig({
   webServer: skipWebServer
     ? undefined
     : {
-        command: "node.exe node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3005",
+        command: "node.exe node_modules/next/dist/bin/next dev -H 127.0.0.1 -p 3005",
         url: baseURL,
         reuseExistingServer: false,
         timeout: 120_000,

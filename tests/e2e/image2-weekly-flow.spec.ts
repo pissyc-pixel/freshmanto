@@ -58,6 +58,7 @@ async function planDay(page: Page, weekday: "mon" | "tue" | "wed") {
       const label = (await option.getByTestId("action-option-label").textContent())?.trim();
       await option.getByTestId("action-option-submit").click();
       await page.waitForLoadState("networkidle");
+      await expect(page).toHaveURL(/\/game\?runId=/);
       await expect(page.getByTestId("action-modal")).toBeHidden();
       await expect(page.getByTestId(`planner-day-action-${weekday}`)).toContainText(label ?? "");
       return label ?? optionId;
@@ -84,7 +85,7 @@ test("image2 weekly planner smoke flow", async ({ page }) => {
   expect(runId).toBeTruthy();
 
   await expect(page.getByTestId("admission-page")).toBeVisible();
-  await expect(page.getByText("official document")).toBeVisible();
+  await expect(page.getByText("正式存档页")).toBeVisible();
   await expect(page.getByText("FIRST-YEAR STUDENT")).toHaveCount(0);
   await expect(page.getByText("Daily Planner")).toHaveCount(0);
   await saveShot(page, "02-admission.png");
@@ -106,7 +107,7 @@ test("image2 weekly planner smoke flow", async ({ page }) => {
 
   await page.getByTestId("formal-nav-journal").click();
   await page.waitForURL(new RegExp(`/journal\\?runId=${runId}`));
-  await expect(page.getByText("还没有进行中的 run")).toHaveCount(0);
+  await expect(page.getByText("还没有进行中的存档")).toHaveCount(0);
 
   await page.getByTestId("formal-nav-game").click();
   await page.waitForURL(new RegExp(`/game\\?runId=${runId}`));
@@ -114,7 +115,7 @@ test("image2 weekly planner smoke flow", async ({ page }) => {
 
   await page.getByTestId("formal-nav-resume").click();
   await page.waitForURL(new RegExp(`/resume\\?runId=${runId}`));
-  await expect(page.getByText("还没有进行中的 run")).toHaveCount(0);
+  await expect(page.getByText("还没有进行中的存档")).toHaveCount(0);
 
   await page.getByTestId("formal-nav-game").click();
   await page.waitForURL(new RegExp(`/game\\?runId=${runId}`));
@@ -138,6 +139,8 @@ test("image2 weekly planner smoke flow", async ({ page }) => {
     await planDay(page, "wed"),
   ];
 
+  await expect(page).toHaveURL(new RegExp(`/game\\?runId=${runId}`));
+  await expect(page.getByTestId("weekly-settlement-card")).toHaveCount(0);
   await expect(page.getByTestId("planner-day-action-mon")).toContainText(chosenLabels[0] ?? "");
   await expect(page.getByTestId("planner-day-action-tue")).toContainText(chosenLabels[1] ?? "");
   await expect(page.getByTestId("planner-day-action-wed")).toContainText(chosenLabels[2] ?? "");
@@ -176,10 +179,10 @@ test("image2 weekly planner smoke flow", async ({ page }) => {
   await expect(page).toHaveURL(new RegExp(`/settlement\\?runId=${runId}`));
   await page.locator(`a[href="/journal?runId=${runId}"]`).first().click();
   await page.waitForURL(new RegExp(`/journal\\?runId=${runId}`));
-  await expect(page.getByText("还没有进行中的 run")).toHaveCount(0);
+  await expect(page.getByText("还没有进行中的存档")).toHaveCount(0);
 
   await page.getByTestId("formal-nav-game").click();
   await page.waitForURL(new RegExp(`/game\\?runId=${runId}`));
   await expect(page.getByTestId("game-page")).toBeVisible();
-  await expect(page.getByText("还没有进行中的 run")).toHaveCount(0);
+  await expect(page.getByText("还没有进行中的存档")).toHaveCount(0);
 });
