@@ -12,6 +12,7 @@ import {
   formatWeeklyDayType,
   formatWeeklyEventFact,
 } from "@/lib/demo/options";
+import { annotatePlannerOptions } from "@/lib/planner-option-priority";
 import type {
   ActiveMonthState,
   ActiveWeekState,
@@ -131,6 +132,39 @@ export function buildPlannerDaysView(currentWeekState: ActiveWeekState, run?: Ga
           run,
         })
       : normalOptions;
+    const hasCashRisk = (currentWeekState.planningWarnings ?? []).length > 0;
+    const plannedOptionId = day.plannedAction?.optionId;
+    const dayEvent = currentWeekState.event?.weekday === day.weekday ? currentWeekState.event : null;
+    const prioritizedNormalOptions = annotatePlannerOptions({
+      options: normalOptions.map((option) => ({
+        optionId: option.optionId,
+        action: option.action,
+        label: option.label,
+        description: option.description,
+        source: option.source,
+        sourceEventId: option.sourceEventId,
+        selected:
+          currentWeekState.lastSelectedOptionId === option.optionId ||
+          plannedOptionId === option.optionId,
+      })),
+      event: dayEvent,
+      hasCashRisk,
+    });
+    const prioritizedSkipOptions = annotatePlannerOptions({
+      options: skipOptions.map((option) => ({
+        optionId: option.optionId,
+        action: option.action,
+        label: option.label,
+        description: option.description,
+        source: option.source,
+        sourceEventId: option.sourceEventId,
+        selected:
+          currentWeekState.lastSelectedOptionId === option.optionId ||
+          plannedOptionId === option.optionId,
+      })),
+      event: dayEvent,
+      hasCashRisk,
+    });
 
     return {
       weekday: day.weekday,
@@ -144,18 +178,9 @@ export function buildPlannerDaysView(currentWeekState: ActiveWeekState, run?: Ga
       skipClassSelected: day.skipClassSelected,
       eventTitle: currentWeekState.event?.weekday === day.weekday ? currentWeekState.event.title : null,
       eventSummary: currentWeekState.event?.weekday === day.weekday ? currentWeekState.event.summary : null,
-      normalOptions: normalOptions.map((option) => ({
-        optionId: option.optionId,
-        label: option.label,
-        description: option.description,
-        selected: currentWeekState.lastSelectedOptionId === option.optionId,
-      })),
-      skipOptions: skipOptions.map((option) => ({
-        optionId: option.optionId,
-        label: option.label,
-        description: option.description,
-        selected: currentWeekState.lastSelectedOptionId === option.optionId,
-      })),
+      hasCashRisk,
+      normalOptions: prioritizedNormalOptions,
+      skipOptions: prioritizedSkipOptions,
     };
   });
 }

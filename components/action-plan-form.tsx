@@ -5,13 +5,21 @@ import { useFormStatus } from "react-dom";
 
 import { submitActionTurnAction } from "@/app/actions";
 import { FmIcon } from "@/components/fm-ui/FmScaffold";
-import type { CourseAttendanceStrategy } from "@/types/game";
+import { buildPlannerEventNotice } from "@/lib/planner-option-priority";
+import { buildStatusGuidance } from "@/lib/status-guidance";
+import type { ActionType, CourseAttendanceStrategy } from "@/types/game";
 
 type PlannerDayOptionView = {
   optionId: string;
+  action: ActionType;
   label: string;
   description: string;
   selected: boolean;
+  source: "default" | "weekly_event";
+  sourceEventId?: string;
+  badges: string[];
+  isEventRelated: boolean;
+  isCashRiskAction: boolean;
 };
 
 export type PlannerDayView = {
@@ -26,6 +34,7 @@ export type PlannerDayView = {
   skipClassSelected: boolean;
   eventTitle: string | null;
   eventSummary: string | null;
+  hasCashRisk: boolean;
   normalOptions: PlannerDayOptionView[];
   skipOptions: PlannerDayOptionView[];
 };
@@ -44,6 +53,8 @@ type PendingPlannerSubmission = {
 type ActionPlanFormProps = {
   runId: string;
   currentWeek: number;
+  currentMood: number;
+  currentStress: number;
   attendanceLocked: boolean;
   defaultAttendanceStrategy: CourseAttendanceStrategy;
   plannerStatusText: string;
@@ -164,7 +175,7 @@ export function applyOptimisticPlan(
   weekday: string,
   optionLabel: string,
   skipClassSelected: boolean,
-): PlannerDayView[] {
+) {
   return days.map((day) => {
     if (day.weekday !== weekday) {
       return {
@@ -177,7 +188,7 @@ export function applyOptimisticPlan(
       skipClassSelected && day.skipClassAvailable
         ? day.baseTypeLabel.includes("半天")
           ? "翘掉半天课后补成完整白天，可安排白天行动"
-          : "翘掉白天课后释放白天，可安排白天行动"
+          : "翘掉白天课后释放完整白天，可安排白天行动"
         : day.effectiveTypeLabel;
 
     return {
@@ -219,7 +230,10 @@ function applyOptimisticPlans(days: PlannerDayView[], optimisticPlans: Record<st
   });
 }
 
-export function handlePlannerDayKeyDown(event: Pick<KeyboardEvent<HTMLElement>, "key" | "preventDefault">, onActivate: () => void) {
+export function handlePlannerDayKeyDown(
+  event: Pick<KeyboardEvent<HTMLElement>, "key" | "preventDefault">,
+  onActivate: () => void,
+) {
   if (event.key !== "Enter" && event.key !== " ") {
     return;
   }
@@ -236,9 +250,23 @@ export function buildPlannerDayAriaLabel(day: PlannerDayView, attendanceLocked: 
   return `${day.label}，${day.status}，${detail}${eventLabel}${readinessLabel}`;
 }
 
+function badgeClassName(badge: string) {
+  if (badge === "本日事件相关") {
+    return "bg-amber-100 text-amber-900";
+  }
+
+  if (badge === "现金风险优先") {
+    return "bg-rose-100 text-rose-900";
+  }
+
+  return "bg-emerald-100 text-emerald-900";
+}
+
 export function ActionPlanForm({
   runId,
   currentWeek,
+  currentMood,
+  currentStress,
   attendanceLocked,
   defaultAttendanceStrategy,
   plannerStatusText,
@@ -265,6 +293,17 @@ export function ActionPlanForm({
   const readyToConfirmNow = attendanceLocked && (readyToConfirm || plannerDays.length > 0);
   const highlightedWeekday =
     pendingPlan?.weekday ?? plannerDays.find((day) => day.justPlanned)?.weekday ?? null;
+  const eventNotice = selectedDay
+    ? buildPlannerEventNotice({
+        eventTitle: selectedDay.eventTitle,
+        eventSummary: selectedDay.eventSummary,
+        options: currentOptions,
+      })
+    : null;
+  const statusGuidance = buildStatusGuidance({
+    mood: currentMood,
+    stress: currentStress,
+  });
 
   function openDayPlanner(day: PlannerDayView) {
     if (!attendanceLocked) {
@@ -310,9 +349,10 @@ export function ActionPlanForm({
         hidden
       />
       <span data-testid="planner-attendance-locked" data-locked={attendanceLocked ? "true" : "false"} hidden />
+
       <div className="rounded-2xl border border-[var(--border)] bg-white/70 p-4 text-sm leading-6 text-stone-700">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="font-semibold text-stone-900">第 {currentWeek} 周操作</p>
+          <p className="font-semibold text-stone-900">第 {currentWeek} 周安排</p>
           {missingCount > 0 ? (
             <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-700">
               还差 {missingCount} 天没点，确认时会自动补成摆烂 / 发呆
@@ -335,6 +375,10 @@ export function ActionPlanForm({
             ))}
           </ul>
         ) : null}
+        <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">
+          <p className="font-semibold">{statusGuidance.summary}</p>
+          <p className="mt-1">{statusGuidance.strategy}</p>
+        </div>
       </div>
 
       {activeFeedback ? <FeedbackBanner feedback={activeFeedback} /> : null}
@@ -422,7 +466,7 @@ export function ActionPlanForm({
                         : "bg-stone-900 text-stone-50"
                   }`}
                 >
-                  {day.eventTitle ? "有事" : isPlanned ? "已安排" : "可排"}
+                  {day.eventTitle ? "有事件" : isPlanned ? "已安排" : "可排"}
                 </span>
               </div>
               <p className="mt-3 text-sm leading-6 text-stone-700" data-testid={`planner-day-action-${day.weekday}`}>
@@ -430,6 +474,9 @@ export function ActionPlanForm({
               </p>
               <p className="mt-2 text-xs leading-5 text-stone-500">默认节奏：{day.baseTypeLabel}</p>
               {day.eventTitle ? <p className="mt-2 text-xs leading-5 text-amber-700">{day.eventTitle}</p> : null}
+              {day.hasCashRisk ? (
+                <p className="mt-2 text-xs leading-5 text-rose-700">这周现金有点紧，赚钱或止损行动会优先显示。</p>
+              ) : null}
               {!attendanceLocked ? (
                 <p className="mt-3 text-xs leading-5 text-stone-500">先定课程态度，再点这一天。</p>
               ) : null}
@@ -459,7 +506,7 @@ export function ActionPlanForm({
               没点到的日期会自动补成“摆烂 / 发呆”，不会因为漏选卡住。
             </span>
           ) : (
-            <span className="text-sm text-stone-500">先把这周课程态度锁定，系统才知道怎么结算这一周。</span>
+            <span className="text-sm text-stone-500">先把这周课程态度锁定，系统才能结算这一周。</span>
           )}
         </div>
         <PendingHint text="正在统一结算本周安排；如果这是月末，也会顺带生成 AI 月记 / 月度总结。" />
@@ -479,7 +526,7 @@ export function ActionPlanForm({
                   {skipClassDraft && selectedDay.skipClassAvailable
                     ? selectedDay.baseTypeLabel.includes("半天")
                       ? "翘掉半天课后补成完整白天"
-                      : "翘掉白天课后释放白天时间"
+                      : "翘掉白天课后释放完整白天时间"
                     : selectedDay.effectiveTypeLabel}
                   。
                 </p>
@@ -488,6 +535,9 @@ export function ActionPlanForm({
                     {selectedDay.eventTitle}：{selectedDay.eventSummary}
                   </p>
                 ) : null}
+                <p className="mt-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">
+                  {statusGuidance.summary}
+                </p>
               </div>
               <button
                 type="button"
@@ -500,6 +550,19 @@ export function ActionPlanForm({
             </div>
 
             <div className="fm-dialog__body">
+              {eventNotice ? (
+                <div
+                  className={`rounded-2xl border px-4 py-3 text-sm leading-6 ${
+                    eventNotice.tone === "amber"
+                      ? "border-amber-200 bg-amber-50 text-amber-900"
+                      : "border-stone-200 bg-stone-50 text-stone-700"
+                  }`}
+                >
+                  <p className="font-semibold">{eventNotice.title}</p>
+                  <p className="mt-1">{eventNotice.body}</p>
+                </div>
+              ) : null}
+
               {selectedDay.skipClassAvailable ? (
                 <label className="mt-3 flex items-start gap-3 rounded-2xl border border-dashed border-[var(--border)] bg-stone-50/80 px-4 py-3 text-sm leading-6 text-stone-700">
                   <input
@@ -548,13 +611,22 @@ export function ActionPlanForm({
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <h3 data-testid="action-option-label">{option.label}</h3>
-                            {option.selected ? (
-                              <p className="mt-1 text-xs font-medium text-amber-700">你上次排过类似行动</p>
+                            {option.badges.length > 0 ? (
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {option.badges.map((badge) => (
+                                  <span
+                                    key={`${option.optionId}-${badge}`}
+                                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${badgeClassName(badge)}`}
+                                  >
+                                    {badge}
+                                  </span>
+                                ))}
+                              </div>
                             ) : null}
                           </div>
                           <SubmitButton
                             label="安排"
-                            pendingLabel="保存中"
+                            pendingLabel="保存中..."
                             className="rounded-full bg-[var(--fm-brand)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--fm-brand-dark)]"
                             testId="action-option-submit"
                           />

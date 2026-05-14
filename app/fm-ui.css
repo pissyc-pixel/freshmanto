@@ -1025,8 +1025,9 @@
 }
 
 .fm-option-card.is-selected {
-  border: 2px dashed var(--fm-orange);
-  box-shadow: 0 12px 24px rgba(240, 143, 68, 0.12);
+  border: 2px solid rgba(17, 148, 118, 0.42);
+  background: linear-gradient(180deg, rgba(239, 253, 249, 0.96), rgba(255, 255, 255, 0.92));
+  box-shadow: 0 12px 24px rgba(17, 148, 118, 0.14);
 }
 
 .fm-option-card__icon {
