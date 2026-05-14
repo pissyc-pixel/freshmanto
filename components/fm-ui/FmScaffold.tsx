@@ -327,7 +327,7 @@ export function FmShellLayout({
                 >
                   <FmIcon name={link.icon} />
                   <span>{link.label}</span>
-                  {readiness.status === "partial" ? <span className="fm-nav-link__meta">partial</span> : null}
+                  {readiness.status === "partial" ? <span className="fm-nav-link__meta">阶段中</span> : null}
                 </Link>
               );
             })}

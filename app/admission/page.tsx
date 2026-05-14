@@ -34,7 +34,7 @@ export default async function AdmissionPage({ searchParams }: AdmissionPageProps
               <div className="mt-6">
                 <FmPartialNotice
                   title="开局确认页"
-                  body="这一步只展示当前 run 已有的真实字段。没有 run 的时候，不会伪造录取信息。"
+                  body="这一步只展示当前存档已有的真实字段。没有存档的时候，不会伪造录取信息。"
                 />
               </div>
             </aside>
@@ -42,7 +42,7 @@ export default async function AdmissionPage({ searchParams }: AdmissionPageProps
             <section className="fm-document-card">
               <FmEmptyState
                 title="还没有可确认的录取信息"
-                body="先回到首页创建一局真实 run。录取通知书页不会自己生成学校、姓名、专业和校区。"
+                body="先回到首页创建一局真实存档。录取通知书页不会自己生成学校、姓名、专业和校区。"
               />
               <div className="fm-doc-actions">
                 <Link href="/" className="fm-doc-button fm-doc-button--primary">
@@ -69,7 +69,7 @@ export default async function AdmissionPage({ searchParams }: AdmissionPageProps
 
             <div className="mt-6">
               <FmPartialNotice
-                title="当前为 partial 接入"
+                title="当前为阶段接入"
                 body="真实流程里目前只有学校层级、城市层级和学科方向等基础画像；姓名、院系、专业、校区等字段暂未记录。"
               />
             </div>
@@ -109,8 +109,7 @@ export default async function AdmissionPage({ searchParams }: AdmissionPageProps
               </p>
               <p>{viewModel.statement}</p>
               <p>
-                你已被纳入本局大学生活模拟流程，后续每周行动、月末结算、成长日志、月记与履历都将只基于该
-                `run` 的真实推进结果呈现。
+                你已被纳入本局大学生活模拟流程，后续每周行动、月末结算、成长日志、月记与履历都将只基于这局真实推进结果呈现。
               </p>
               <p>
                 尚未被规则层确认的字段将暂以保守文案保留，不会以 UI 需要为理由补写成完整学校、专业或校区。
@@ -162,7 +161,7 @@ export default async function AdmissionPage({ searchParams }: AdmissionPageProps
               </button>
               <div className="fm-official">
                 <FmIcon name="file" className="h-4 w-4" />
-                <span>official document</span>
+                <span>正式存档页</span>
               </div>
             </div>
           </section>

@@ -157,7 +157,7 @@ function scholarshipAmount(run: GameRun): number {
 export const starterEventTemplates: EventRuleTemplate[] = [
   {
     id: "freshman-orientation",
-    title: "Freshman Orientation",
+    title: "新生适应活动",
     severity: "routine",
     phase: "monthly",
     polarity: "positive",
@@ -165,7 +165,7 @@ export const starterEventTemplates: EventRuleTemplate[] = [
     conditions: ["always"],
     baseWeight: 8,
     maxOccurrences: 1,
-    summary: "A first-month orientation gives a small push to campus belonging.",
+    summary: "开学第一个月的适应活动，会稍微帮你把人和环境接起来一点。",
     supportsRemedy: false,
     effect: {
       stats: {
@@ -177,14 +177,14 @@ export const starterEventTemplates: EventRuleTemplate[] = [
   },
   {
     id: "midterm-pressure",
-    title: "Midterm Pressure",
+    title: "期中压力",
     severity: "important",
     phase: "monthly",
     polarity: "negative",
     triggerMonths: [4, 10],
     conditions: ["academic_risk_high"],
     baseWeight: 7,
-    summary: "Missed material piles up near midterms and makes recovery harder.",
+    summary: "之前漏掉的课程内容会在期中前后一起压上来，补起来更吃力。",
     supportsRemedy: true,
     effect: {
       stats: {
@@ -199,7 +199,7 @@ export const starterEventTemplates: EventRuleTemplate[] = [
   },
   {
     id: "academic-scholarship",
-    title: "Academic Scholarship",
+    title: "学业奖学金",
     severity: "important",
     phase: "monthly",
     polarity: "positive",
@@ -207,7 +207,7 @@ export const starterEventTemplates: EventRuleTemplate[] = [
     conditions: ["academic_streak_high"],
     baseWeight: 8,
     maxOccurrences: 2,
-    summary: "Strong academic momentum can turn into scholarship or school-level recognition.",
+    summary: "学业势头够稳的时候，可能会换来奖学金或校内认可。",
     supportsRemedy: false,
     effect: {
       money: scholarshipAmount,
@@ -219,15 +219,15 @@ export const starterEventTemplates: EventRuleTemplate[] = [
       notableFact: "event:academic-scholarship",
       addResume: {
         category: "special_experience",
-        title: "Received an academic scholarship",
-        summary: "Academic momentum translated into scholarship or official recognition.",
+        title: "拿到一笔学业奖学金",
+        summary: "这一阶段的学业势头，终于换成了一次看得见的奖学金或正式认可。",
         tags: ["scholarship", "academic"],
       },
     },
   },
   {
     id: "teacher-attention",
-    title: "Teacher Attention",
+    title: "老师关注",
     severity: "routine",
     phase: "monthly",
     polarity: "positive",
@@ -235,7 +235,7 @@ export const starterEventTemplates: EventRuleTemplate[] = [
     conditions: ["academic_streak_high"],
     baseWeight: 6,
     maxOccurrences: 2,
-    summary: "Consistent work gets noticed and opens a little more guidance or opportunity.",
+    summary: "持续用功会被老师注意到，也可能换来一点提醒、指导或机会。",
     supportsRemedy: true,
     effect: {
       stats: {
@@ -248,22 +248,22 @@ export const starterEventTemplates: EventRuleTemplate[] = [
       notableFact: "event:teacher-attention",
       addResume: {
         category: "special_experience",
-        title: "Received faculty recognition",
-        summary: "A teacher noticed consistent work and offered more guidance or opportunities.",
+        title: "得到老师认可",
+        summary: "持续投入被老师看见之后，你获得了一点更具体的提醒、指导或机会。",
         tags: ["faculty", "academic"],
       },
     },
   },
   {
     id: "social-mutual-aid",
-    title: "Social Mutual Aid",
+    title: "同学互助",
     severity: "routine",
     phase: "monthly",
     polarity: "positive",
     triggerMonths: ALL_MONTHS,
     conditions: ["social_high"],
     baseWeight: 6,
-    summary: "Good social ties increase the odds of classmates sharing resources and reminders.",
+    summary: "社交关系好的时候，同学更可能主动分享资料和提醒。",
     supportsRemedy: true,
     effect: {
       stats: {
@@ -278,14 +278,14 @@ export const starterEventTemplates: EventRuleTemplate[] = [
   },
   {
     id: "economic-pressure",
-    title: "Economic Pressure",
+    title: "经济压力",
     severity: "critical",
     phase: "monthly",
     polarity: "negative",
     triggerMonths: ALL_MONTHS,
     conditions: ["money_low"],
     baseWeight: 9,
-    summary: "A thin wallet starts distorting mood, bandwidth, and day-to-day choices.",
+    summary: "手头一紧，情绪、精力和日常选择都会一起受影响。",
     supportsRemedy: true,
     effect: {
       stats: {
@@ -302,14 +302,14 @@ export const starterEventTemplates: EventRuleTemplate[] = [
   },
   {
     id: "stress-surge",
-    title: "Stress Surge",
+    title: "压力陡增",
     severity: "important",
     phase: "monthly",
     polarity: "negative",
     triggerMonths: ALL_MONTHS,
     conditions: ["stress_high"],
     baseWeight: 8,
-    summary: "A month of sustained pressure starts cutting into sleep, patience, and follow-through.",
+    summary: "一整个月都在顶压力的时候，睡眠、耐心和执行力会一起被磨掉。",
     supportsRemedy: true,
     effect: {
       stats: {
@@ -326,14 +326,14 @@ export const starterEventTemplates: EventRuleTemplate[] = [
   },
   {
     id: "burnout-slump",
-    title: "Burnout Slump",
+    title: "状态低谷",
     severity: "critical",
     phase: "monthly",
     polarity: "negative",
     triggerMonths: ALL_MONTHS,
     conditions: ["mood_low", "stress_high"],
     baseWeight: 10,
-    summary: "High stress and low mood combine into a rough slump that drags everything down.",
+    summary: "高压力和低心情叠在一起时，人会进入一段明显下坠的状态。",
     supportsRemedy: true,
     effect: {
       stats: {
@@ -350,7 +350,7 @@ export const starterEventTemplates: EventRuleTemplate[] = [
   },
   {
     id: "monthly-routine-reset",
-    title: "Routine Reset",
+    title: "节奏回拢",
     severity: "routine",
     phase: "monthly",
     polarity: "neutral",
@@ -358,7 +358,7 @@ export const starterEventTemplates: EventRuleTemplate[] = [
     conditions: ["always"],
     baseWeight: 2,
     fallback: true,
-    summary: "Even a quiet month leaves a small trace in routine and self-perception.",
+    summary: "就算没什么大事，一个平静月份也会在节奏和自我感受上留下痕迹。",
     supportsRemedy: false,
     effect: {
       stats: {
@@ -373,7 +373,7 @@ export const starterEventTemplates: EventRuleTemplate[] = [
 export const actionEventTemplates: EventRuleTemplate[] = [
   {
     id: "stress-spillover",
-    title: "Stress Spillover",
+    title: "压力外溢",
     severity: "important",
     phase: "action",
     polarity: "negative",
@@ -381,7 +381,7 @@ export const actionEventTemplates: EventRuleTemplate[] = [
     actionTypes: ["study", "job_prep", "part_time", "student_activity", "remedy"],
     conditions: ["stress_high"],
     baseWeight: 5,
-    summary: "Carrying too much stress makes even normal actions spill into extra strain.",
+    summary: "压力带太满的时候，连普通行动都会被额外拖累。",
     supportsRemedy: true,
     effect: {
       stats: {
@@ -397,7 +397,7 @@ export const actionEventTemplates: EventRuleTemplate[] = [
   },
   {
     id: "study-group-help",
-    title: "Study Group Help",
+    title: "同学帮忙",
     severity: "routine",
     phase: "action",
     polarity: "positive",
@@ -405,7 +405,7 @@ export const actionEventTemplates: EventRuleTemplate[] = [
     actionTypes: ["study", "job_prep", "social", "student_activity", "remedy"],
     conditions: ["social_high"],
     baseWeight: 6,
-    summary: "Strong social ties sometimes turn into practical help right after an action.",
+    summary: "社交关系不错时，同学有时会在行动之后给你一点很实际的帮助。",
     supportsRemedy: true,
     effect: {
       stats: {
@@ -421,7 +421,7 @@ export const actionEventTemplates: EventRuleTemplate[] = [
   },
   {
     id: "teacher-nudge",
-    title: "Teacher Nudge",
+    title: "老师提醒",
     severity: "routine",
     phase: "action",
     polarity: "positive",
@@ -429,7 +429,7 @@ export const actionEventTemplates: EventRuleTemplate[] = [
     actionTypes: ["study", "remedy"],
     conditions: ["academic_streak_high"],
     baseWeight: 5,
-    summary: "Strong study momentum can trigger timely encouragement or direction from a teacher.",
+    summary: "学习势头比较稳的时候，老师有时会给你一点及时提醒或鼓励。",
     supportsRemedy: true,
     effect: {
       stats: {
@@ -445,7 +445,7 @@ export const actionEventTemplates: EventRuleTemplate[] = [
   },
   {
     id: "cash-crunch",
-    title: "Cash Crunch",
+    title: "手头吃紧",
     severity: "important",
     phase: "action",
     polarity: "negative",
@@ -453,7 +453,7 @@ export const actionEventTemplates: EventRuleTemplate[] = [
     actionTypes: ["study", "job_prep", "part_time", "social", "relax", "student_activity", "remedy"],
     conditions: ["money_low"],
     baseWeight: 8,
-    summary: "Low cash makes follow-through harder and adds distraction after ordinary choices.",
+    summary: "现金太少的时候，普通选择都会被额外分心和焦虑拖住。",
     supportsRemedy: true,
     effect: {
       stats: {

@@ -1,4 +1,5 @@
 import type { ResumeItem } from "@/types/game";
+import { sanitizePlayerFacingText } from "@/lib/player-facing-text";
 
 type ResumeItemListProps = {
   items: ResumeItem[];
@@ -31,17 +32,17 @@ export function ResumeItemList({ items }: ResumeItemListProps) {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-amber-700">M{item.month}</p>
-              <h3 className="mt-1 text-lg font-semibold text-stone-900">{item.title}</h3>
+              <h3 className="mt-1 text-lg font-semibold text-stone-900">{sanitizePlayerFacingText(item.title)}</h3>
             </div>
             <span className="rounded-full bg-stone-900 px-3 py-1 text-xs font-semibold text-stone-50">
               {categoryLabels[item.category]}
             </span>
           </div>
-          <p className="mt-3 text-sm leading-6 text-stone-600">{item.summary}</p>
+          <p className="mt-3 text-sm leading-6 text-stone-600">{sanitizePlayerFacingText(item.summary)}</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {item.tags.map((tag) => (
               <span key={tag} className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-900">
-                {tag}
+                {sanitizePlayerFacingText(tag)}
               </span>
             ))}
           </div>

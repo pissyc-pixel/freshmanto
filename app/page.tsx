@@ -26,7 +26,7 @@ export default async function StartPage() {
             真实规则层会决定你的开局、每周可选行动、月末结果与后续走向。
           </div>
           <div className="fm-start-input">
-            这里不会预填假学校、假履历或假结局，先从一局真实 run 开始。
+            这里不会预填假学校、假履历或假结局，先从一局真实存档开始。
           </div>
           <div className="fm-start-help">每一次选择，都会慢慢把你的大学生活推成某一种样子。</div>
 

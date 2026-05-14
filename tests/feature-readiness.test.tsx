@@ -61,7 +61,7 @@ describe("fm ui feedback states", () => {
     expect(comingSoonMarkup).toContain("formal flow");
     expect(partialMarkup).toContain("Partial");
     expect(partialMarkup).toContain("Only real data is shown here.");
-    expect(partialMarkup).toContain("partial");
+    expect(partialMarkup).toContain("阶段说明");
   });
 
   it("keeps not-ready features out of the formal player sidebar", () => {

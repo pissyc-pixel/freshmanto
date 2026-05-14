@@ -13,8 +13,9 @@ import { buildJournalOverview } from "@/lib/journal-overview";
 import { buildGrowthJournalEntry, buildMonthlyDiaryDigest } from "@/lib/demo/monthly-digest";
 import { formatMonthLabel } from "@/lib/demo/options";
 import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
-import { getServerDemoBundle } from "@/lib/demo/server";
+import { getServerJournalBundle } from "@/lib/demo/server";
 import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
+import { sanitizePlayerFacingText } from "@/lib/player-facing-text";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,7 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
     searchParamRunId: readSearchParam(params.runId),
     cookieRunId: await readActiveRunIdFromCookies(),
   });
-  const bundle = runId ? await getServerDemoBundle(runId) : null;
+  const bundle = runId ? await getServerJournalBundle(runId) : null;
 
   if (!runId || !bundle) {
     return (
@@ -52,12 +53,12 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
           <FmPanel>
             <FmSectionHead
               title="这里会收集每个月的 AI 月记"
-              copy="月记只能基于真实月结算后的结构化摘要生成，没有 run 的时候不会凭空生成。"
+              copy="月记只能基于真实月结算后的结构化摘要生成，没有存档的时候不会凭空生成。"
             />
             <div className="mt-6">
               <FmEmptyState
                 title="先回到首页创建一局"
-                body="这条线索还没有在你的大学生活中出现。没有 run 的时候，这里会优先显示空状态，而不是直接报错。"
+                body="这条线索还没有在你的大学生活中出现。没有存档的时候，这里会优先显示空状态，而不是直接报错。"
               />
             </div>
           </FmPanel>
@@ -144,7 +145,7 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
                     </div>
                     <div className="fm-paper__date">{formatMonthLabel(latestReport.year, latestReport.month ?? 1)}</div>
                     <h2 className="fm-paper__title">月记</h2>
-                    <div className="fm-paper__copy">{latestReport.output_markdown}</div>
+                    <div className="fm-paper__copy">{sanitizePlayerFacingText(latestReport.output_markdown)}</div>
                     <div className="fm-paper__footer">
                       方向线索：{latestDigest.directionSignal}
                     </div>

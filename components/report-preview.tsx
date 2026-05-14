@@ -1,3 +1,5 @@
+import { sanitizePlayerFacingText } from "@/lib/player-facing-text";
+
 type ReportPreviewProps = {
   title: string;
   contractLabel: string;
@@ -34,7 +36,9 @@ export function ReportPreview({
       <article className="rounded-2xl border border-[var(--border)] bg-white/80 p-5">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">玩家可见正文</p>
         <h3 className="mt-2 text-lg font-semibold text-stone-900">{title}</h3>
-        <div className="mt-4 whitespace-pre-wrap text-sm leading-7 text-stone-700">{markdown}</div>
+        <div className="mt-4 whitespace-pre-wrap text-sm leading-7 text-stone-700">
+          {sanitizePlayerFacingText(markdown)}
+        </div>
       </article>
     </div>
   );
