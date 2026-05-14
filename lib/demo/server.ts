@@ -109,6 +109,14 @@ export async function getServerDemoBundle(runId: string) {
   };
 }
 
+export async function getServerDemoRun(runId: string) {
+  await ensureDemoSchema();
+  const repository = createServerSupabaseRepository();
+  const runRecord = await repository.getRun(runId);
+
+  return runRecord?.current_state_json ?? null;
+}
+
 export async function getServerEndingPreview(runId: string) {
   const bundle = await getServerDemoBundle(runId);
 

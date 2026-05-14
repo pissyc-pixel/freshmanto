@@ -9,9 +9,9 @@ import {
   buildWeeklySettlementView,
   resolveCurrentWeekState,
 } from "@/app/game/view-model";
+import { ActiveRunSync } from "@/components/active-run-sync";
 import { ActionPlanForm } from "@/components/action-plan-form";
 import { LogFeed } from "@/components/log-feed";
-import { ProfileSummary } from "@/components/profile-summary";
 import { ScrollIntoView } from "@/components/scroll-into-view";
 import { WeeklySettlementCard } from "@/components/weekly-settlement-card";
 import {
@@ -28,8 +28,10 @@ import {
   ensureProgressionState,
   summarizeDirectionSignals,
 } from "@/core/resolvers/progression";
+import { buildRunHref, resolveActiveRunId } from "@/lib/demo/active-run";
 import { buildGrowthJournalEntry } from "@/lib/demo/monthly-digest";
 import { formatMonthLabel } from "@/lib/demo/options";
+import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
 import { getServerDemoBundle } from "@/lib/demo/server";
 import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
 import type { DynamicStats, TimeBlockKind } from "@/types/game";
@@ -87,7 +89,7 @@ function buildMetricItems(stats: DynamicStats) {
 function formatDirectionStage(stage: "undecided" | "forming" | "clear") {
   switch (stage) {
     case "clear":
-      return "方向已经更清晰了";
+      return "方向已经更清楚了";
     case "forming":
       return "方向正在成形";
     default:
@@ -135,6 +137,7 @@ function labelForDayKind(kind: TimeBlockKind, released?: boolean) {
   if (released) {
     return "已释放";
   }
+
   switch (kind) {
     case "free":
       return "全天";
@@ -147,7 +150,10 @@ function labelForDayKind(kind: TimeBlockKind, released?: boolean) {
 
 export default async function GamePage({ searchParams }: GamePageProps) {
   const params = await searchParams;
-  const runId = readSearchParam(params.runId);
+  const runId = resolveActiveRunId({
+    searchParamRunId: readSearchParam(params.runId),
+    cookieRunId: await readActiveRunIdFromCookies(),
+  });
   const focusParam = readSearchParam(params.focus);
   const bundle = runId ? await getServerDemoBundle(runId) : null;
 
@@ -155,6 +161,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
     return (
       <FmShellLayout
         active="game"
+        runId={runId}
         title="本周周历"
         subtitle="先创建一局真实 run，再从这里进入逐天排周历和统一周结算。"
         headerMeta={<FmInlineStat tone="teal" icon="calendar" label="当前进度" value="未开局" />}
@@ -207,42 +214,41 @@ export default async function GamePage({ searchParams }: GamePageProps) {
   return (
     <FmShellLayout
       active="game"
+      runId={runId}
       title="本周周历"
       subtitle={`${formatMonthLabel(bundle.run.currentYear, bundle.run.currentMonth)} 的周排程与统一周结算都在这里完成。`}
-      sidebarSummary="敏感链路保持原样：只换视觉壳，不改 action pool、plannedAction、confirm_week 或周结算。"
+      sidebarSummary="这里只承接当前 run 的真实周流程，不靠前端内存猜状态。"
       headerMeta={
         <>
           <FmInlineStat tone="teal" icon="calendar" label="当前月份" value={formatMonthLabel(bundle.run.currentYear, bundle.run.currentMonth)} />
           <FmInlineStat tone="cyan" icon="book" label="当前周次" value={`第 ${Math.min(currentWeek, 4)} 周`} />
-          <FmInlineStat tone="amber" icon="alert" label="待排天数" value={`${plannerDays.filter((day) => !day.plannedActionLabel).length} 天`} />
+          <FmInlineStat
+            tone="amber"
+            icon="alert"
+            label="待排天数"
+            value={`${plannerDays.filter((day) => !day.plannedActionLabel).length} 天`}
+          />
         </>
       }
     >
       <div className="fm-stack" data-testid="game-page">
+        <ActiveRunSync runId={bundle.run.id} />
         <FmMetricStrip items={buildMetricItems(hydratedRun.stats)} />
 
         <div className="fm-grid-2">
           <div className="fm-stack">
             <FmPanel>
               <FmSectionHead
-                title="开局画像"
-                copy="这里只展示这局真实 run 的基础画像，不把设计稿里的信息强行塞进来。"
-              />
-              <div className="mt-6">
-                <ProfileSummary profile={hydratedRun.profile} />
-              </div>
-            </FmPanel>
-
-            <FmPanel>
-              <FmSectionHead
                 title="安排这一周"
-                copy="课程态度、逐天排程和确认本周都还是原来的状态管理与 payload，只换成新的视觉外壳。"
+                copy="课程态度、逐天排程和确认本周都还是原来的状态管理与 payload，只把入口做得更稳、更易懂。"
               />
               <div className="mt-6">
                 <ActionPlanForm
                   key={plannerFormKey}
                   runId={bundle.run.id}
                   currentWeek={Math.min(currentWeek, 4)}
+                  currentMood={hydratedRun.stats.mood}
+                  currentStress={hydratedRun.stats.stress}
                   attendanceLocked={Boolean(currentWeekState.attendanceLocked)}
                   defaultAttendanceStrategy={currentWeekState.attendanceStrategy}
                   plannerStatusText={plannerStatusText}
@@ -259,7 +265,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
                 <ScrollIntoView targetId="weekly-settlement" active={focusParam === "weekly-settlement"} />
                 <div id="weekly-settlement">
                   <FmPanel>
-                    <FmSectionHead title="上周结算" copy="这里读取的仍然是统一周结算结果，不会重算也不会猜测玩家选择。" />
+                    <FmSectionHead title="上周结算" copy="这里只读取已经落地的统一周结算结果，不会重算，也不会猜玩家选择。" />
                     <div className="mt-6">
                       <WeeklySettlementCard {...weeklySettlement} />
                     </div>
@@ -334,9 +340,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
                 </article>
                 <article className="fm-stat-card">
                   <div className="fm-stat-card__label">为什么会往这边偏</div>
-                  <div className="fm-stat-card__copy">
-                    {[...directionPerception.reasons, ...directionSignals].join(" ")}
-                  </div>
+                  <div className="fm-stat-card__copy">{[...directionPerception.reasons, ...directionSignals].join(" ")}</div>
                 </article>
                 <article className="fm-stat-card">
                   <div className="fm-stat-card__label">当前最值得留意</div>
@@ -352,7 +356,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
 
             {latestGrowthLog ? (
               <FmPanel>
-                <FmSectionHead title="最近一条成长日志" copy="这块偏事实层，只读取最近一次真实月结算留下来的记录。" />
+                <FmSectionHead title="最近一条成长日志" copy="这里只读取最近一次真实月结算留下来的记录。" />
                 <div className="mt-6">
                   <LogFeed items={[latestGrowthLog]} variant="player" />
                 </div>
@@ -367,10 +371,10 @@ export default async function GamePage({ searchParams }: GamePageProps) {
             </FmPanel>
 
             <div className="flex flex-wrap gap-3">
-              <Link href={`/settlement?runId=${bundle.run.id}`} className="fm-button-secondary">
+              <Link href={buildRunHref("/settlement", bundle.run.id)} className="fm-button-secondary">
                 查看最近月结算
               </Link>
-              <Link href={`/resume?runId=${bundle.run.id}`} className="fm-button-secondary">
+              <Link href={buildRunHref("/resume", bundle.run.id)} className="fm-button-secondary">
                 履历与成长日志
               </Link>
               <form action={startNewRunAction}>

@@ -1,9 +1,11 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { ensureDemoSchema } from "@/db/ensure-schema";
 import { generateAiReport } from "@/lib/ai/reports";
+import { ACTIVE_RUN_COOKIE } from "@/lib/demo/active-run";
 import {
   advanceServerDemoTurn,
   confirmServerWeek,
@@ -45,6 +47,15 @@ function readString(formData: FormData, key: string) {
   return typeof value === "string" ? value : "";
 }
 
+async function persistActiveRun(runId: string) {
+  const cookieStore = await cookies();
+  cookieStore.set(ACTIVE_RUN_COOKIE, runId, {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30,
+    sameSite: "lax",
+  });
+}
+
 function parseActionTurn(formData: FormData) {
   const action = actionSchema.parse(readString(formData, "action")) as ActionType;
   const time = timeSchema.parse(readString(formData, "time") || "night") as ActionTime;
@@ -62,11 +73,13 @@ function parseActionTurn(formData: FormData) {
 
 export async function startNewRunAction() {
   const result = await createServerDemoRun();
+  await persistActiveRun(result.run.id);
   redirect(`/admission?runId=${result.run.id}`);
 }
 
 export async function submitActionTurnAction(formData: FormData) {
   const runId = z.string().min(1).parse(readString(formData, "runId"));
+  await persistActiveRun(runId);
   const intent = readString(formData, "intent") || "act";
   const attendanceStrategy = attendanceSchema.parse(
     readString(formData, "attendanceStrategy"),

@@ -1,5 +1,7 @@
+import { ActiveRunSync } from "@/components/active-run-sync";
 import { FmEmptyState } from "@/components/fm-ui/FmEmptyState";
 import { FmPartialNotice } from "@/components/fm-ui/FmPartialNotice";
+import { ProfileSummary } from "@/components/profile-summary";
 import {
   FmIcon,
   FmInlineStat,
@@ -16,8 +18,10 @@ import {
   ensureProgressionState,
   summarizeDirectionSignals,
 } from "@/core/resolvers/progression";
+import { resolveActiveRunId } from "@/lib/demo/active-run";
 import { buildGrowthJournalEntry } from "@/lib/demo/monthly-digest";
 import { formatCityTier, formatCollegeTrack, formatMonthLabel, formatSchoolTier } from "@/lib/demo/options";
+import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
 import { getServerDemoBundle } from "@/lib/demo/server";
 import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
 
@@ -61,13 +65,17 @@ function buildCoreAbilityTags(items: {
 
 export default async function ResumePage({ searchParams }: ResumePageProps) {
   const params = await searchParams;
-  const runId = readSearchParam(params.runId);
+  const runId = resolveActiveRunId({
+    searchParamRunId: readSearchParam(params.runId),
+    cookieRunId: await readActiveRunIdFromCookies(),
+  });
   const bundle = runId ? await getServerDemoBundle(runId) : null;
 
   if (!runId || !bundle) {
     return (
       <FmShellLayout
         active="resume"
+        runId={runId}
         title="个人履历"
         subtitle="这里会把真实形成的 GPA、排名、履历条目和成长痕迹整理出来。没有数据时，只展示空状态，不会直接报错。"
         headerMeta={
@@ -147,6 +155,7 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
   return (
     <FmShellLayout
       active="resume"
+      runId={runId}
       title="个人履历"
       subtitle="履历页只整理已经形成的证据，帮助你看清现在这局真实地在往哪条路上偏。"
       sidebarSummary="这里展示的是当前 run 的真实画像：GPA、履历条目、方向线索与阶段日志。"
@@ -169,6 +178,7 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
       }
     >
       <div className="fm-grid-2">
+        <ActiveRunSync runId={bundle.run.id} />
         <div className="fm-stack">
           <FmPanel padded={false}>
             <section className="fm-resume-head">
@@ -215,6 +225,16 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
                 )}
               </div>
             </section>
+          </FmPanel>
+
+          <FmPanel>
+            <FmSectionHead
+              title="基础画像 / 入学档案"
+              copy="学院、学校、城市、家庭资源和初始特质都只读取当前 run 的真实字段，缺失时保守展示。"
+            />
+            <div className="mt-6">
+              <ProfileSummary profile={hydratedRun.profile} />
+            </div>
           </FmPanel>
 
           <FmPanel>

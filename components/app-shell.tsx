@@ -5,6 +5,7 @@ type AppShellProps = {
   eyebrow: string;
   title: string;
   description: string;
+  runId?: string;
   actions?: ReactNode;
   children: ReactNode;
 };
@@ -13,13 +14,14 @@ export function AppShell({
   eyebrow,
   title,
   description,
+  runId,
   actions,
   children
 }: AppShellProps) {
   return (
     <main className="min-h-screen px-6 py-8 text-stone-900 md:px-10">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
-        <NavBar />
+        <NavBar runId={runId} />
         <section className="rounded-[2rem] border border-amber-900/10 bg-[var(--surface)] p-8 shadow-[0_24px_60px_rgba(84,51,16,0.08)] backdrop-blur">
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-amber-700">{eyebrow}</p>
           <div className="mt-3 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
@@ -35,4 +37,3 @@ export function AppShell({
     </main>
   );
 }
-

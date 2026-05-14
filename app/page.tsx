@@ -1,9 +1,14 @@
 import Link from "next/link";
 
 import { startNewRunAction } from "@/app/actions";
+import { StartNewRunButton } from "@/components/start-new-run-button";
 import { FmAppRoot, FmBrandMark, FmIcon } from "@/components/fm-ui/FmScaffold";
+import { buildRunHref } from "@/lib/demo/active-run";
+import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
 
-export default function StartPage() {
+export default async function StartPage() {
+  const activeRunId = await readActiveRunIdFromCookies();
+
   return (
     <FmAppRoot centered data-testid="start-page">
       <section className="fm-start-scene">
@@ -26,14 +31,11 @@ export default function StartPage() {
           <div className="fm-start-help">每一次选择，都会慢慢把你的大学生活推成某一种样子。</div>
 
           <form action={startNewRunAction} data-testid="start-new-run-form">
-            <button type="submit" className="fm-button-primary" data-testid="start-new-run-submit">
-              <FmIcon name="chevron-right" className="h-7 w-7" />
-              <span>开始新档</span>
-            </button>
+            <StartNewRunButton />
           </form>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <Link href="/game" className="fm-button-secondary">
+            <Link href={buildRunHref("/game", activeRunId)} className="fm-button-secondary">
               <FmIcon name="calendar" />
               <span>查看当前周历</span>
             </Link>

@@ -1,3 +1,4 @@
+import { ActiveRunSync } from "@/components/active-run-sync";
 import { FmEmptyState } from "@/components/fm-ui/FmEmptyState";
 import { FmPartialNotice } from "@/components/fm-ui/FmPartialNotice";
 import {
@@ -7,8 +8,11 @@ import {
   FmSectionHead,
   FmShellLayout,
 } from "@/components/fm-ui/FmScaffold";
+import { resolveActiveRunId } from "@/lib/demo/active-run";
+import { buildJournalOverview } from "@/lib/journal-overview";
 import { buildGrowthJournalEntry, buildMonthlyDiaryDigest } from "@/lib/demo/monthly-digest";
 import { formatMonthLabel } from "@/lib/demo/options";
+import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
 import { getServerDemoBundle } from "@/lib/demo/server";
 import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
 
@@ -24,13 +28,17 @@ function formatMoney(value: number) {
 
 export default async function JournalPage({ searchParams }: JournalPageProps) {
   const params = await searchParams;
-  const runId = readSearchParam(params.runId);
+  const runId = resolveActiveRunId({
+    searchParamRunId: readSearchParam(params.runId),
+    cookieRunId: await readActiveRunIdFromCookies(),
+  });
   const bundle = runId ? await getServerDemoBundle(runId) : null;
 
   if (!runId || !bundle) {
     return (
       <FmShellLayout
         active="journal"
+        runId={runId}
         title="成长日志"
         subtitle="这里会收集每个月的 AI 月记，也会把规则层已经确认过的成长痕迹按时间整理出来。"
         headerMeta={
@@ -72,6 +80,10 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
   }
 
   const monthlyReports = bundle.aiReports.filter((item) => item.report_type === "monthly_journal");
+  const overview = buildJournalOverview({
+    monthlyStates: bundle.monthlyStates,
+    aiReports: bundle.aiReports,
+  });
   const pendingMonths = bundle.monthlyStates.filter(
     (state) => !monthlyReports.some((report) => report.year === state.year && report.month === state.month),
   );
@@ -94,18 +106,20 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
   return (
     <FmShellLayout
       active="journal"
+      runId={runId}
       title="成长日志"
       subtitle="这里会收集每个月的 AI 月记，也会把规则层已经确认过的成长痕迹按时间整理出来。"
       sidebarSummary="已开放页面只展示真实月度状态、AI 月记归档与履历证据，不补写不存在的经历。"
       headerMeta={
         <>
-          <FmInlineStat tone="teal" icon="book" label="月记归档" value={`${monthlyReports.length} 篇`} />
-          <FmInlineStat tone="amber" icon="calendar" label="成长记录" value={`${growthEntries.length} 条`} />
-          <FmInlineStat tone="cyan" icon="check" label="待生成" value={`${pendingMonths.length} 月`} />
+          <FmInlineStat tone="teal" icon="book" label="月记归档" value={`${overview.monthlyJournalCount} 篇`} />
+          <FmInlineStat tone="amber" icon="calendar" label="成长记录" value={`${overview.growthLogCount} 条`} />
+          <FmInlineStat tone="cyan" icon="check" label="已结算月份" value={`${overview.settledMonthCount} 月`} />
         </>
       }
     >
       <div className="fm-grid-2">
+        <ActiveRunSync runId={bundle.run.id} />
         <div className="fm-stack">
           <FmPanel>
             <FmSectionHead

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ComponentPropsWithoutRef, ReactNode } from "react";
 
+import { buildRunHref } from "@/lib/demo/active-run";
 import { featureReadiness, isFeatureRoutedForPlayers, type FeatureKey } from "@/lib/feature-readiness";
 
 type IconName =
@@ -270,6 +271,7 @@ export function FmMetricStrip({
 
 export function FmShellLayout({
   active,
+  runId,
   title,
   subtitle,
   sidebarTitle = "大学生活模拟器",
@@ -279,6 +281,7 @@ export function FmShellLayout({
   children,
 }: {
   active: SidebarPageKey;
+  runId?: string;
   title: ReactNode;
   subtitle?: ReactNode;
   sidebarTitle?: string;
@@ -315,12 +318,12 @@ export function FmShellLayout({
                 return null;
               }
 
-              return (
-                <Link
-                  href={link.href}
-                  key={link.key}
-                  data-testid={`formal-nav-${link.key}`}
-                  className={`fm-nav-link ${active === link.sidebarKey ? "is-active" : ""}`}
+                return (
+                  <Link
+                  href={buildRunHref(link.href, runId)}
+                    key={link.key}
+                    data-testid={`formal-nav-${link.key}`}
+                    className={`fm-nav-link ${active === link.sidebarKey ? "is-active" : ""}`}
                 >
                   <FmIcon name={link.icon} />
                   <span>{link.label}</span>

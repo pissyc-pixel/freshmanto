@@ -1,10 +1,13 @@
 import Link from "next/link";
 
+import { ActiveRunSync } from "@/components/active-run-sync";
 import { FmEmptyState } from "@/components/fm-ui/FmEmptyState";
 import { FmPartialNotice } from "@/components/fm-ui/FmPartialNotice";
 import { FmAppRoot, FmBrandMark, FmIcon } from "@/components/fm-ui/FmScaffold";
 import { buildAdmissionViewModel } from "@/lib/admission-view-model";
-import { getServerDemoBundle } from "@/lib/demo/server";
+import { resolveActiveRunId } from "@/lib/demo/active-run";
+import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
+import { getServerDemoRun } from "@/lib/demo/server";
 import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
 
 export const dynamic = "force-dynamic";
@@ -15,10 +18,13 @@ type AdmissionPageProps = {
 
 export default async function AdmissionPage({ searchParams }: AdmissionPageProps) {
   const params = await searchParams;
-  const runId = readSearchParam(params.runId);
-  const bundle = runId ? await getServerDemoBundle(runId) : null;
+  const runId = resolveActiveRunId({
+    searchParamRunId: readSearchParam(params.runId),
+    cookieRunId: await readActiveRunIdFromCookies(),
+  });
+  const run = runId ? await getServerDemoRun(runId) : null;
 
-  if (!runId || !bundle) {
+  if (!runId || !run) {
     return (
       <FmAppRoot>
         <div className="fm-page-center">
@@ -50,10 +56,11 @@ export default async function AdmissionPage({ searchParams }: AdmissionPageProps
     );
   }
 
-  const viewModel = buildAdmissionViewModel(bundle.run);
+  const viewModel = buildAdmissionViewModel(run);
 
   return (
     <FmAppRoot data-testid="admission-page">
+      <ActiveRunSync runId={run.id} />
       <div className="fm-page-center">
         <div className="fm-page-grid">
           <aside className="fm-side-sheet">

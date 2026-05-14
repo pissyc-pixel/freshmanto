@@ -1,3 +1,4 @@
+import { ActiveRunSync } from "@/components/active-run-sync";
 import { AppShell } from "@/components/app-shell";
 import { FactList } from "@/components/fact-list";
 import { ReportPreview } from "@/components/report-preview";
@@ -8,6 +9,8 @@ import {
   formatGraduationOutcome,
   formatMonthLabel,
 } from "@/lib/demo/options";
+import { resolveActiveRunId } from "@/lib/demo/active-run";
+import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
 import { getServerEndingPreview } from "@/lib/demo/server";
 import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
 
@@ -49,12 +52,16 @@ function formatPathResultLabel(result?: string) {
 
 export default async function EndingPage({ searchParams }: EndingPageProps) {
   const params = await searchParams;
-  const runId = readSearchParam(params.runId);
+  const runId = resolveActiveRunId({
+    searchParamRunId: readSearchParam(params.runId),
+    cookieRunId: await readActiveRunIdFromCookies(),
+  });
   const bundle = runId ? await getServerEndingPreview(runId) : null;
 
   if (!runId || !bundle) {
     return (
       <AppShell
+        runId={runId}
         eyebrow="结局"
         title="还没有可查看的结局"
         description="结局页会展示目前已经能确定的走向，以及毕业后保存下来的 AI 回望。"
@@ -76,11 +83,13 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
 
   return (
     <AppShell
+      runId={runId}
       eyebrow="结局"
       title={bundle.run.status === "completed" ? "正式结局回望" : "当前结局预览"}
       description="这里先展示目前已经能确定的结局线索；等毕业结算真正落地后，AI 才会把这些事实整理成完整回望。"
     >
       <div className="space-y-6">
+        <ActiveRunSync runId={bundle.run.id} />
         <SectionCard
           title="当前已经能确定的结局线索"
           description={`眼下更像会走到：${predictedOutcome}。长期学业均值大约是 ${bundle.endingSummary.longTermAcademicAverage}。`}
