@@ -95,6 +95,10 @@ function normalizeMonthlySummary(summary: StructuredMonthlySummary): StructuredM
 }
 
 function summarizeEmotionalArc(summary: StructuredMonthlySummary) {
+  if (summary.notableFacts.includes("vacation:winter-break") || summary.notableFacts.includes("vacation:summer-break")) {
+    return "这个月更像是在假期里重新分配时间，节奏没有平时上课那么挤，但也更考验自己怎么安排。";
+  }
+
   if (summary.statsDelta.stress >= 8) {
     return "这个月明显是在顶着压力往前赶，很多时候不是从容安排，而是硬把事情往下推。";
   }
@@ -252,6 +256,14 @@ function buildKeyMoments(summary: StructuredMonthlySummary, directionSignal: str
 }
 
 function buildTitle(summary: StructuredMonthlySummary) {
+  if (summary.notableFacts.includes("vacation:winter-break")) {
+    return "这个寒假没再按上课周过日子";
+  }
+
+  if (summary.notableFacts.includes("vacation:summer-break")) {
+    return "这个暑假终于开始自己决定怎么分配时间";
+  }
+
   if (summary.scholarshipAwarded?.level === "high") {
     return "这个月终于尝到一点被回报的感觉";
   }

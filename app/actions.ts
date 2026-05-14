@@ -25,6 +25,7 @@ const attendanceSchema = z.enum([
 
 const actionSchema = z.enum([
   "study",
+  "writing_research",
   "job_prep",
   "postgraduate_prep",
   "public_exam_prep",

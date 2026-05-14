@@ -52,7 +52,7 @@ export default async function SettlementPage({ searchParams }: SettlementPagePro
         title="这里会展示月底结算"
         description="月底结算会把状态总览、成长日志、AI 月记和系统留档分开展示。"
       >
-        <SectionCard title="还没有可查询的 run" description="先回到首页创建一局，再从主游戏推进到月底。">
+        <SectionCard title="还没有可查询的存档" description="先回到首页创建一局，再从主游戏推进到月底。">
           <Link href="/" className="text-sm font-semibold text-amber-700 underline-offset-4 hover:underline">
             返回开局页
           </Link>
@@ -122,10 +122,10 @@ export default async function SettlementPage({ searchParams }: SettlementPagePro
             查看月记归档
           </Link>
           <Link
-            href={buildRunHref("/game", runId)}
+            href={buildRunHref(bundle.run.status === "completed" ? "/ending" : "/game", runId)}
             className="rounded-full border border-amber-900/15 bg-white/60 px-5 py-3 font-semibold text-stone-800 transition hover:bg-white/90"
           >
-            继续下个月
+            {bundle.run.status === "completed" ? "查看正式结局" : "继续下个月"}
           </Link>
         </>
       }

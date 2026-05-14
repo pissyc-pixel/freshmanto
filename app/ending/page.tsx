@@ -4,6 +4,7 @@ import { FactList } from "@/components/fact-list";
 import { ReportPreview } from "@/components/report-preview";
 import { ResumeItemList } from "@/components/resume-item-list";
 import { SectionCard } from "@/components/section-card";
+import { deriveAcademicProfile } from "@/core/resolvers/progression";
 import {
   formatEndingNotableFact,
   formatGraduationOutcome,
@@ -38,15 +39,49 @@ function formatPathLabel(path?: string) {
 function formatPathResultLabel(result?: string) {
   switch (result) {
     case "success":
-      return "走势比较稳";
+      return "成功落地";
     case "ordinary":
-      return "已经成形，但还不算特别稳";
+      return "普通完成";
     case "failure":
-      return "有明显风险";
+      return "结果不太理想";
     case "pivot":
-      return "后面大概率还会转向";
+      return "中途转向";
     default:
       return "还在继续变化";
+  }
+}
+
+function formatDirectionLabel(direction?: string) {
+  switch (direction) {
+    case "employment":
+      return "就业";
+    case "postgraduate":
+      return "考研";
+    case "public_exam":
+      return "考公";
+    case "recommendation":
+      return "推免";
+    default:
+      return "仍未定型";
+  }
+}
+
+function formatRecommendationQualification(status?: string) {
+  switch (status) {
+    case "eligible":
+      return "已经形成推免竞争力";
+    case "borderline":
+      return "已经摸到推免边缘";
+    case "unlikely":
+      return "当前还够不到推免线";
+    case "accepted":
+      return "已经拿到推免资格";
+    case "declined_to_postgraduate":
+      return "放弃推免，转向考研";
+    case "declined_to_employment":
+      return "放弃推免，转向就业";
+    default:
+      return "暂未正式判断";
   }
 }
 
@@ -66,7 +101,7 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
         title="还没有可查看的结局"
         description="结局页会展示目前已经能确定的走向，以及毕业后保存下来的 AI 回望。"
       >
-        <SectionCard title="暂无结局" description="先创建 run 并继续推进月份。">
+        <SectionCard title="暂无结局" description="先创建存档并继续推进月份。">
           <p className="text-sm leading-6 text-stone-600">
             在四年完整结束前，这里只会显示当前规则层已经能看出来的结局预估。
           </p>
@@ -77,48 +112,70 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
 
   const predictedOutcome = formatGraduationOutcome(bundle.endingSummary.outcome);
   const savedReport = bundle.savedEndingReport;
+  const academicProfile = deriveAcademicProfile(bundle.run);
   const endingFacts = bundle.endingSummary.notableFacts.map(formatEndingNotableFact);
   const pathLabel = formatPathLabel(bundle.endingSummary.graduationPath);
   const pathResultLabel = formatPathResultLabel(bundle.endingSummary.pathResult);
+  const completed = bundle.run.status === "completed";
+  const reviewFacts = [
+    academicProfile.gpa !== null
+      ? `最终已结算 GPA：${academicProfile.gpa.toFixed(2)}`
+      : "最终 GPA：暂无已结算成绩",
+    `长期学业均值：${bundle.endingSummary.longTermAcademicAverage}`,
+    `毕业时手头余额：${bundle.run.stats.money} 元`,
+    `毕业时心情 / 压力：${bundle.run.stats.mood} / ${bundle.run.stats.stress}`,
+    `累积履历条目：${bundle.run.resume.length} 条`,
+    `长期主导方向：${formatDirectionLabel(bundle.endingSummary.dominantDirection)}`,
+  ];
 
   return (
     <AppShell
       runId={runId}
       eyebrow="结局"
-      title={bundle.run.status === "completed" ? "正式结局回望" : "当前结局预览"}
-      description="这里先展示目前已经能确定的结局线索；等毕业结算真正落地后，AI 才会把这些事实整理成完整回望。"
+      title={completed ? "正式结局回望" : "当前结局预览"}
+      description={
+        completed
+          ? "四年已经走完，这里只回顾规则层已经真实落地的毕业结果、去向与关键轨迹。"
+          : "这里先展示目前已经能确定的结局线索；等毕业结算真正落地后，AI 才会把这些事实整理成完整回望。"
+      }
     >
       <div className="space-y-6">
         <ActiveRunSync runId={bundle.run.id} />
         <SectionCard
-          title="当前已经能确定的结局线索"
-          description={`眼下更像会走到：${predictedOutcome}。长期学业均值大约是 ${bundle.endingSummary.longTermAcademicAverage}。`}
+          title={completed ? "毕业结果" : "当前已经能确定的结局线索"}
+          description={
+            completed
+              ? `这局最后落在“${predictedOutcome}”，主去向更像是“${pathLabel}”，结果层属于“${pathResultLabel}”。`
+              : `眼下更像会走到：${predictedOutcome}。长期学业均值大约是 ${bundle.endingSummary.longTermAcademicAverage}。`
+          }
         >
           <FactList
             items={[
-              `当前学年位置：${formatMonthLabel(Math.min(bundle.run.currentYear, 4), Math.min(bundle.run.currentMonth, 12))}`,
-              `后期主路径：${pathLabel}`,
-              `这条路径现在的状态：${pathResultLabel}`,
+              completed
+                ? `毕业结算完成于：${formatMonthLabel(4, 12)}`
+                : `当前学年位置：${formatMonthLabel(Math.min(bundle.run.currentYear, 4), Math.min(bundle.run.currentMonth, 12))}`,
+              `主去向：${pathLabel}`,
+              `结果层：${pathResultLabel}`,
               ...endingFacts,
             ]}
           />
         </SectionCard>
 
         <SectionCard
-          title="后期路径画像"
-          description="这一块只把当前已经能看出来的主方向翻出来，不提前替玩家把人生盖棺定论。"
+          title={completed ? "四年轨迹回看" : "后期路径画像"}
+          description={
+            completed
+              ? "这里只回看已经沉淀下来的学业、状态、履历和方向变化，不把没实现的系统写成发生过。"
+              : "这一块只把当前已经能看出来的主方向翻出来，不提前替玩家把人生盖棺定论。"
+          }
         >
           <FactList
             items={[
-              bundle.endingSummary.recommendationQualification
-                ? `推免资格状态：${bundle.endingSummary.recommendationQualification}`
-                : "推免资格还没有形成明确结论。",
+              ...reviewFacts,
+              `推免资格状态：${formatRecommendationQualification(bundle.endingSummary.recommendationQualification)}`,
               typeof bundle.endingSummary.publicExamProgress === "number"
-                ? `公考进度：${bundle.endingSummary.publicExamProgress}`
+                ? `公考准备进度：${bundle.endingSummary.publicExamProgress}`
                 : "公考线目前还没有形成稳定进度。",
-              bundle.endingSummary.dominantDirection
-                ? `长期主导倾向：${bundle.endingSummary.dominantDirection}`
-                : "长期倾向还没有完全定型。",
             ]}
           />
         </SectionCard>
@@ -128,11 +185,11 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
         </SectionCard>
 
         <SectionCard
-          title={savedReport ? "已保存的结局回望" : "结局回望尚未落地"}
+          title={savedReport ? (completed ? "毕业回望" : "已保存的结局回望") : "结局回望尚未落地"}
           description={
             savedReport
-              ? "这份回望来自已经保存的 ending_report 记录。"
-              : "当前 run 还没走完四年，所以这里只展示规则层预估，不会提前生成正式结局文案。"
+              ? "这份回望只负责把规则层已经确定的结果写成自然叙述，不负责改写结局。"
+              : "当前存档还没走完四年，所以这里只展示规则层预估，不会提前生成正式结局文案。"
           }
         >
           {savedReport ? (

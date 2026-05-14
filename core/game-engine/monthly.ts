@@ -18,6 +18,7 @@ import {
   createWeeklyCalendar,
   getActionTimeCost,
   getWeeklyDayLabel,
+  isVacationMonth,
   isWeekReadyToConfirm,
   releaseSkippedClassDays,
   resolveAvailableWeeklyActions,
@@ -568,6 +569,11 @@ function buildMonthlySummary(input: {
     eventIds: input.eventIds,
     resumeAdditions: [...turnResumeAdditions, ...input.eventResumeAdditions],
     notableFacts: dedupe([
+      isVacationMonth(input.runBeforeMonth.currentMonth)
+        ? input.runBeforeMonth.currentMonth === 6
+          ? "vacation:winter-break"
+          : "vacation:summer-break"
+        : "",
       ...turns.flatMap((turn) => turn.notableFacts),
       ...input.eventFacts,
     ]),
@@ -1257,6 +1263,12 @@ export function confirmPlannedWeek(run: GameRun): {
     };
     const eventBoost = findWeeklyEventBoost(weekState.event, option);
     const skipClassEffect = createSkipClassDayEffect(day);
+    const missedEventEffect =
+      weekState.event?.weekday === day.weekday &&
+      weekState.event.missEffect &&
+      plannedAction.sourceEventId !== weekState.event.id
+        ? weekState.event.missEffect
+        : undefined;
     const livingCostEffect: WeeklyActionEffect = {
       money: -(dailyLivingCosts[dayIndex] ?? 0),
       notableFact: `daily-living-cost:${dailyLivingCosts[dayIndex] ?? 0}`,
@@ -1265,30 +1277,36 @@ export function confirmPlannedWeek(run: GameRun): {
       ? {
           stats: sumStats(
             sumStats(
-              sumStats(emptyStatsDelta(), eventBoost.stats),
+              sumStats(
+                sumStats(emptyStatsDelta(), eventBoost.stats),
+                missedEventEffect?.stats,
+              ),
               livingCostEffect.stats,
             ),
             skipClassEffect.stats,
           ),
           money:
             (eventBoost.money ?? 0) +
+            (missedEventEffect?.money ?? 0) +
             (livingCostEffect.money ?? 0) +
             (skipClassEffect.money ?? 0),
           risk: sumRisk(
             sumRisk(
               sumRisk(emptyRiskDelta(), eventBoost.risk),
-              livingCostEffect.risk,
+              missedEventEffect?.risk,
             ),
-            skipClassEffect.risk,
+            sumRisk(sumRisk(emptyRiskDelta(), livingCostEffect.risk), skipClassEffect.risk),
           ),
           flags: dedupe([
             ...(eventBoost.flags ?? []),
+            ...(missedEventEffect?.flags ?? []),
             ...(livingCostEffect.flags ?? []),
             ...(skipClassEffect.flags ?? []),
           ]),
-          notableFact: eventBoost.notableFact ?? livingCostEffect.notableFact ?? skipClassEffect.notableFact,
+          notableFact: eventBoost.notableFact ?? missedEventEffect?.notableFact ?? livingCostEffect.notableFact ?? skipClassEffect.notableFact,
           resume:
             eventBoost.resume ??
+            missedEventEffect?.resume ??
             skipClassEffect.resume,
         }
       : livingCostEffect;

@@ -64,6 +64,7 @@ const COURSE_LOCKED_DAYTIME_WEEKDAYS: Weekday[] = ["mon", "tue", "wed", "thu", "
 
 const ACTION_TIME_COSTS: Record<ActionType, number> = {
   study: 1,
+  writing_research: 2,
   social: 1,
   relax: 1,
   idle: 0,
@@ -99,6 +100,37 @@ function isOptionUnlocked(run: GameRun | undefined, option: WeeklyActionOption):
   return true;
 }
 
+function isVacationActionAllowed(action: WeeklyActionOption["action"], run: GameRun | undefined) {
+  if (!run || !isVacationMonth(run.currentMonth)) {
+    return true;
+  }
+
+  const baselineVacationActions = new Set<WeeklyActionOption["action"]>([
+    "study",
+    "writing_research",
+    "job_prep",
+    "competition_project",
+    "part_time",
+    "social",
+    "relax",
+    "idle",
+    "big_meal",
+    "student_activity",
+    "remedy",
+    "ask_family",
+  ]);
+
+  if (action === "postgraduate_prep") {
+    return run.currentYear >= 3;
+  }
+
+  if (action === "public_exam_prep") {
+    return run.currentYear > 3 || (run.currentYear === 3 && run.currentMonth >= 7);
+  }
+
+  return baselineVacationActions.has(action);
+}
+
 function resolveWeekdayKind(weekday: Weekday): TimeBlockKind {
   if (weekday === "sat" || weekday === "sun") {
     return "free";
@@ -111,8 +143,12 @@ function resolveWeekdayKind(weekday: Weekday): TimeBlockKind {
   return "busy_day";
 }
 
-function createScheduledWeekday(weekday: Weekday): ScheduledWeekday {
-  const dayType = resolveWeekdayKind(weekday);
+export function isVacationMonth(month: number): boolean {
+  return month === 6 || month === 12;
+}
+
+function createScheduledWeekday(weekday: Weekday, month: number): ScheduledWeekday {
+  const dayType = isVacationMonth(month) ? "free" : resolveWeekdayKind(weekday);
 
   return {
     weekday,
@@ -220,6 +256,10 @@ export function resolveAvailableWeeklyActions(input: {
       return false;
     }
 
+    if (!isVacationActionAllowed(option.action, input.run)) {
+      return false;
+    }
+
     if (effectiveDayType === "night_only") {
       return option.availability.includes("night");
     }
@@ -266,12 +306,10 @@ export function createMonthlySchedule(month: number): ScheduledDay[] {
 }
 
 export function createWeeklyCalendar(month: number): ScheduledWeek[] {
-  void month;
-
   return Array.from({ length: 4 }, (_, index) => ({
     week: index + 1,
     label: `第 ${index + 1} 周`,
-    days: WEEKDAY_ORDER.map((weekday) => createScheduledWeekday(weekday)),
+    days: WEEKDAY_ORDER.map((weekday) => createScheduledWeekday(weekday, month)),
   }));
 }
 
