@@ -104,6 +104,22 @@ test("image2 weekly planner smoke flow", async ({ page }) => {
   await expect(linkByExactName(page, "保研去向")).toHaveCount(0);
   await saveShot(page, "03-game-weekly-planner.png");
 
+  await page.getByTestId("formal-nav-journal").click();
+  await page.waitForURL(new RegExp(`/journal\\?runId=${runId}`));
+  await expect(page.getByText("还没有进行中的 run")).toHaveCount(0);
+
+  await page.getByTestId("formal-nav-game").click();
+  await page.waitForURL(new RegExp(`/game\\?runId=${runId}`));
+  await expect(page.getByTestId("game-page")).toBeVisible();
+
+  await page.getByTestId("formal-nav-resume").click();
+  await page.waitForURL(new RegExp(`/resume\\?runId=${runId}`));
+  await expect(page.getByText("还没有进行中的 run")).toHaveCount(0);
+
+  await page.getByTestId("formal-nav-game").click();
+  await page.waitForURL(new RegExp(`/game\\?runId=${runId}`));
+  await expect(page.getByTestId("game-page")).toBeVisible();
+
   await page.getByTestId("set-attendance-submit").click();
   await expect(page.getByTestId("planner-attendance-locked")).toHaveAttribute("data-locked", "true");
 
@@ -148,4 +164,22 @@ test("image2 weekly planner smoke flow", async ({ page }) => {
   const idleLabels = actionLabels.filter((label) => label.includes("摆烂") || label.includes("发呆"));
   expect(idleLabels.length).toBeGreaterThan(0);
   expect(idleLabels.length).toBeLessThan(actionLabels.length);
+
+  for (let week = 0; week < 3; week += 1) {
+    await expect(page).toHaveURL(new RegExp(`/game\\?runId=${runId}`));
+    await page.getByTestId("set-attendance-submit").click();
+    await expect(page.getByTestId("planner-attendance-locked")).toHaveAttribute("data-locked", "true");
+    await page.getByTestId("confirm-week-submit").click();
+    await page.waitForLoadState("networkidle");
+  }
+
+  await expect(page).toHaveURL(new RegExp(`/settlement\\?runId=${runId}`));
+  await page.locator(`a[href="/journal?runId=${runId}"]`).first().click();
+  await page.waitForURL(new RegExp(`/journal\\?runId=${runId}`));
+  await expect(page.getByText("还没有进行中的 run")).toHaveCount(0);
+
+  await page.getByTestId("formal-nav-game").click();
+  await page.waitForURL(new RegExp(`/game\\?runId=${runId}`));
+  await expect(page.getByTestId("game-page")).toBeVisible();
+  await expect(page.getByText("还没有进行中的 run")).toHaveCount(0);
 });

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 describe("real pages use freshmanto ui shells safely", () => {
   it("renders the start page with the image2-style brand entrance", async () => {
     const pageModule = await import("@/app/page");
-    const markup = renderToStaticMarkup(pageModule.default());
+    const markup = renderToStaticMarkup(await pageModule.default());
 
     expect(markup).toContain("Freshmanto");
     expect(markup).toContain("开始新档");
