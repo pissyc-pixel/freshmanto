@@ -22,7 +22,7 @@ import { resolveActiveRunId } from "@/lib/demo/active-run";
 import { buildGrowthJournalEntry } from "@/lib/demo/monthly-digest";
 import { formatCityTier, formatCollegeTrack, formatMonthLabel, formatSchoolTier } from "@/lib/demo/options";
 import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
-import { getServerDemoBundle } from "@/lib/demo/server";
+import { getServerResumeBundle } from "@/lib/demo/server";
 import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +30,18 @@ export const dynamic = "force-dynamic";
 type ResumePageProps = {
   searchParams: DemoPageSearchParams;
 };
+
+function formatAcademicValue(value: number | null) {
+  return value === null ? "暂无 GPA" : value.toFixed(2);
+}
+
+function formatRankPercentile(rank: number | null, percentile: number | null) {
+  if (rank === null || percentile === null) {
+    return "暂无排名 / 百分位";
+  }
+
+  return `前 ${rank} · ${percentile}%`;
+}
 
 function hasKeyword(value: string, keywords: string[]) {
   return keywords.some((keyword) => value.includes(keyword));
@@ -40,11 +52,11 @@ function buildCoreAbilityTags(items: {
   internshipCount: number;
   scholarshipCount: number;
   directionLabel: string;
-  gpa: number;
+  gpa: number | null;
 }) {
   const tags = [];
 
-  if (items.gpa >= 3) {
+  if (items.gpa !== null && items.gpa >= 3) {
     tags.push("学业积累");
   }
   if (items.competitionCount > 0) {
@@ -69,7 +81,7 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
     searchParamRunId: readSearchParam(params.runId),
     cookieRunId: await readActiveRunIdFromCookies(),
   });
-  const bundle = runId ? await getServerDemoBundle(runId) : null;
+  const bundle = runId ? await getServerResumeBundle(runId) : null;
 
   if (!runId || !bundle) {
     return (
@@ -80,7 +92,7 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
         subtitle="这里会把真实形成的 GPA、排名、履历条目和成长痕迹整理出来。没有数据时，只展示空状态，不会直接报错。"
         headerMeta={
           <>
-            <FmInlineStat tone="teal" icon="chart" label="GPA" value="未形成" />
+            <FmInlineStat tone="teal" icon="chart" label="GPA" value="暂无 GPA" />
             <FmInlineStat tone="amber" icon="file" label="履历证据" value="0 条" />
           </>
         }
@@ -158,10 +170,10 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
       runId={runId}
       title="个人履历"
       subtitle="履历页只整理已经形成的证据，帮助你看清现在这局真实地在往哪条路上偏。"
-      sidebarSummary="这里展示的是当前 run 的真实画像：GPA、履历条目、方向线索与阶段日志。"
+      sidebarSummary="这里展示的是当前存档的真实画像：GPA、履历条目、方向线索与阶段日志。"
       headerMeta={
         <>
-          <FmInlineStat tone="teal" icon="chart" label="GPA" value={academicProfile.gpa.toFixed(2)} />
+          <FmInlineStat tone="teal" icon="chart" label="GPA" value={formatAcademicValue(academicProfile.gpa)} />
           <FmInlineStat
             tone="amber"
             icon="file"
@@ -189,21 +201,16 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
                 <span>{formatSchoolTier(hydratedRun.profile.schoolTier)}</span>
                 <span>·</span>
                 <span>{formatCityTier(hydratedRun.profile.cityTier)}</span>
-                <span>·</span>
-                <span>Run #{hydratedRun.id.slice(0, 8)}</span>
               </div>
 
               <div className="fm-score-strip">
                 <div className="fm-score-box">
                   <span className="fm-score-box__label">GPA</span>
-                  <span className="fm-score-box__value">{academicProfile.gpa.toFixed(2)}</span>
+                  <span className="fm-score-box__value">{formatAcademicValue(academicProfile.gpa)}</span>
                 </div>
                 <div className="fm-score-box">
                   <span className="fm-score-box__label">排名 / 百分位</span>
-                  <span className="fm-score-box__value">
-                    {academicProfile.rank ? `前 ${academicProfile.rank}` : "暂未形成"}
-                    {academicProfile.percentile ? ` · ${academicProfile.percentile}%` : ""}
-                  </span>
+                  <span className="fm-score-box__value">{formatRankPercentile(academicProfile.rank, academicProfile.percentile)}</span>
                 </div>
               </div>
 
@@ -230,7 +237,7 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
           <FmPanel>
             <FmSectionHead
               title="基础画像 / 入学档案"
-              copy="学院、学校、城市、家庭资源和初始特质都只读取当前 run 的真实字段，缺失时保守展示。"
+              copy="学院、学校、城市、家庭资源和初始特质都只读取当前存档的真实字段，缺失时保守展示。"
             />
             <div className="mt-6">
               <ProfileSummary profile={hydratedRun.profile} />
@@ -305,7 +312,7 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
           <FmPanel>
             <FmSectionHead
               title="证据拆分"
-              copy="三类证据都只来自当前 run 的真实累计，不从 PRD 或设计稿里借数据。"
+              copy="三类证据都只来自当前存档的真实累计，不从 PRD 或设计稿里借数据。"
             />
 
             <div className="mt-6 fm-stack">
@@ -360,7 +367,7 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
           </FmPanel>
 
           <FmPanel>
-            <FmSectionHead title="方向线索" copy="这些线索只反映当前 run 已有的倾向，不预示最终结果。" />
+            <FmSectionHead title="方向线索" copy="这些线索只反映当前存档已有的倾向，不预示最终结果。" />
             <div className="mt-6">
               {directionSignals.length > 0 ? (
                 <div className="fm-tag-row">

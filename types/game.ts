@@ -25,6 +25,7 @@ export type CourseAttendanceStrategy =
 
 export type ActionType =
   | "study"
+  | "writing_research"
   | "job_prep"
   | "postgraduate_prep"
   | "public_exam_prep"
@@ -266,10 +267,13 @@ export type WeeklyEventInstance = {
   summary: string;
   weekday: Weekday;
   effectDescription: string;
+  attendSummary?: string;
+  skipSummary?: string;
   dayTypeOverride?: WeeklyDayType;
   limitedActions?: ActionType[];
   specialAction?: WeeklyActionOption;
   actionBoosts?: WeeklyEventActionBoost[];
+  missEffect?: WeeklyActionEffect;
   linkedProjectId?: string;
   linkedProjectTitle?: string;
   skipClosesProjectLine?: boolean;
@@ -319,7 +323,7 @@ export type SemesterRecord = {
 };
 
 export type AcademicProfileSnapshot = {
-  gpa: number;
+  gpa: number | null;
   rank: number | null;
   percentile: number | null;
   recommendationScore: number;
