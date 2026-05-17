@@ -10,6 +10,7 @@ import {
   buildScholarshipExplanation,
   buildScholarshipExplanationFromSummary,
   ensureProgressionState,
+  summarizeDirectionSignals,
 } from "@/core/resolvers/progression";
 import type { GameRun, StructuredMonthlySummary } from "@/types/game";
 
@@ -58,6 +59,31 @@ describe("progression perception helpers", () => {
     expect(["forming", "clear"]).toContain(perception.stage);
     expect(perception.reasons.length).toBeGreaterThan(0);
     expect(perception.summary).toContain("就业");
+  });
+
+  it("keeps direction signal copy readable instead of exposing raw direction enums", () => {
+    const baseRun = createBaseRun("direction-signal-readable");
+    const run: GameRun = {
+      ...baseRun,
+      currentYear: 3,
+      progression: {
+        ...baseRun.progression!,
+        dominantDirection: "employment",
+        employmentReadiness: 38,
+        tendencies: {
+          ...baseRun.progression!.tendencies,
+          employment: 36,
+          recommendation: 14,
+          postgraduate: 9,
+          undecided: 4,
+        },
+      },
+    };
+
+    const lines = summarizeDirectionSignals(run);
+
+    expect(lines.some((line) => line.includes("就业"))).toBe(true);
+    expect(lines.join(" ")).not.toContain("employment");
   });
 
   it("explains recommendation qualification through strengths and gaps", () => {

@@ -21,6 +21,42 @@ type EndingPageProps = {
   searchParams: DemoPageSearchParams;
 };
 
+function formatDirectionLabel(direction?: string) {
+  switch (direction) {
+    case "employment":
+      return "就业";
+    case "recommendation":
+      return "推免 / 保研";
+    case "postgraduate":
+      return "考研";
+    case "public_exam":
+      return "公考";
+    default:
+      return "仍未定型";
+  }
+}
+
+function formatRecommendationQualificationLabel(status?: string) {
+  switch (status) {
+    case "pending":
+      return "还在积累阶段";
+    case "eligible":
+      return "已具备推免竞争力";
+    case "borderline":
+      return "已经摸到推免边缘";
+    case "unlikely":
+      return "离推免线还有距离";
+    case "accepted":
+      return "推免已经落定";
+    case "declined_to_postgraduate":
+      return "放下推免，转向考研";
+    case "declined_to_employment":
+      return "放下推免，转向就业";
+    default:
+      return "还没有明确结论";
+  }
+}
+
 function formatPathLabel(path?: string) {
   switch (path) {
     case "employment":
@@ -51,38 +87,17 @@ function formatPathResultLabel(result?: string) {
   }
 }
 
-function formatDirectionLabel(direction?: string) {
-  switch (direction) {
-    case "employment":
-      return "就业";
-    case "postgraduate":
-      return "考研";
-    case "public_exam":
-      return "考公";
-    case "recommendation":
-      return "推免";
-    default:
-      return "仍未定型";
+function formatEndingPosition(input: {
+  status: "active" | "completed";
+  currentYear: number;
+  currentMonth: number;
+  finalYear: number;
+}) {
+  if (input.status === "completed") {
+    return formatMonthLabel(input.finalYear, 12);
   }
-}
 
-function formatRecommendationQualification(status?: string) {
-  switch (status) {
-    case "eligible":
-      return "已经形成推免竞争力";
-    case "borderline":
-      return "已经摸到推免边缘";
-    case "unlikely":
-      return "当前还够不到推免线";
-    case "accepted":
-      return "已经拿到推免资格";
-    case "declined_to_postgraduate":
-      return "放弃推免，转向考研";
-    case "declined_to_employment":
-      return "放弃推免，转向就业";
-    default:
-      return "暂未正式判断";
-  }
+  return formatMonthLabel(Math.min(input.currentYear, 4), Math.min(input.currentMonth, 12));
 }
 
 export default async function EndingPage({ searchParams }: EndingPageProps) {
@@ -116,6 +131,12 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
   const endingFacts = bundle.endingSummary.notableFacts.map(formatEndingNotableFact);
   const pathLabel = formatPathLabel(bundle.endingSummary.graduationPath);
   const pathResultLabel = formatPathResultLabel(bundle.endingSummary.pathResult);
+  const positionLabel = formatEndingPosition({
+    status: bundle.run.status,
+    currentYear: bundle.run.currentYear,
+    currentMonth: bundle.run.currentMonth,
+    finalYear: bundle.endingSummary.finalYear,
+  });
   const completed = bundle.run.status === "completed";
   const reviewFacts = [
     academicProfile.gpa !== null
@@ -125,7 +146,7 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
     `毕业时手头余额：${bundle.run.stats.money} 元`,
     `毕业时心情 / 压力：${bundle.run.stats.mood} / ${bundle.run.stats.stress}`,
     `累积履历条目：${bundle.run.resume.length} 条`,
-    `长期主导方向：${formatDirectionLabel(bundle.endingSummary.dominantDirection)}`,
+    `长期主导倾向：${formatDirectionLabel(bundle.endingSummary.dominantDirection)}`,
   ];
 
   return (
@@ -145,15 +166,13 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
           title={completed ? "毕业结果" : "当前已经能确定的结局线索"}
           description={
             completed
-              ? `这局最后落在“${predictedOutcome}”，主去向更像是“${pathLabel}”，结果层属于“${pathResultLabel}”。`
+              ? `这局最后落在"${predictedOutcome}"，主去向更像是"${pathLabel}"，结果层属于"${pathResultLabel}"。`
               : `眼下更像会走到：${predictedOutcome}。长期学业均值大约是 ${bundle.endingSummary.longTermAcademicAverage}。`
           }
         >
           <FactList
             items={[
-              completed
-                ? `毕业结算完成于：${formatMonthLabel(4, 12)}`
-                : `当前学年位置：${formatMonthLabel(Math.min(bundle.run.currentYear, 4), Math.min(bundle.run.currentMonth, 12))}`,
+              `当前学年位置：${positionLabel}`,
               `主去向：${pathLabel}`,
               `结果层：${pathResultLabel}`,
               ...endingFacts,
@@ -172,7 +191,9 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
           <FactList
             items={[
               ...reviewFacts,
-              `推免资格状态：${formatRecommendationQualification(bundle.endingSummary.recommendationQualification)}`,
+              bundle.endingSummary.recommendationQualification
+                ? `推免资格状态：${formatRecommendationQualificationLabel(bundle.endingSummary.recommendationQualification)}`
+                : "推免资格还没有形成明确结论。",
               typeof bundle.endingSummary.publicExamProgress === "number"
                 ? `公考准备进度：${bundle.endingSummary.publicExamProgress}`
                 : "公考线目前还没有形成稳定进度。",
@@ -185,11 +206,19 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
         </SectionCard>
 
         <SectionCard
-          title={savedReport ? (completed ? "毕业回望" : "已保存的结局回望") : "结局回望尚未落地"}
+          title={
+            savedReport
+              ? "已保存的结局回望"
+              : bundle.run.status === "completed"
+                ? "正式结局回望暂未存档"
+                : "结局回望尚未落地"
+          }
           description={
             savedReport
-              ? "这份回望只负责把规则层已经确定的结果写成自然叙述，不负责改写结局。"
-              : "当前存档还没走完四年，所以这里只展示规则层预估，不会提前生成正式结局文案。"
+              ? "这份回望来自已经保存的 ending_report 记录。"
+              : bundle.run.status === "completed"
+                ? "正式结局已经落定，但这份回望暂时还没有保存成功，现在先看规则层的结果摘要。"
+                : "当前 run 还没走完四年，所以这里只展示规则层预估，不会提前生成正式结局文案。"
           }
         >
           {savedReport ? (
@@ -200,7 +229,9 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
             />
           ) : (
             <p className="text-sm leading-6 text-stone-600">
-              等到第 4 学年 第 12 月完成结算后，系统才会自动生成并保存正式结局回望。
+              {bundle.run.status === "completed"
+                ? "当前先根据结构化结局摘要查看毕业结果；正式回望缺失时，不会把它误说成"还没毕业"。"
+                : "等到第 4 学年 第 12 月完成结算后，系统才会自动生成并保存正式结局回望。"}
             </p>
           )}
         </SectionCard>
