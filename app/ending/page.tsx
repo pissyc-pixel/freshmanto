@@ -230,7 +230,7 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
           ) : (
             <p className="text-sm leading-6 text-stone-600">
               {bundle.run.status === "completed"
-                ? "当前先根据结构化结局摘要查看毕业结果；正式回望缺失时，不会把它误说成"还没毕业"。"
+                ? "当前先根据结构化结局摘要查看毕业结果；正式回望缺失时，不会把它误说成“还没毕业”。"
                 : "等到第 4 学年 第 12 月完成结算后，系统才会自动生成并保存正式结局回望。"}
             </p>
           )}
