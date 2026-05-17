@@ -82,12 +82,15 @@ export function resolveWeeklyEvent(run: GameRun, week: number): WeeklyEventInsta
       summary: template.summary,
       weekday: pickEventWeekday(run, week, template.allowedWeekdays),
       effectDescription: template.detail,
+      attendSummary: template.attendSummary,
+      skipSummary: template.skipSummary,
       dayTypeOverride: template.dayTypeOverride,
       limitedActions: template.limitedActions,
       specialAction: template.specialAction
         ? buildWeeklyEventSpecialOption(template.id, template.specialAction)
         : undefined,
       actionBoosts: template.actionBoosts,
+      missEffect: template.missEffect,
     };
   }
 
@@ -100,12 +103,15 @@ export function resolveWeeklyEvent(run: GameRun, week: number): WeeklyEventInsta
     summary: template.summary,
     weekday,
     effectDescription: `${WEEKDAY_LABELS[weekday]}：${template.detail}`,
+    attendSummary: template.attendSummary,
+    skipSummary: template.skipSummary,
     dayTypeOverride: template.dayTypeOverride,
     limitedActions: template.limitedActions,
     specialAction: template.specialAction
       ? buildWeeklyEventSpecialOption(template.id, template.specialAction)
       : undefined,
     actionBoosts: template.actionBoosts,
+    missEffect: template.missEffect,
   };
 }
 

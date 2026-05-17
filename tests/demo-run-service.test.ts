@@ -263,7 +263,7 @@ describe("demo run service", () => {
 
     expect(result.run.id).toBeTruthy();
     expect(store.run?.current_state_json.id).toBe(result.run.id);
-    expect(store.logs[0]?.message).toContain("run created");
+    expect(store.logs[0]?.message).toContain("已创建新档");
   });
 
   it("consumes time from the current week pool without immediately ending the week", async () => {
@@ -308,7 +308,7 @@ describe("demo run service", () => {
     });
     expect(store.monthlyStates).toHaveLength(0);
     expect(store.aiReports).toHaveLength(0);
-    expect(store.logs.some((log) => log.message === "action step resolved")).toBe(true);
+    expect(store.logs.some((log) => log.message === "单次行动已结算")).toBe(true);
   });
 
   it("keeps zero-cost actions in the same week without spending time", async () => {

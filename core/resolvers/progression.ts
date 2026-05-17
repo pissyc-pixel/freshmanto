@@ -138,22 +138,22 @@ function createSeededProject(run: GameRun, slot: number): CompetitionProject {
 }
 
 export function deriveAcademicProfile(run: GameRun): AcademicProfileSnapshot {
-  const academicBase =
-    run.semesterAverage > 0
-      ? run.semesterAverage
-      : clamp(60 + run.stats.semesterAcademics - run.risk.academicRisk * 0.7, 45, 92);
-  const gpa = Number(clamp(academicBase / 20, 1.8, 4.0).toFixed(2));
+  const hasSettledSemester = run.semesters.length > 0 && run.semesterAverage > 0;
+  const academicBase = hasSettledSemester ? run.semesterAverage : null;
+  const gpa = academicBase === null ? null : Number(clamp(academicBase / 20, 1.8, 4.0).toFixed(2));
   const competitionCount = (run.competitionProjects ?? []).filter((project) => project.result).length;
   const scholarshipBonus = (run.scholarships ?? []).reduce((sum, item) => sum + (item.level === "high" ? 3 : item.level === "standard" ? 1 : 0), 0);
-  const rank = clamp(
-    Math.round(65 - academicBase * 0.4 - schoolTierScore(run.profile) * 1.3 - competitionCount * 1.8 - scholarshipBonus * 2),
-    1,
-    95,
-  );
-  const percentile = clamp(100 - rank, 1, 99);
+  const rank = academicBase === null
+    ? null
+    : clamp(
+      Math.round(65 - academicBase * 0.4 - schoolTierScore(run.profile) * 1.3 - competitionCount * 1.8 - scholarshipBonus * 2),
+      1,
+      95,
+    );
+  const percentile = rank === null ? null : clamp(100 - rank, 1, 99);
   const recommendationScore = clamp(
     Math.round(
-      academicBase * 0.55 +
+      (academicBase ?? clamp(60 + run.stats.semesterAcademics - run.risk.academicRisk * 0.7, 45, 92)) * 0.55 +
         competitionCount * 6 +
         scholarshipBonus * 5 +
         schoolTierScore(run.profile) * 2 +
@@ -169,6 +169,10 @@ export function deriveAcademicProfile(run: GameRun): AcademicProfileSnapshot {
     percentile,
     recommendationScore,
   };
+}
+
+function hasSettledAcademicProfile(profile: AcademicProfileSnapshot): boolean {
+  return profile.gpa !== null && profile.rank !== null && profile.percentile !== null;
 }
 
 export function determineDominantDirection(tendencies: DirectionTendencyMap): DirectionKey {
@@ -408,6 +412,20 @@ export function applyAcceptedActionProgression(run: GameRun, action: ActionType)
         postgraduateProgress: action === "study" ? 2 : 1,
         recommendationReadiness: 1,
       });
+    case "writing_research":
+      nextRun = withTendencyShift(nextRun, {
+        postgraduate: 2,
+        public_exam: 2,
+        recommendation: run.profile.collegeTrack === "science" || run.profile.collegeTrack === "medicine" ? 2 : 1,
+        employment: run.profile.collegeTrack === "business" ? 1 : 0,
+        undecided: -2,
+      }, ["你开始把时间投进写作、资料整理或调研，这会慢慢把表达、深造和项目线都抬出来。"]);
+      return withProgressMetric(nextRun, {
+        postgraduateProgress: 2,
+        recommendationReadiness: run.profile.collegeTrack === "science" || run.profile.collegeTrack === "medicine" ? 2 : 1,
+        publicExamProgress: run.profile.collegeTrack === "arts" || run.profile.collegeTrack === "business" ? 2 : 1,
+        employmentReadiness: run.profile.collegeTrack === "business" ? 1 : 0,
+      });
     case "student_activity":
       return withTendencyShift(nextRun, {
         employment: 1,
@@ -439,8 +457,10 @@ export function summarizeDirectionSignals(run: GameRun): string[] {
     lines.push(`公考进度已经到 ${ensuredRun.progression!.publicExam.progress}，这条线开始有连续性了。`);
   }
 
-  if (profile.gpa >= 3.5) {
+  if (profile.gpa !== null && profile.gpa >= 3.5) {
     lines.push(`当前 GPA 约 ${profile.gpa}，如果后续履历再补强，推免线会更有讨论空间。`);
+  } else if (!hasSettledAcademicProfile(profile)) {
+    lines.push("本学期尚未完成正式结算，GPA 和排名还没真正形成。");
   }
 
   const leadProject = getLeadCompetitionProject(ensuredRun);
@@ -537,7 +557,7 @@ function getDirectionReasons(run: GameRun, direction: DirectionKey): string[] {
       if ((ensuredRun.progression?.postgraduateProgress ?? 0) >= 20) {
         reasons.push("复习和备考投入开始稳定下来，考研已经不是一句口头想法。");
       }
-      if (profile.gpa >= 3.2) {
+      if (profile.gpa !== null && profile.gpa >= 3.2) {
         reasons.push(`当前 GPA 约 ${profile.gpa}，学业底子能支撑继续往深造方向发力。`);
       }
       if (competitionCount > 0) {
@@ -553,7 +573,7 @@ function getDirectionReasons(run: GameRun, direction: DirectionKey): string[] {
       }
       break;
     case "recommendation":
-      if (profile.gpa >= 3.5 || (profile.rank ?? 99) <= 20) {
+      if ((profile.gpa !== null && profile.gpa >= 3.5) || (profile.rank ?? 99) <= 20) {
         reasons.push("成绩和排名已经开始提供推免竞争力，不只是单次发挥。");
       }
       if (scholarshipCount > 0) {
@@ -593,7 +613,7 @@ export function buildDirectionPerception(run: GameRun): DirectionPerception {
 
   if (primary.key === "recommendation") {
     const profile = deriveAcademicProfile(ensuredRun);
-    if (profile.gpa < 3.4) {
+    if (profile.gpa === null || profile.gpa < 3.4) {
       blockers.push("学业还需要再稳一点，推免更看长期成绩的上限。");
     }
     if ((ensuredRun.competitionProjects ?? []).filter((project) => project.result).length === 0) {
@@ -639,10 +659,12 @@ export function buildRecommendationExplanation(run: GameRun): RecommendationExpl
   const strengths: string[] = [];
   const gaps: string[] = [];
 
-  if (profile.gpa >= 3.5) {
+  if (profile.gpa !== null && profile.gpa >= 3.5) {
     strengths.push(`GPA 约 ${profile.gpa}，学业基础已经在推免竞争线附近。`);
-  } else {
+  } else if (profile.gpa !== null) {
     gaps.push(`GPA 目前约 ${profile.gpa}，学业上限还可以继续往上抬。`);
+  } else {
+    gaps.push("本学期 GPA 还没结算出来，推免画像暂时还缺学业硬指标。");
   }
 
   if ((profile.rank ?? 99) <= 20 || (profile.percentile ?? 0) >= 80) {
@@ -697,12 +719,14 @@ export function buildRecommendationExplanationFromSummary(
   const strengths: string[] = [];
   const gaps: string[] = [];
 
-  if (profile?.gpa !== undefined) {
+  if (profile?.gpa !== null && profile?.gpa !== undefined) {
     if (profile.gpa >= 3.5) {
       strengths.push(`这份月结算快照里的 GPA 约 ${profile.gpa}，学业基础已经在推免竞争线附近。`);
     } else {
       gaps.push(`这份月结算快照里的 GPA 约 ${profile.gpa}，学业上限还可以继续往上抬。`);
     }
+  } else {
+    gaps.push("这份月结算快照里还没有已结算 GPA，推免画像暂时不能按绩点判断。");
   }
 
   if ((profile?.rank ?? 99) <= 20 || (profile?.percentile ?? 0) >= 80) {
@@ -752,10 +776,12 @@ export function buildScholarshipExplanation(run: GameRun): ScholarshipExplanatio
   const hasFailure = ensuredRun.semesters.some((item) => !item.passed);
   const reasons: string[] = [];
 
-  if (profile.gpa >= 3.3) {
+  if (profile.gpa !== null && profile.gpa >= 3.3) {
     reasons.push(`学业表现比较稳，当前 GPA 大约在 ${profile.gpa} 左右。`);
-  } else {
+  } else if (profile.gpa !== null) {
     reasons.push("学业基础还不算特别突出，奖学金更多取决于整体稳定度。");
+  } else {
+    reasons.push("这学期还没完成正式结算，奖学金线暂时看不到已落地的 GPA。");
   }
 
   if ((profile.rank ?? 99) <= 30) {
@@ -797,12 +823,14 @@ export function buildScholarshipExplanationFromSummary(
   const competitionCount = countSnapshotCompetitionResults(summary);
   const reasons: string[] = [];
 
-  if (summary.academicProfile?.gpa !== undefined) {
+  if (summary.academicProfile?.gpa !== null && summary.academicProfile?.gpa !== undefined) {
     if (summary.academicProfile.gpa >= 3.3) {
       reasons.push(`这份月结算快照里的 GPA 约 ${summary.academicProfile.gpa}，学业表现整体比较稳。`);
     } else {
       reasons.push(`这份月结算快照里的 GPA 约 ${summary.academicProfile.gpa}，学业基础还不算特别突出。`);
     }
+  } else {
+    reasons.push("这份月结算快照里还没有已结算 GPA，所以奖学金判断更偏阶段过程。");
   }
 
   if ((summary.academicProfile?.rank ?? 99) <= 30) {
@@ -905,7 +933,9 @@ export function buildResumeEvidenceSummary(run: GameRun): ResumeEvidenceSummary 
   const scholarshipCount = countScholarshipRecords(ensuredRun.scholarships, undefined);
 
   const academic = [
-    `GPA 约 ${profile.gpa}，当前排名大约在前 ${profile.percentile ?? 0}% 的位置附近。`,
+    hasSettledAcademicProfile(profile)
+      ? `GPA 约 ${profile.gpa}，当前排名大约在前 ${profile.percentile ?? 0}% 的位置附近。`
+      : "GPA、排名和百分位都还没到正式结算的时候，学业线暂时只能先看阶段积累。",
     scholarshipCount > 0 ? `已经累计 ${scholarshipCount} 次奖学金结果，说明前期成绩不只是偶尔冒尖。` : "奖学金还比较空，说明学业竞争力还在继续补。",
   ];
   const practice = [
@@ -1044,7 +1074,7 @@ export function evaluateRecommendationQualification(run: GameRun): Recommendatio
   const competitionCount = (run.competitionProjects ?? []).filter((project) => project.result).length;
   const scholarshipCount = (run.scholarships ?? []).filter((record) => record.level !== "none").length;
   const score =
-    profile.gpa * 20 +
+    (profile.gpa ?? 0) * 20 +
     (100 - (profile.rank ?? 90)) * 0.4 +
     (profile.percentile ?? 0) * 0.2 +
     competitionCount * 6 +
@@ -1204,7 +1234,7 @@ export function inferGraduationPathResult(run: GameRun, path: GraduationPath): G
     case "public_exam":
       return (run.progression?.publicExam.progress ?? 0) >= 75 ? "success" : (run.progression?.publicExam.progress ?? 0) >= 45 ? "ordinary" : "failure";
     case "postgraduate_exam":
-      return (run.progression?.postgraduateProgress ?? 0) + profile.gpa * 10 >= 78 ? "success" : (run.progression?.postgraduateProgress ?? 0) >= 38 ? "ordinary" : "failure";
+      return (run.progression?.postgraduateProgress ?? 0) + (profile.gpa ?? 0) * 10 >= 78 ? "success" : (run.progression?.postgraduateProgress ?? 0) >= 38 ? "ordinary" : "failure";
     case "employment":
       return (run.progression?.employmentReadiness ?? 0) + schoolTierScore(run.profile) * 4 >= 65 ? "success" : (run.progression?.employmentReadiness ?? 0) >= 28 ? "ordinary" : "failure";
     default:

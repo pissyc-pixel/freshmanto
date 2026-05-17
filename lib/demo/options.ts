@@ -16,6 +16,7 @@ import type {
   WeeklyDayType,
   Weekday,
 } from "@/types/game";
+import { sanitizePlayerFacingText } from "@/lib/player-facing-text";
 
 export const attendanceStrategyOptions: Array<{
   value: CourseAttendanceStrategy;
@@ -33,6 +34,7 @@ export const actionOptions: Array<{
   description: string;
 }> = [
   { value: "study", label: "复习 / 学习", description: "稳步推进学业，但收益不再无限叠高。" },
+  { value: "writing_research", label: "写作 / 调研", description: "做写作、访谈、资料整理或小调研，会慢慢补学业、表达和项目感。" },
   { value: "job_prep", label: "实习 / 求职准备", description: "为履历铺路，会消耗一些金钱和精力。" },
   { value: "part_time", label: "兼职 / 赚钱", description: "补充现金流，但不能安排在夜间。" },
   { value: "social", label: "社交 / 关系", description: "花点钱换心情和人脉，后面可能派上用场。" },
@@ -229,7 +231,7 @@ function describeRejectionReason(reason?: string): string {
     return "这一步没能顺利做成";
   }
 
-  return rejectionReasonLabels[reason] ?? `这一步被规则判定为未生效（${reason}）`;
+  return sanitizePlayerFacingText(rejectionReasonLabels[reason] ?? `这一步最后没有真正生效。`);
 }
 
 function describeTurnImpact(turn: ActionTurnSummary): string | undefined {
@@ -307,8 +309,21 @@ function describeNotableFact(fact: string): string | undefined {
     return `房租、吃饭和日常开销一共扣掉了 ${amount} 元固定生活成本。`;
   }
 
+  if (fact.startsWith("daily-living-cost:")) {
+    const amount = Number(fact.split(":").at(-1) ?? 0);
+    return `这一天照常扣掉了 ${amount} 元日常开销。`;
+  }
+
   if (fact === "auto-filled-idle") {
     return "这一天没有手动安排，系统自动补成了“摆烂 / 发呆”。";
+  }
+
+  if (fact === "vacation:winter-break") {
+    return "这个月已经进入寒假节奏，不再按普通上课周推进。";
+  }
+
+  if (fact === "vacation:summer-break") {
+    return "这个月已经进入暑假节奏，不再按普通上课周推进。";
   }
 
   if (fact.startsWith("skip-class:")) {
@@ -339,11 +354,11 @@ function describeNotableFact(fact: string): string | undefined {
     return describeEvent(fact.replace("event:", ""));
   }
 
-  return fact;
+  return sanitizePlayerFacingText(fact);
 }
 
 function describeFlag(flag: string): string | undefined {
-  return flagLabels[flag];
+  return flagLabels[flag] ? sanitizePlayerFacingText(flagLabels[flag]) : undefined;
 }
 
 function describeEndingNotableFact(fact: string): string {
@@ -361,6 +376,14 @@ function describeEndingNotableFact(fact: string): string {
 }
 
 function buildMoodSentence(summary: StructuredMonthlySummary): string {
+  if (summary.notableFacts.includes("vacation:winter-break")) {
+    return "假期一到，整个月都像从课表里暂时抽身出来了，怎么休息、怎么继续往前，都得自己拿主意。";
+  }
+
+  if (summary.notableFacts.includes("vacation:summer-break")) {
+    return "没有课表硬卡着之后，时间忽然变宽了，反而更能看出自己到底想把假期过成什么样。";
+  }
+
   if (summary.eventIds.includes("academic-scholarship")) {
     return "前段时间没白熬，终于从结果上感受到一点被肯定的回响。";
   }
@@ -381,6 +404,14 @@ function buildMoodSentence(summary: StructuredMonthlySummary): string {
 }
 
 function buildMonthlyTitle(summary: StructuredMonthlySummary): string {
+  if (summary.notableFacts.includes("vacation:winter-break")) {
+    return "这个寒假终于不再按上课周的节奏过";
+  }
+
+  if (summary.notableFacts.includes("vacation:summer-break")) {
+    return "这个暑假开始像是把时间重新拿回自己手里";
+  }
+
   if (summary.eventIds.includes("academic-scholarship")) {
     return "这个月终于尝到一点被回报的感觉";
   }
@@ -437,6 +468,10 @@ export function formatCityTier(value: CityTier): string {
 }
 
 export function formatActionType(value: ActionType): string {
+  if (value === "writing_research") {
+    return "写作 / 调研";
+  }
+
   if (value === "postgraduate_prep") {
     return "考研 / 深造准备";
   }
@@ -494,8 +529,12 @@ export function formatWeeklyEventFact(fact: string): string {
       return "宣讲带来的信息马上接到了求职准备这条线上，做事时没那么发虚了。";
     case "weekly-event:class-meeting":
       return "这周有一天被班会和通知切了一刀，节奏不算舒服，但至少先把它处理掉了。";
+    case "weekly-event:class-meeting-skip":
+      return "这周把班会 / 导员通知拖过去了，后面补信息和补材料的烦躁感也跟着上来了。";
     case "weekly-event:quiet-recovery":
       return "这周没什么额外插曲，反而让那点休息真的缓回来了一点。";
+    case "weekly-event:strict-roll-call-skip":
+      return "这周硬扛着没去那次严查签到，学业风险和后续补救压力都被往上推了一截。";
     default:
       return formatPlayerFacingFact(fact);
   }
@@ -514,7 +553,7 @@ export function formatMonthLabel(year: number, month: number): string {
 }
 
 export function formatSystemLogType(value: keyof typeof systemLogTypeLabels | string): string {
-  return systemLogTypeLabels[value as keyof typeof systemLogTypeLabels] ?? value;
+  return sanitizePlayerFacingText(systemLogTypeLabels[value as keyof typeof systemLogTypeLabels] ?? value);
 }
 
 export function formatPlayerFacingTurn(turn: ActionTurnSummary): string {
@@ -522,15 +561,15 @@ export function formatPlayerFacingTurn(turn: ActionTurnSummary): string {
 }
 
 export function formatPlayerFacingFact(fact: string): string {
-  return describeNotableFact(fact) ?? fact;
+  return sanitizePlayerFacingText(describeNotableFact(fact) ?? fact);
 }
 
 export function formatPlayerFacingFlag(flag: string): string {
-  return describeFlag(flag) ?? flag;
+  return sanitizePlayerFacingText(describeFlag(flag) ?? flag);
 }
 
 export function formatEndingNotableFact(fact: string): string {
-  return describeEndingNotableFact(fact);
+  return sanitizePlayerFacingText(describeEndingNotableFact(fact));
 }
 
 export function buildPlayerFacingMonthlyLog(

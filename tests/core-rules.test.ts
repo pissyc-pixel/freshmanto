@@ -4,6 +4,7 @@ import {
   createInitialGameRun,
   confirmPlannedWeek,
   createMonthlySchedule,
+  createWeeklyCalendar,
   evaluateGraduationOutcome,
   planWeeklyDayAction,
   resolveActionTurn,
@@ -269,7 +270,7 @@ describe("monthly resolution", () => {
     expect(mealBeforeWeek.run.activeMonth?.currentWeek).toBe(1);
     expect(mealBeforeWeek.turnSummary.weekTimeBefore).toBe(mealBeforeWeek.turnSummary.weekTimeAfter);
     expect(mealBeforeWeek.turnSummary.statsDelta.mood).toBe(8);
-    expect(mealBeforeWeek.turnSummary.statsDelta.stress).toBe(-6);
+    expect(mealBeforeWeek.turnSummary.statsDelta.stress).toBe(-7);
 
     expect(firstWeekStudy.turnSummary.advancesCalendar).toBe(true);
     expect(firstWeekStudy.turnSummary.moneyDelta).toBe(weeklyAllowance - weeklyExpense);
@@ -901,6 +902,96 @@ describe("semester and ending evaluation", () => {
     expect(settlement?.dailyResults.find((day) => day.weekday === "tue")?.resolvedAction.action).toBe("social");
     expect(settlement?.dailyResults.find((day) => day.weekday === "sat")?.resolvedAction.action).toBe("job_prep");
     expect(settlement?.dailyResults.filter((day) => day.resolvedAction.action === "idle")).toHaveLength(4);
+  });
+
+  it("applies real writing / research gains instead of leaving it as flavor text only", () => {
+    const baseRun = createInitialGameRun({
+      id: "writing-research-real-effect-run",
+      randomValues: [0.26, 0.34, 0.41, 0.52, 0.67, 0.13, 0.22, 0.49],
+    });
+    const laterRun: GameRun = {
+      ...baseRun,
+      currentYear: 2,
+    };
+
+    const result = resolveActionTurn(laterRun, {
+      attendanceStrategy: "mixed",
+      action: {
+        action: "writing_research",
+        time: "day",
+      },
+    });
+
+    expect(result.turnSummary.resolvedAction.accepted).toBe(true);
+    expect(result.run.stats.semesterAcademics).toBeGreaterThan(laterRun.stats.semesterAcademics);
+    expect(result.run.resume.some((item) => item.category === "research" && item.title.includes("写作 / 调研"))).toBe(true);
+  });
+
+  it("treats vacation months as full-day weeks with a vacation-oriented action pool", () => {
+    const baseRun = createInitialGameRun({
+      id: "vacation-planner-run",
+      randomValues: [0.24, 0.33, 0.42, 0.51, 0.62, 0.17, 0.29, 0.47],
+    });
+    const vacationRun: GameRun = {
+      ...baseRun,
+      currentMonth: 6,
+      activeMonth: {
+        ...baseRun.activeMonth!,
+        month: 6,
+        weeklyCalendar: createWeeklyCalendar(6),
+      },
+    };
+    const withAttendance = selectWeekAttendanceStrategy(vacationRun, "mixed");
+    const monday = withAttendance.activeMonth?.currentWeekState.days?.find((day) => day.weekday === "mon");
+    const mondayOptions = resolveAvailableWeeklyActions({
+      day: monday!,
+      event: withAttendance.activeMonth?.currentWeekState.event,
+      run: withAttendance,
+    });
+
+    expect(monday?.baseDayType).toBe("full_day");
+    expect(mondayOptions.some((option) => option.optionId === "part_time")).toBe(true);
+    expect(mondayOptions.some((option) => option.optionId === "relax")).toBe(true);
+  });
+
+  it("shows a real consequence when the player skips a forced class-meeting style event", () => {
+    const baseRun = createInitialGameRun({
+      id: "forced-event-skip-run",
+      randomValues: [0.18, 0.27, 0.39, 0.48, 0.57, 0.14, 0.25, 0.46],
+    });
+    const withAttendance = selectWeekAttendanceStrategy(baseRun, "mixed");
+    const runWithEvent: GameRun = {
+      ...withAttendance,
+      activeMonth: {
+        ...withAttendance.activeMonth!,
+        currentWeekState: {
+          ...withAttendance.activeMonth!.currentWeekState,
+          event: {
+            id: "weekly-class-meeting",
+            title: "班会 / 导员通知",
+            summary: "这周有一段时间会被班会和材料确认占掉。",
+            weekday: "mon",
+            effectDescription: "周一会被班会切掉一部分时间。",
+            attendSummary: "去：能把通知和导员印象先稳住。",
+            skipSummary: "不去：会错过信息，也会多一点后续压力。",
+            missEffect: {
+              stats: { stress: 2, social: -1 },
+              risk: { burnout: 1 },
+              notableFact: "weekly-event:class-meeting-skip",
+            },
+          },
+        },
+      },
+    };
+    const planned = planWeeklyDayAction({
+      run: runWithEvent,
+      weekday: "mon",
+      optionId: "study",
+    });
+    const result = confirmPlannedWeek(planned);
+    const mondayResult = result.run.activeMonth?.latestWeekSettlement?.dailyResults.find((day) => day.weekday === "mon");
+
+    expect(mondayResult?.notableFacts).toContain("weekly-event:class-meeting-skip");
   });
 
   it("explains weekly allowance and fixed living costs in weekly settlement", () => {

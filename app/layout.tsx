@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./fm-ui.css";
 
 export const metadata: Metadata = {
   title: "大学生模拟器 v0 Demo",

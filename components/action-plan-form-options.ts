@@ -22,6 +22,11 @@ export const actionOptions: Array<{
     description: `稳步推进学业，但连续硬学会越来越累。${formatActionCost("study")}`,
   },
   {
+    value: "writing_research",
+    label: "写作 / 调研",
+    description: `做资料整理、访谈、写作或小调研，能慢慢补学业、表达和长期方向感。${formatActionCost("writing_research")}`,
+  },
+  {
     value: "job_prep",
     label: "实习 / 求职准备",
     description: `打磨简历、投递和准备面试，也会消耗一些钱和精力。${formatActionCost("job_prep")}`,

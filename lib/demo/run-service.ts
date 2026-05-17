@@ -158,7 +158,7 @@ function createRunLog(run: GameRun) {
     year: run.currentYear,
     month: run.currentMonth,
     logType: "settlement" as const,
-    message: "run created",
+    message: "已创建新档",
     metadata: {
       schoolTier: run.profile.schoolTier,
       cityTier: run.profile.cityTier,
@@ -178,7 +178,7 @@ function createTurnLog(input: {
     year: input.year,
     month: input.month,
     logType: "action" as const,
-    message: "action step resolved",
+    message: "单次行动已结算",
     metadata: {
       week: input.turnSummary.week,
       advancesCalendar: input.turnSummary.advancesCalendar,
@@ -201,7 +201,7 @@ function createWeekEndLog(input: {
     year: input.year,
     month: input.month,
     logType: "action" as const,
-    message: "week ended early",
+    message: "本周已提前结束",
     metadata: {
       week: input.week,
       attendanceStrategy: input.attendanceStrategy,
@@ -252,7 +252,7 @@ function createMonthlyLogs(input: {
     year: input.year,
     month: input.month,
     logType: "action",
-    message: "monthly actions resolved",
+    message: "本月行动已完成结算",
     metadata: {
       attendanceStrategy: input.summary.attendanceStrategy,
       actions: input.summary.actions,
@@ -266,7 +266,7 @@ function createMonthlyLogs(input: {
       year: input.year,
       month: input.month,
       logType: "event",
-      message: "events triggered",
+      message: "本月事件已触发",
       metadata: {
         eventIds: input.summary.eventIds,
       },
@@ -278,7 +278,7 @@ function createMonthlyLogs(input: {
     year: input.year,
     month: input.month,
     logType: "settlement",
-    message: "monthly settlement saved",
+    message: "本月结算已存档",
     metadata: {
       feedback: input.summary.academicFeedback,
       moneyDelta: input.summary.moneyDelta,
@@ -291,7 +291,7 @@ function createMonthlyLogs(input: {
       year: input.year,
       month: input.month,
       logType: "settlement",
-      message: "semester settlement saved",
+      message: "学期结算已存档",
       metadata: {
         semester: input.semesterSettlement.semester,
         feedback: input.semesterSettlement.feedback,
@@ -306,7 +306,7 @@ function createMonthlyLogs(input: {
       year: input.year,
       month: input.month,
       logType: "settlement",
-      message: "ending summary saved",
+      message: "终局摘要已存档",
       metadata: {
         outcome: input.endingSummary.outcome,
       },
@@ -494,7 +494,7 @@ export async function setDemoWeekAttendance(input: {
       year: playedYear,
       month: playedMonth,
       week: playedWeek,
-      message: "weekly attendance selected",
+      message: "已确定本周课程态度",
       metadata: {
         attendanceStrategy: input.attendanceStrategy,
       },
@@ -546,7 +546,7 @@ export async function planDemoWeekday(input: {
       year: playedYear,
       month: playedMonth,
       week: playedWeek,
-      message: "weekly day planned",
+      message: "已安排某一天行动",
       metadata: {
         weekday: input.weekday,
         optionId: input.optionId,
@@ -599,7 +599,7 @@ export async function confirmDemoWeek(input: {
       year: playedYear,
       month: playedMonth,
       week: playedWeek,
-      message: "weekly plan confirmed",
+      message: "已确认本周安排",
       metadata: {
         monthCompleted: weekResult.monthCompleted,
       },

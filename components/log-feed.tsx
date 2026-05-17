@@ -1,4 +1,5 @@
 import { formatMonthLabel, formatSystemLogType } from "@/lib/demo/options";
+import { sanitizePlayerFacingText, sanitizePlayerFacingTextList } from "@/lib/player-facing-text";
 
 type LogItem = {
   id?: string;
@@ -59,12 +60,12 @@ export function LogFeed({
               {periodLabel ? <span className="text-sm font-medium text-amber-700">{periodLabel}</span> : null}
             </div>
             {item.title ? <h3 className="mt-3 text-base font-semibold text-stone-900">{item.title}</h3> : null}
-            <p className="mt-3 text-sm leading-6 text-stone-700">{item.message}</p>
+            <p className="mt-3 text-sm leading-6 text-stone-700">{sanitizePlayerFacingText(item.message)}</p>
             {variant === "player" && item.details && item.details.length > 0 ? (
               <div className="mt-3">
                 <p className="text-xs font-semibold tracking-[0.12em] text-stone-500">这几件事我还记得</p>
                 <ul className="mt-2 space-y-2 text-sm leading-6 text-stone-600">
-                  {item.details.map((detail) => (
+                  {sanitizePlayerFacingTextList(item.details).map((detail) => (
                     <li key={detail} className="rounded-2xl bg-white/90 px-3 py-2">
                       {detail}
                     </li>
@@ -74,7 +75,7 @@ export function LogFeed({
             ) : null}
             {variant === "system" && item.details && item.details.length > 0 ? (
               <ul className="mt-3 space-y-2 text-sm leading-6 text-stone-600">
-                {item.details.map((detail) => (
+                {sanitizePlayerFacingTextList(item.details).map((detail) => (
                   <li key={detail} className="rounded-2xl bg-stone-100/80 px-3 py-2">
                     {detail}
                   </li>

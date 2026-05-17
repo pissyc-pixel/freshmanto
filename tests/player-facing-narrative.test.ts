@@ -8,6 +8,7 @@ import {
   actionOptions,
   skipClassDayOptions,
 } from "@/components/action-plan-form-options";
+import { FmPartialNotice } from "@/components/fm-ui/FmPartialNotice";
 import { LogFeed } from "@/components/log-feed";
 import { ReportPreview } from "@/components/report-preview";
 import { buildEndingReportPrompt } from "@/core/prompts/ending-report";
@@ -292,6 +293,14 @@ describe("player-facing narrative helpers", () => {
     }
   });
 
+  it("sanitizes weekly internal fact keys like daily-living-cost before they reach player-facing copy", () => {
+    const formatted = formatPlayerFacingFact("daily-living-cost:95");
+
+    expect(formatted).not.toContain("daily-living-cost");
+    expect(formatted).not.toContain(":95");
+    expect(formatted).toContain("日常");
+  });
+
   it.each(
     eventTemplates
       .map((template) => ({
@@ -439,6 +448,18 @@ describe("player-facing narrative helpers", () => {
     expect(emptyMarkup).toContain("这里暂时还没有可回看的记录");
   });
 
+  it("does not render raw English status labels in partial notices", () => {
+    const markup = renderToStaticMarkup(
+      createElement(FmPartialNotice, {
+        title: "当前阶段尚未形成明确方向",
+        body: "目前只展示已经落地的真实证据。",
+      }),
+    );
+
+    expect(markup).not.toContain(">partial<");
+    expect(markup).toContain("当前阶段尚未形成明确方向");
+  });
+
   it("renders a humanized monthly journal fallback without inventing facts", () => {
     const report = renderMonthlyJournalFallback(monthlyInput);
 
@@ -476,6 +497,28 @@ describe("player-facing narrative helpers", () => {
     expect(journal.title.length).toBeGreaterThan(0);
     expect(report.markdown).toContain("#");
     expect(report.usedFallback).toBe(true);
+  });
+
+  it("does not fabricate GPA lines in monthly digest or fallback when the semester has not settled yet", () => {
+    const unsettledSummary = {
+      ...monthlyInput.summary,
+      academicProfile: {
+        gpa: null,
+        rank: null,
+        percentile: null,
+        recommendationScore: 26,
+      },
+    };
+    const digest = buildMonthlyDiaryDigest(unsettledSummary, 2, 3);
+    const report = renderMonthlyJournalFallback({
+      ...monthlyInput,
+      summary: unsettledSummary,
+    });
+
+    expect(JSON.stringify(digest)).not.toContain("3.00");
+    expect(report.markdown).not.toContain("GPA");
+    expect(report.markdown).not.toContain("排名");
+    expect(report.markdown).not.toContain("百分位");
   });
 
   it("renders a grounded ending fallback in first-person voice", () => {

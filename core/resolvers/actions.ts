@@ -165,6 +165,7 @@ function refusalReason(run: GameRun, action: SupportedAction): string | null {
 function isProductiveAction(action: SupportedAction): boolean {
   return (
     action === "study" ||
+    action === "writing_research" ||
     action === "job_prep" ||
     action === "postgraduate_prep" ||
     action === "public_exam_prep" ||
@@ -209,6 +210,46 @@ function createHighStressReliefAdjustment(run: GameRun, action: SupportedAction)
     stressDelta: -2,
     burnoutDelta: run.stats.stress >= 85 ? -1 : 0,
   };
+}
+
+function resolveWritingResearchTrackBonus(run: GameRun) {
+  switch (run.profile.collegeTrack) {
+    case "arts":
+      return {
+        academics: 3,
+        fulfillment: 3,
+        mood: 1,
+        money: -20,
+      };
+    case "business":
+      return {
+        academics: 2,
+        fulfillment: 2,
+        mood: 0,
+        money: -30,
+      };
+    case "science":
+      return {
+        academics: 3,
+        fulfillment: 2,
+        mood: 0,
+        money: -25,
+      };
+    case "medicine":
+      return {
+        academics: 3,
+        fulfillment: 2,
+        mood: 0,
+        money: -25,
+      };
+    default:
+      return {
+        academics: 2,
+        fulfillment: 2,
+        mood: 0,
+        money: -20,
+      };
+  }
 }
 
 function shouldApplyWeeklySettlement(run: GameRun, action: SupportedAction): boolean {
@@ -388,12 +429,27 @@ export function resolveActionPlan(
         actionRiskDelta.academicRisk -= Math.max(1, Math.round(2 * Math.max(0.55, studyMultiplier)));
         break;
       }
+      case "writing_research": {
+        const bonus = resolveWritingResearchTrackBonus(projectedRun);
+        actionStatsDelta.semesterAcademics += Math.max(2, Math.round(bonus.academics * efficiency));
+        actionStatsDelta.fulfillment += Math.max(2, Math.round(bonus.fulfillment * Math.max(0.75, efficiency)));
+        actionStatsDelta.stress += 2;
+        actionStatsDelta.mood += bonus.mood;
+        actionMoneyDelta += bonus.money;
+        actionRiskDelta.academicRisk -= Math.max(1, Math.round(2 * Math.max(0.7, efficiency)));
+        if (run.currentYear >= 2) {
+          resumeAdditions.push(
+            createResumeItem(run, "写作 / 调研积累", "做了一次更完整的写作、资料整理或小型调研，表达和项目感都留下一点痕迹。", "research"),
+          );
+        }
+        break;
+      }
       case "job_prep":
         actionStatsDelta.stress += 4;
         actionStatsDelta.fulfillment += Math.max(1, Math.round(2 * efficiency));
         actionStatsDelta.money -= 60;
         resumeAdditions.push(
-          createResumeItem(run, "Resume Sprint", "Started tightening the resume and testing job directions.", "job_progress"),
+          createResumeItem(run, "简历打磨 / 求职推进", "认真整理了一轮简历、投递或岗位方向，求职线开始更像连续动作。", "job_progress"),
         );
         break;
       case "postgraduate_prep":
@@ -404,7 +460,7 @@ export function resolveActionPlan(
         actionRiskDelta.academicRisk -= Math.max(1, Math.round(2 * Math.max(0.65, efficiency)));
         if (run.currentYear >= 3) {
           resumeAdditions.push(
-            createResumeItem(run, "Postgraduate Prep", "Started to prepare a more explicit postgraduate study rhythm.", "research"),
+            createResumeItem(run, "深造准备节奏", "把考研 / 深造准备真正排进了日程，复习和资料整理开始变得更具体。", "research"),
           );
         }
         break;
@@ -414,7 +470,7 @@ export function resolveActionPlan(
         actionStatsDelta.money -= 40;
         if (run.currentYear >= 3) {
           resumeAdditions.push(
-            createResumeItem(run, "Public Exam Prep", "Started building a stable public exam preparation rhythm.", "project"),
+            createResumeItem(run, "公考准备节奏", "开始稳定推进行测、申论或资料整理，公考线第一次有了持续投入感。", "project"),
           );
         }
         break;
@@ -424,7 +480,7 @@ export function resolveActionPlan(
         actionStatsDelta.semesterAcademics += Math.max(1, Math.round(3 * efficiency));
         actionStatsDelta.money -= 50;
         resumeAdditions.push(
-          createResumeItem(run, "Competition Project", "Put another day into a longer competition or project line.", "competition"),
+          createResumeItem(run, "比赛 / 项目推进", "继续把时间投进手里的比赛或长期项目，履历线往前挪了一点。", "competition"),
         );
         break;
       case "part_time":
@@ -437,31 +493,33 @@ export function resolveActionPlan(
         break;
       case "social":
         actionStatsDelta.money -= 120;
-        actionStatsDelta.mood += 4;
+        actionStatsDelta.mood += 5;
         actionStatsDelta.social += 6;
-        actionStatsDelta.stress -= 3;
+        actionStatsDelta.stress -= 5;
         break;
       case "relax":
         actionStatsDelta.money -= 80;
-        actionStatsDelta.mood += 6;
-        actionStatsDelta.stress -= 4;
+        actionStatsDelta.mood += 7;
+        actionStatsDelta.stress -= 6;
         break;
       case "idle":
-        actionStatsDelta.mood += 2;
-        actionStatsDelta.stress -= 2;
+        actionStatsDelta.mood += 1;
+        actionStatsDelta.stress -= 3;
+        actionStatsDelta.fulfillment -= 1;
         break;
       case "big_meal":
         actionStatsDelta.money -= 180;
         actionStatsDelta.mood += 8;
-        actionStatsDelta.stress -= 6;
+        actionStatsDelta.stress -= 7;
         break;
       case "student_activity":
         actionStatsDelta.money -= 30;
         actionStatsDelta.mood += 2;
         actionStatsDelta.social += 4;
+        actionStatsDelta.stress -= 1;
         actionStatsDelta.fulfillment += Math.max(2, Math.round(3 * Math.max(0.75, efficiency)));
         resumeAdditions.push(
-          createResumeItem(run, "Campus Activity", "Joined a lecture, club, or student activity with visible participation.", "campus_activity"),
+          createResumeItem(run, "校园活动参与", "认真参加了一次讲座、社团或校园活动，留下了能被记住的参与痕迹。", "campus_activity"),
         );
         break;
       case "remedy":

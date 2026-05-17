@@ -85,6 +85,11 @@ export type SaveResumeItemInput = {
   metadata?: JsonObject;
 };
 
+type ListQueryOptions = {
+  limit?: number;
+  ascending?: boolean;
+};
+
 function ensureSingle<T>(result: PostgrestSingleResponse<T>, context: string) {
   if (result.error) {
     throw createRepositoryError(context, result.error);
@@ -218,13 +223,19 @@ export function createSupabaseDataRepository(client: DatabaseClient) {
       return ensureSingle(result, "save monthly state");
     },
 
-    async listMonthlyStates(runId: string): Promise<MonthlyStateRecord[]> {
-      const result = await client
+    async listMonthlyStates(runId: string, options: ListQueryOptions = {}): Promise<MonthlyStateRecord[]> {
+      let query = client
         .from("monthly_states")
         .select("*")
         .eq("run_id", runId)
-        .order("year", { ascending: true })
-        .order("month", { ascending: true });
+        .order("year", { ascending: options.ascending ?? true })
+        .order("month", { ascending: options.ascending ?? true });
+
+      if (options.limit) {
+        query = query.limit(options.limit);
+      }
+
+      const result = await query;
 
       return ensureMany(result, "list monthly states");
     },
@@ -244,14 +255,20 @@ export function createSupabaseDataRepository(client: DatabaseClient) {
       return ensureMany(result, "write event logs");
     },
 
-    async listEventLogs(runId: string): Promise<GameEventLogRecord[]> {
-      const result = await client
+    async listEventLogs(runId: string, options: ListQueryOptions = {}): Promise<GameEventLogRecord[]> {
+      let query = client
         .from("game_event_logs")
         .select("*")
         .eq("run_id", runId)
-        .order("year", { ascending: true })
-        .order("month", { ascending: true })
-        .order("created_at", { ascending: true });
+        .order("year", { ascending: options.ascending ?? true })
+        .order("month", { ascending: options.ascending ?? true })
+        .order("created_at", { ascending: options.ascending ?? true });
+
+      if (options.limit) {
+        query = query.limit(options.limit);
+      }
+
+      const result = await query;
 
       return ensureMany(result, "list event logs");
     },
@@ -261,17 +278,21 @@ export function createSupabaseDataRepository(client: DatabaseClient) {
       return ensureSingle(result, "save ai report");
     },
 
-    async listAiReports(runId: string, reportType?: AiReportType): Promise<AIReportRecord[]> {
+    async listAiReports(runId: string, reportType?: AiReportType, options: ListQueryOptions = {}): Promise<AIReportRecord[]> {
       let query = client
         .from("ai_reports")
         .select("*")
         .eq("run_id", runId)
-        .order("year", { ascending: true })
-        .order("month", { ascending: true, nullsFirst: false })
-        .order("created_at", { ascending: true });
+        .order("year", { ascending: options.ascending ?? true })
+        .order("month", { ascending: options.ascending ?? true, nullsFirst: false })
+        .order("created_at", { ascending: options.ascending ?? true });
 
       if (reportType) {
         query = query.eq("report_type", reportType);
+      }
+
+      if (options.limit) {
+        query = query.limit(options.limit);
       }
 
       const result = await query;
@@ -293,14 +314,20 @@ export function createSupabaseDataRepository(client: DatabaseClient) {
       return ensureMany(result, "save resume items");
     },
 
-    async listResumeItems(runId: string): Promise<ResumeItemRecord[]> {
-      const result = await client
+    async listResumeItems(runId: string, options: ListQueryOptions = {}): Promise<ResumeItemRecord[]> {
+      let query = client
         .from("resume_items")
         .select("*")
         .eq("run_id", runId)
-        .order("year", { ascending: true })
-        .order("month", { ascending: true })
-        .order("created_at", { ascending: true });
+        .order("year", { ascending: options.ascending ?? true })
+        .order("month", { ascending: options.ascending ?? true })
+        .order("created_at", { ascending: options.ascending ?? true });
+
+      if (options.limit) {
+        query = query.limit(options.limit);
+      }
+
+      const result = await query;
 
       return ensureMany(result, "list resume items");
     }

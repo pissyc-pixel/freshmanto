@@ -25,6 +25,8 @@ type WeeklyEventTemplate = {
   title: string;
   summary: string;
   detail: string;
+  attendSummary?: string;
+  skipSummary?: string;
   allowedWeekdays: Weekday[];
   baseWeight: number | ((run: GameRun) => number);
   conditions: EventCondition[];
@@ -42,6 +44,7 @@ type WeeklyEventTemplate = {
     action: WeeklyActionOption["action"];
     effect: WeeklyActionEffect;
   }>;
+  missEffect?: WeeklyActionEffect;
 };
 
 function emptyStatsDelta(): DynamicStats {
@@ -69,6 +72,8 @@ export const weeklyEventTemplates: WeeklyEventTemplate[] = [
     title: "班会 / 导员通知",
     summary: "这周有一天会被班会、材料确认和导员通知切掉一部分时间。",
     detail: "它不会让这一天完全失去安排空间，但很难再塞进最完整的白天行动。",
+    attendSummary: "去：能把通知、材料和导员印象先稳住，后续少一点漏信息和补材料压力。",
+    skipSummary: "不去：容易错过通知、后续补材料更烦，也会让压力和导员印象吃一点亏。",
     allowedWeekdays: ["wed", "thu"],
     baseWeight: 7,
     conditions: ["always"],
@@ -84,6 +89,11 @@ export const weeklyEventTemplates: WeeklyEventTemplate[] = [
         notableFact: "weekly-event:class-meeting",
       },
     },
+    missEffect: {
+      stats: { stress: 2, social: -1 },
+      risk: { burnout: 1 },
+      notableFact: "weekly-event:class-meeting-skip",
+    },
   },
   {
     id: "weekly-strict-roll-call",
@@ -91,6 +101,8 @@ export const weeklyEventTemplates: WeeklyEventTemplate[] = [
     title: "课程签到严查",
     summary: "这周有一天课程签到查得格外紧，逃掉白天会更伤学业。",
     detail: "它不一定逼你去上课，但会让这一天更像带着风险在排。",
+    attendSummary: "去：至少能把签到和平时分风险压住一点，也不容易被突然抓到。",
+    skipSummary: "不去：会把点名和平时分风险往上堆，后面补起来更难。",
     allowedWeekdays: ["mon", "fri"],
     baseWeight: 5,
     conditions: ["academic_risk_high"],
@@ -104,6 +116,11 @@ export const weeklyEventTemplates: WeeklyEventTemplate[] = [
         },
       },
     ],
+    missEffect: {
+      stats: { stress: 1 },
+      risk: { academicRisk: 2 },
+      notableFact: "weekly-event:strict-roll-call-skip",
+    },
   },
   {
     id: "weekly-recruitment-talk",

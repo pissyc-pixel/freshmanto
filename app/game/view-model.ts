@@ -12,6 +12,7 @@ import {
   formatWeeklyDayType,
   formatWeeklyEventFact,
 } from "@/lib/demo/options";
+import { annotatePlannerOptions } from "@/lib/planner-option-priority";
 import type {
   ActiveMonthState,
   ActiveWeekState,
@@ -44,8 +45,51 @@ function mapWeeklyDayTypeToBlockKind(value: PlannedWeekdayState["effectiveDayTyp
   }
 }
 
-function uniqueLines(lines: string[]): string[] {
-  return [...new Set(lines.filter((line) => line.trim().length > 0))];
+function uniqueLines(lines: Array<string | undefined | null>): string[] {
+  return [...new Set(lines.filter((line): line is string => Boolean(line && line.trim().length > 0)))];
+}
+
+function describeExpectedImpact(option: { action: WeeklySettlementSummary["dailyResults"][number]["resolvedAction"]["action"]; source: "default" | "weekly_event"; }, run?: GameRun) {
+  const track = run?.profile.collegeTrack;
+
+  switch (option.action) {
+    case "study":
+      return "预期影响：补学业、压一点挂科风险，但会更累。";
+    case "writing_research":
+      if (track === "arts" || track === "business") {
+        return "预期影响：补学业与表达，慢慢抬高写作 / 调研经历，对考公和项目线更友好。";
+      }
+      if (track === "science" || track === "medicine") {
+        return "预期影响：补学业与研究感，更容易长出调研 / 科研类履历。";
+      }
+      return "预期影响：补学业、表达和调研积累，也更容易留下项目痕迹。";
+    case "job_prep":
+      return "预期影响：推就业 / 实习线、补履历，但会花钱耗神。";
+    case "postgraduate_prep":
+      return "预期影响：补学业和深造准备，后期更影响考研 / 推免。";
+    case "public_exam_prep":
+      return "预期影响：推进考公准备和方向感，但会占掉一整段时间。";
+    case "competition_project":
+      return "预期影响：补项目 / 比赛履历，也会慢慢推高推免和就业竞争力。";
+    case "part_time":
+      return "预期影响：补现金流，但压力和疲惫感会更明显。";
+    case "social":
+      return "预期影响：降压、回心情、补社交，但通常要花钱。";
+    case "relax":
+      return "预期影响：更明显地降压回血，但这段时间就不会推进学业和履历。";
+    case "big_meal":
+      return "预期影响：快速回心情、缓压力，代价是花掉一笔钱。";
+    case "student_activity":
+      return option.source === "weekly_event"
+        ? "预期影响：先接住今天这条事件入口，减少错过信息或机会的风险。"
+        : "预期影响：补社交和校园参与感，偶尔也会留下履历痕迹。";
+    case "remedy":
+      return "预期影响：优先止损，减压并把学业风险往回拉。";
+    case "ask_family":
+      return "预期影响：立刻补钱，但心理压力会明显上来。";
+    default:
+      return undefined;
+  }
 }
 
 function formatPlannerWeeklyEventFact(fact: string): string {
@@ -60,6 +104,8 @@ function formatPlannerWeeklyEventFact(fact: string): string {
     "weekly-event:humanities-workshop": "这周的调研和写作活动，把表达和公考这条线都往前轻轻推了一下。",
     "weekly-event:science-training": "这周更像在往建模和科研训练上面走，深造的方向感也更明显了。",
     "weekly-event:medical-observation": "这周的见习和实践机会，让医学线的履历和深造味道都更真实了一点。",
+    "weekly-event:class-meeting-skip": "这周把班会和通知先拖过去了，后面补信息和补材料的压力也跟着上来了。",
+    "weekly-event:strict-roll-call-skip": "这周把那次严查签到硬扛过去了，学业和后续补救压力都更高了一点。",
   };
 
   return extraFacts[fact] ?? formatWeeklyEventFact(fact);
@@ -131,6 +177,39 @@ export function buildPlannerDaysView(currentWeekState: ActiveWeekState, run?: Ga
           run,
         })
       : normalOptions;
+    const hasCashRisk = (currentWeekState.planningWarnings ?? []).length > 0;
+    const plannedOptionId = day.plannedAction?.optionId;
+    const dayEvent = currentWeekState.event?.weekday === day.weekday ? currentWeekState.event : null;
+    const prioritizedNormalOptions = annotatePlannerOptions({
+      options: normalOptions.map((option) => ({
+        optionId: option.optionId,
+        action: option.action,
+        label: option.label,
+        description: uniqueLines([option.description, describeExpectedImpact(option, run)]).join(" "),
+        source: option.source,
+        sourceEventId: option.sourceEventId,
+        selected:
+          currentWeekState.lastSelectedOptionId === option.optionId ||
+          plannedOptionId === option.optionId,
+      })),
+      event: dayEvent,
+      hasCashRisk,
+    });
+    const prioritizedSkipOptions = annotatePlannerOptions({
+      options: skipOptions.map((option) => ({
+        optionId: option.optionId,
+        action: option.action,
+        label: option.label,
+        description: uniqueLines([option.description, describeExpectedImpact(option, run)]).join(" "),
+        source: option.source,
+        sourceEventId: option.sourceEventId,
+        selected:
+          currentWeekState.lastSelectedOptionId === option.optionId ||
+          plannedOptionId === option.optionId,
+      })),
+      event: dayEvent,
+      hasCashRisk,
+    });
 
     return {
       weekday: day.weekday,
@@ -144,18 +223,11 @@ export function buildPlannerDaysView(currentWeekState: ActiveWeekState, run?: Ga
       skipClassSelected: day.skipClassSelected,
       eventTitle: currentWeekState.event?.weekday === day.weekday ? currentWeekState.event.title : null,
       eventSummary: currentWeekState.event?.weekday === day.weekday ? currentWeekState.event.summary : null,
-      normalOptions: normalOptions.map((option) => ({
-        optionId: option.optionId,
-        label: option.label,
-        description: option.description,
-        selected: currentWeekState.lastSelectedOptionId === option.optionId,
-      })),
-      skipOptions: skipOptions.map((option) => ({
-        optionId: option.optionId,
-        label: option.label,
-        description: option.description,
-        selected: currentWeekState.lastSelectedOptionId === option.optionId,
-      })),
+      eventAttendSummary: currentWeekState.event?.weekday === day.weekday ? currentWeekState.event.attendSummary ?? null : null,
+      eventSkipSummary: currentWeekState.event?.weekday === day.weekday ? currentWeekState.event.skipSummary ?? null : null,
+      hasCashRisk,
+      normalOptions: prioritizedNormalOptions,
+      skipOptions: prioritizedSkipOptions,
     };
   });
 }
@@ -217,7 +289,9 @@ export function buildPlannerStatusText(currentWeekState: ActiveWeekState) {
 }
 
 export function buildPlannerFeedbackLines(currentWeekState: ActiveWeekState) {
+  const isVacationWeek = currentWeekState.days?.every((day) => day.baseDayType === "full_day") ?? false;
   const lines = [
+    isVacationWeek ? "这是一个假期周，不再按普通上课周锁白天；这周更多是在安排休息、兼职、实践和后续准备。" : "",
     currentWeekState.event
       ? `本周事件落在${weekdayLabels[currentWeekState.event.weekday]}：${currentWeekState.event.title}。`
       : "",

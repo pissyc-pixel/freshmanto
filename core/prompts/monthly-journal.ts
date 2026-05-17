@@ -10,10 +10,11 @@ import type { ActionType, DynamicStats, StructuredMonthlySummary } from "@/types
 
 export const monthlyJournalPromptContract = {
   name: "monthly-journal",
-  purpose: "把规则层已经确认的月度事实改写成更像大学生本人写的月底月记。",
-  allowedInput: "只能接收规则层产出的结构化月度摘要和整理后的 digest，AI 不参与规则判定。",
-  forbiddenInput: "不得编造新的关键事实，不得修改数值、事件结果或规则结论，也不得直接复读系统字段。",
-  outputStyle: "输出中文 markdown，像大学生月底写给自己的回顾，有情绪、有重点，会主动跳过细碎重复。",
+  purpose: "把规则层已经确认的月度 summary 改写成更像普通大学生本人写的月底月记。",
+  allowedInput: "只能接收规则层产出的结构化月度摘要、weekly settlements 和整理后的 digest，AI 不参与规则判定。",
+  forbiddenInput:
+    "不得编造新的关键事实，不得修改数值、事件结果或规则结论，不得把 summary 里没有的人物、地点、奖项、比赛结果写进去。",
+  outputStyle: "输出中文 markdown，像普通大学生月底写给自己的生活记录，克制、有生活感，不写总结报告腔。",
 } as const;
 
 function formatSignedValue(value: number) {
@@ -38,7 +39,7 @@ function summarizeStats(stats?: Partial<DynamicStats>): Record<string, string> {
   };
 
   return {
-    钱: formatSignedValue(safeStats.money),
+    金钱: formatSignedValue(safeStats.money),
     心情: formatSignedValue(safeStats.mood),
     压力: formatSignedValue(safeStats.stress),
     学业: formatSignedValue(safeStats.semesterAcademics),
@@ -72,7 +73,6 @@ function summarizeWeeklySettlements(summary: StructuredMonthlySummary) {
     const readableFacts = facts
       .map((fact) => {
         const readableFact = formatPlayerFacingFact(fact);
-
         return readableFact === fact ? formatPlayerFacingFlag(fact) : readableFact;
       })
       .filter((fact) => fact && !fact.includes("daily-living-cost"))
@@ -128,14 +128,17 @@ export function buildMonthlyJournalPrompt(input: MonthlyJournalPromptInput): AiP
         role: "system",
         content: [
           "AI 只负责表达，不负责规则判定。",
-          "请把输入写成第一人称月记，像大学生在月底复盘自己这个月是怎么过来的。",
-          "重点写主线、情绪、体感和最重要的几件事，不要把动作名一条条流水账复述。",
+          "请基于提供的 monthly summary 和 digest 来写，不能超出输入事实。",
+          "请写成第一人称月记，像普通大学生在月底写给自己的生活记录。",
+          "重点写主线、情绪、体感和最重要的几件小事，不要把动作名一条条流水账复述。",
+          "允许出现排队、下课、图书馆、宿舍、食堂、犯困、焦虑、松一口气这类生活感细节，但前提是不能编造输入里没有的事实结论。",
+          "如果 summary 信息不足，可以明确写“这个月好像没留下太多特别清晰的记忆”，不要硬编大事。",
           "还要自然写出角色对未来方向的意识变化，比如越来越像在往推免、考研、考公、就业某条路靠，或者依然没想清楚。",
           "可以有疲惫、松口气、懊恼、期待，但这些感受都必须由输入里的事实支撑。",
-          "绝对不要编造新事件、新人物关系、新 offer、新奖项或额外剧情。",
+          "绝对不要编造新事件、新人物关系、新 offer、新奖项、新比赛结果或额外剧情。",
           "不要解释规则如何计算，也不要出现“系统”“规则层”“eventIds”“statsDelta”之类幕后说法。",
-          "不要写成系统播报，也不要把代码字段翻译成人话后硬塞进正文。",
-          "正文建议 300-600 字，2-4 段，口语自然，不要鸡汤，不要过度文学化。",
+          "避免总结报告腔、鸡汤腔和宏大抒情，不要写成系统播报。",
+          "正文建议 250-500 字，2-4 段，每段不要太长。",
         ].join("\n"),
       },
       {
@@ -152,10 +155,10 @@ export function buildMonthlyJournalPrompt(input: MonthlyJournalPromptInput): AiP
               "真正值得记住的几件事",
             ],
             constraints: [
-              "只能使用下面紧凑事实中已经存在的事实与数值",
-              "不要新增决定性事件或新人物关系",
+              "只能使用下面紧凑事实中已经存在的事实与数值，必须基于 summary",
+              "不要新增决定性事件、新人物关系、新地点、新奖项或新结果",
               "不要把几十个动作名逐条复述",
-              "语气像大学生月底写给自己的月记，不要写成系统播报",
+              "语气像大学生月底写给自己的月记，不要写成系统播报或总结报告",
               "如果某周没有主动安排，只能说它被自动补成摆烂 / 发呆，不要编出额外活动",
             ],
             preferredStructure: ["标题", "2-4 段第一人称正文", "结尾一句收束"],

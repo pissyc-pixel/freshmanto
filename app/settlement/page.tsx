@@ -1,4 +1,6 @@
 import Link from "next/link";
+
+import { ActiveRunSync } from "@/components/active-run-sync";
 import { AppShell } from "@/components/app-shell";
 import { FactList } from "@/components/fact-list";
 import { LogFeed } from "@/components/log-feed";
@@ -10,8 +12,10 @@ import {
   buildRecommendationExplanationFromSummary,
   buildScholarshipExplanationFromSummary,
 } from "@/core/resolvers/progression";
+import { buildRunHref, resolveActiveRunId } from "@/lib/demo/active-run";
 import { buildGrowthJournalEntry, buildMonthlyDiaryDigest } from "@/lib/demo/monthly-digest";
 import { formatMonthLabel, formatStatLabel } from "@/lib/demo/options";
+import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
 import { getServerDemoBundle } from "@/lib/demo/server";
 import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
 import type { DynamicStats } from "@/types/game";
@@ -32,7 +36,10 @@ function buildDeltaItems(statsAfter: DynamicStats, statsDelta: DynamicStats) {
 
 export default async function SettlementPage({ searchParams }: SettlementPageProps) {
   const params = await searchParams;
-  const runId = readSearchParam(params.runId);
+  const runId = resolveActiveRunId({
+    searchParamRunId: readSearchParam(params.runId),
+    cookieRunId: await readActiveRunIdFromCookies(),
+  });
   const year = Number(readSearchParam(params.year) ?? 0);
   const month = Number(readSearchParam(params.month) ?? 0);
   const bundle = runId ? await getServerDemoBundle(runId) : null;
@@ -40,11 +47,12 @@ export default async function SettlementPage({ searchParams }: SettlementPagePro
   if (!runId || !bundle) {
     return (
       <AppShell
+        runId={runId}
         eyebrow="月结算"
         title="这里会展示月底结算"
         description="月底结算会把状态总览、成长日志、AI 月记和系统留档分开展示。"
       >
-        <SectionCard title="还没有可查询的 run" description="先回到首页创建一局，再从主游戏推进到月底。">
+        <SectionCard title="还没有可查询的存档" description="先回到首页创建一局，再从主游戏推进到月底。">
           <Link href="/" className="text-sm font-semibold text-amber-700 underline-offset-4 hover:underline">
             返回开局页
           </Link>
@@ -60,13 +68,14 @@ export default async function SettlementPage({ searchParams }: SettlementPagePro
   if (!monthlyState) {
     return (
       <AppShell
+        runId={runId}
         eyebrow="月结算"
         title="这局还没有月结算记录"
         description="完成至少一次月底结算之后，这里才会出现结构化快照、成长日志和 AI 月记。"
       >
         <SectionCard title="当前没有可展示内容" description="先回到主游戏页继续推进。">
           <Link
-            href={`/game?runId=${runId}`}
+            href={buildRunHref("/game", runId)}
             className="text-sm font-semibold text-amber-700 underline-offset-4 hover:underline"
           >
             返回主游戏页
@@ -100,27 +109,29 @@ export default async function SettlementPage({ searchParams }: SettlementPagePro
 
   return (
     <AppShell
+      runId={runId}
       eyebrow="月结算"
       title={`${formatMonthLabel(monthlyState.year, monthlyState.month)} 已结算`}
       description="成长日志偏事实层，月记偏体验层；这页会把两者拆开，也顺手解释这个月正在把你推向哪里。"
       actions={
         <>
           <Link
-            href={`/journal?runId=${runId}`}
+            href={buildRunHref("/journal", runId)}
             className="rounded-full border border-amber-900/15 bg-white/60 px-5 py-3 font-semibold text-stone-800 transition hover:bg-white/90"
           >
             查看月记归档
           </Link>
           <Link
-            href={`/game?runId=${runId}`}
+            href={buildRunHref(bundle.run.status === "completed" ? "/ending" : "/game", runId)}
             className="rounded-full border border-amber-900/15 bg-white/60 px-5 py-3 font-semibold text-stone-800 transition hover:bg-white/90"
           >
-            继续下个月
+            {bundle.run.status === "completed" ? "查看正式结局" : "继续下个月"}
           </Link>
         </>
       }
     >
       <div className="space-y-6">
+        <ActiveRunSync runId={bundle.run.id} />
         <SectionCard title="结算总览" description="先看这个月最后落在了什么状态上。">
           <StatsGrid items={buildDeltaItems(summary.statsAfter, summary.statsDelta)} />
         </SectionCard>

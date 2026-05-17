@@ -109,6 +109,80 @@ export async function getServerDemoBundle(runId: string) {
   };
 }
 
+export async function getServerGameBundle(runId: string) {
+  await ensureDemoSchema();
+  const repository = createServerSupabaseRepository();
+  const runRecord = await repository.getRun(runId);
+
+  if (!runRecord) {
+    return null;
+  }
+
+  const [monthlyStates, logs] = await Promise.all([
+    repository.listMonthlyStates(runId, { limit: 1, ascending: false }),
+    repository.listEventLogs(runId, { limit: 6, ascending: false }),
+  ]);
+
+  return {
+    run: runRecord.current_state_json,
+    runRecord,
+    monthlyStates: monthlyStates.slice().reverse(),
+    logs: logs.slice().reverse(),
+  };
+}
+
+export async function getServerJournalBundle(runId: string) {
+  await ensureDemoSchema();
+  const repository = createServerSupabaseRepository();
+  const runRecord = await repository.getRun(runId);
+
+  if (!runRecord) {
+    return null;
+  }
+
+  const [monthlyStates, aiReports] = await Promise.all([
+    repository.listMonthlyStates(runId),
+    repository.listAiReports(runId, "monthly_journal"),
+  ]);
+
+  return {
+    run: runRecord.current_state_json,
+    runRecord,
+    monthlyStates,
+    aiReports,
+  };
+}
+
+export async function getServerResumeBundle(runId: string) {
+  await ensureDemoSchema();
+  const repository = createServerSupabaseRepository();
+  const runRecord = await repository.getRun(runId);
+
+  if (!runRecord) {
+    return null;
+  }
+
+  const [monthlyStates, resumeItems] = await Promise.all([
+    repository.listMonthlyStates(runId),
+    repository.listResumeItems(runId),
+  ]);
+
+  return {
+    run: runRecord.current_state_json,
+    runRecord,
+    monthlyStates,
+    resumeItems,
+  };
+}
+
+export async function getServerDemoRun(runId: string) {
+  await ensureDemoSchema();
+  const repository = createServerSupabaseRepository();
+  const runRecord = await repository.getRun(runId);
+
+  return runRecord?.current_state_json ?? null;
+}
+
 export async function getServerEndingPreview(runId: string) {
   const bundle = await getServerDemoBundle(runId);
 
