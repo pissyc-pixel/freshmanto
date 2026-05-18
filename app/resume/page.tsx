@@ -127,7 +127,7 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
     title: item.title,
     summary: item.summary,
     month: item.month,
-    tags: Array.isArray(item.metadata_json.tags)
+    tags: Array.isArray(item.metadata_json?.tags)
       ? item.metadata_json.tags.filter((tag): tag is string => typeof tag === "string")
       : [],
   }));
@@ -153,7 +153,9 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
     .slice(0, 4)
     .map((state) => ({
       id: `${state.id}-growth`,
-      ...buildGrowthJournalEntry(state.snapshot_json, state.year, state.month),
+      ...(state.snapshot_json
+        ? buildGrowthJournalEntry(state.snapshot_json, state.year, state.month)
+        : { badge: "成长日志", periodLabel: formatMonthLabel(state.year, state.month), title: "数据不完整", message: "这条月度记录的快照数据不完整，无法生成成长日志。", details: [] as string[] }),
     }));
 
   const coreAbilityTags = buildCoreAbilityTags({

@@ -289,6 +289,7 @@ export type WeeklyEventInstance = {
   linkedProjectTitle?: string;
   skipClosesProjectLine?: boolean;
   defaultAttendIfUnplanned?: boolean;
+  hardBlock?: boolean;
 };
 
 export type PlannedWeekdayState = {

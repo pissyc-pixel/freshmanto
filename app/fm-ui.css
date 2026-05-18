@@ -1488,3 +1488,66 @@
     padding-top: 0;
   }
 }
+
+/* Loading overlay */
+.fm-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+}
+
+.fm-loading-overlay__card {
+  max-width: 400px;
+  width: 90%;
+  background: white;
+  border-radius: var(--fm-radius-lg);
+  padding: 2rem;
+  text-align: center;
+  box-shadow: var(--fm-shadow);
+}
+
+.fm-loading-overlay__spinner {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 1rem;
+  border: 3px solid var(--fm-border);
+  border-top-color: var(--fm-brand);
+  border-radius: 50%;
+  animation: fm-spin 0.8s linear infinite;
+}
+
+@keyframes fm-spin {
+  to { transform: rotate(360deg); }
+}
+
+.fm-loading-overlay__title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--fm-text);
+}
+
+.fm-loading-overlay__body {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--fm-muted);
+}
+
+/* Journal card fixed height */
+.fm-month-paper-scene {
+  min-height: 520px;
+}
+
+.fm-paper-stack {
+  min-height: 480px;
+}
+
+.fm-paper__copy {
+  max-height: 360px;
+  overflow-y: auto;
+}

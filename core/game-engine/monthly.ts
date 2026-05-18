@@ -1069,7 +1069,7 @@ function finalizePlannedWeek(input: {
     flags: dedupe(input.dayTurns.flatMap((turn) => turn.flags)),
     opportunities: [],
     budgetLines: [
-      `本周生活费到账 ${weeklyAllowance} 元。`,
+      `月生活费 ${weeklyAllowance} 元将在月底统一到账。`,
       `固定生活支出一共 ${weeklyLivingExpense} 元，已经按天拆进了逐日结算。`,
       `行动本身带来的直接收支合计 ${input.dayTurns.reduce((sum, turn) => sum + turn.moneyDelta, 0) + weeklyLivingExpense} 元。`,
       course.proxyCost > 0 ? `翘课或代价带来的额外课程成本 ${course.proxyCost} 元。` : "",

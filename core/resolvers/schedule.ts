@@ -267,12 +267,14 @@ export function resolveEffectiveDayType(input: {
   event?: WeeklyEventInstance | null;
   skipClassSelected?: boolean;
 }): WeeklyDayType {
-  if (input.event?.weekday === input.day.weekday && input.event.dayTypeOverride) {
-    return input.event.dayTypeOverride;
-  }
+  const eventApplies = input.event?.weekday === input.day.weekday;
 
   if (input.skipClassSelected && input.day.skipClassAvailable) {
     return "full_day";
+  }
+
+  if (eventApplies && input.event?.dayTypeOverride) {
+    return input.event.dayTypeOverride;
   }
 
   return input.day.baseDayType;
@@ -298,7 +300,8 @@ export function resolveAvailableWeeklyActions(input: {
     eventApplies &&
     input.event?.limitedActions &&
     input.event.limitedActions.length > 0 &&
-    !(input.event.skipClosesProjectLine && shouldShowSpecialAction)
+    !(input.event.skipClosesProjectLine && shouldShowSpecialAction) &&
+    !(input.skipClassSelected && !input.event.hardBlock)
       ? new Set(input.event.limitedActions)
       : null;
 

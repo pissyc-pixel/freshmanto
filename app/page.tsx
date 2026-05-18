@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { ContinueSaveButton } from "@/components/continue-save-button";
 import { FmAppRoot, FmBrandMark, FmIcon } from "@/components/fm-ui/FmScaffold";
 import { buildRunHref } from "@/lib/demo/active-run";
 import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
@@ -32,6 +33,8 @@ export default async function StartPage() {
             <FmIcon name="chevron-right" className="h-7 w-7" />
             <span>新生建档</span>
           </Link>
+
+          <ContinueSaveButton />
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <Link href={buildRunHref("/game", activeRunId)} className="fm-button-secondary">

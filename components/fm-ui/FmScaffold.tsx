@@ -14,8 +14,11 @@ type IconName =
   | "compass"
   | "file"
   | "home"
+  | "minus"
   | "moon"
   | "spark"
+  | "trending-down"
+  | "trending-up"
   | "users";
 
 type SidebarPageKey = "game" | "journal" | "resume" | "ending";
@@ -174,6 +177,26 @@ export function FmIcon({
       return (
         <svg className={className} {...common}>
           <path d="m10 7 5 5-5 5" />
+        </svg>
+      );
+    case "trending-up":
+      return (
+        <svg className={className} {...common}>
+          <path d="m3 17 6-6 4 4 8-8" />
+          <path d="M17 7h4v4" />
+        </svg>
+      );
+    case "trending-down":
+      return (
+        <svg className={className} {...common}>
+          <path d="m3 7 6 6 4-4 8 8" />
+          <path d="M17 17h4v-4" />
+        </svg>
+      );
+    case "minus":
+      return (
+        <svg className={className} {...common}>
+          <path d="M5 12h14" />
         </svg>
       );
     default:
