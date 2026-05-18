@@ -12,8 +12,6 @@ import { createPortal } from "react-dom";
 import { useFormStatus } from "react-dom";
 
 import { planWeekdayActionAction, submitActionTurnAction } from "@/app/actions";
-import { FmBadge } from "@/components/fm-ui/FmBadge";
-import { FmLoadingState } from "@/components/fm-ui/FmLoadingState";
 import { FmIcon } from "@/components/fm-ui/FmScaffold";
 import { LoadingOverlay } from "@/components/loading-overlay";
 import { buildPlannerEventNotice } from "@/lib/planner-option-priority";
@@ -150,12 +148,12 @@ function SubmitButton(props: {
 function FeedbackBanner({ feedback }: { feedback: PlannerFeedback }) {
   return (
     <div
-      className={`fm-card fm-card--pad text-sm leading-6 ${
+      className={`rounded-2xl border px-4 py-4 text-sm leading-6 ${
         feedback.kind === "error"
-          ? "fm-card--danger"
+          ? "border-rose-200 bg-rose-50 text-rose-900"
           : feedback.kind === "success"
-            ? "fm-card--completed"
-            : "fm-card--warning"
+            ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+            : "border-amber-200 bg-amber-50 text-amber-900"
       }`}
     >
       <p className="font-semibold">{feedback.title}</p>
@@ -205,123 +203,6 @@ function optionVisual(optionId: string) {
   }
 
   return { icon: "spark" as const, tone: "teal" };
-}
-
-type ActionEffectTone = "academic" | "money" | "mood" | "stress" | "resume" | "event";
-type ActionEffectDirection = "up" | "down" | "flat";
-
-type ActionEffect = {
-  label: string;
-  tone: ActionEffectTone;
-  direction: ActionEffectDirection;
-  level: 1 | 2 | 3;
-};
-
-function buildActionEffects(action: ActionType): ActionEffect[] {
-  switch (action) {
-    case "study":
-      return [
-        { label: "学业", tone: "academic", direction: "up", level: 3 },
-        { label: "压力", tone: "stress", direction: "up", level: 2 },
-        { label: "心情", tone: "mood", direction: "down", level: 1 },
-      ];
-    case "writing_research":
-      return [
-        { label: "学业", tone: "academic", direction: "up", level: 2 },
-        { label: "履历", tone: "resume", direction: "up", level: 2 },
-        { label: "压力", tone: "stress", direction: "up", level: 1 },
-      ];
-    case "job_prep":
-      return [
-        { label: "履历", tone: "resume", direction: "up", level: 3 },
-        { label: "金钱", tone: "money", direction: "down", level: 1 },
-        { label: "压力", tone: "stress", direction: "up", level: 2 },
-      ];
-    case "postgraduate_prep":
-      return [
-        { label: "学业", tone: "academic", direction: "up", level: 2 },
-        { label: "深造", tone: "resume", direction: "up", level: 2 },
-        { label: "压力", tone: "stress", direction: "up", level: 2 },
-      ];
-    case "public_exam_prep":
-      return [
-        { label: "公考", tone: "resume", direction: "up", level: 2 },
-        { label: "金钱", tone: "money", direction: "down", level: 1 },
-        { label: "压力", tone: "stress", direction: "up", level: 2 },
-      ];
-    case "competition_project":
-      return [
-        { label: "履历", tone: "resume", direction: "up", level: 3 },
-        { label: "学业", tone: "academic", direction: "up", level: 1 },
-        { label: "压力", tone: "stress", direction: "up", level: 2 },
-      ];
-    case "part_time":
-      return [
-        { label: "金钱", tone: "money", direction: "up", level: 3 },
-        { label: "压力", tone: "stress", direction: "up", level: 2 },
-        { label: "心情", tone: "mood", direction: "down", level: 1 },
-      ];
-    case "social":
-      return [
-        { label: "社交", tone: "event", direction: "up", level: 3 },
-        { label: "心情", tone: "mood", direction: "up", level: 2 },
-        { label: "金钱", tone: "money", direction: "down", level: 1 },
-      ];
-    case "relax":
-      return [
-        { label: "心情", tone: "mood", direction: "up", level: 2 },
-        { label: "压力", tone: "stress", direction: "down", level: 3 },
-      ];
-    case "big_meal":
-      return [
-        { label: "心情", tone: "mood", direction: "up", level: 2 },
-        { label: "压力", tone: "stress", direction: "down", level: 2 },
-        { label: "金钱", tone: "money", direction: "down", level: 2 },
-      ];
-    case "student_activity":
-      return [
-        { label: "社交", tone: "event", direction: "up", level: 2 },
-        { label: "履历", tone: "resume", direction: "up", level: 1 },
-        { label: "压力", tone: "stress", direction: "down", level: 1 },
-      ];
-    case "remedy":
-      return [
-        { label: "学业", tone: "academic", direction: "flat", level: 1 },
-        { label: "压力", tone: "stress", direction: "down", level: 2 },
-        { label: "金钱", tone: "money", direction: "down", level: 1 },
-      ];
-    case "ask_family":
-      return [
-        { label: "金钱", tone: "money", direction: "up", level: 3 },
-        { label: "压力", tone: "stress", direction: "up", level: 2 },
-      ];
-    default:
-      return [{ label: "状态", tone: "event", direction: "flat", level: 1 }];
-  }
-}
-
-function badgeTone(badge: string) {
-  if (badge.includes("事件")) {
-    return "event" as const;
-  }
-
-  if (badge.includes("现金")) {
-    return "warning" as const;
-  }
-
-  return "ending" as const;
-}
-
-function effectDirectionIcon(direction: ActionEffectDirection) {
-  if (direction === "up") {
-    return "trending-up" as const;
-  }
-
-  if (direction === "down") {
-    return "trending-down" as const;
-  }
-
-  return "minus" as const;
 }
 
 function clonePlannerDay(day: PlannerDayView): PlannerDayView {
@@ -439,6 +320,18 @@ export function buildPlannerDayAriaLabel(day: PlannerDayView, attendanceLocked: 
   const readinessLabel = attendanceLocked ? "" : "，需先确认本周课程态度";
 
   return `${day.label}，${day.status}，${detail}${eventLabel}${readinessLabel}`;
+}
+
+function badgeClassName(badge: string) {
+  if (badge === "本日事件相关") {
+    return "bg-amber-100 text-amber-900";
+  }
+
+  if (badge === "现金风险优先") {
+    return "bg-rose-100 text-rose-900";
+  }
+
+  return "bg-emerald-100 text-emerald-900";
 }
 
 function GlobalPlannerDialog(props: {
@@ -563,7 +456,7 @@ export function ActionPlanForm({
         setLocalFeedback({
           kind: "success",
           title: `${request.dayLabel} 已保存`,
-          message: `"${request.optionLabel}"已经写回本周安排。你可以继续安排后面的日期。`,
+          message: `“${request.optionLabel}”已经写回本周安排。你可以继续安排后面的日期。`,
         });
       } catch {
         setOptimisticPlans((currentPlans) => {
@@ -636,7 +529,7 @@ export function ActionPlanForm({
     setLocalFeedback({
       kind: "success",
       title: `${day.label} 已安排`,
-      message: `已经把"${option.label}"排到这一天，后台会按顺序写回存档。`,
+      message: `已经把“${option.label}”排到这一天，后台会按顺序写回存档。`,
     });
     setSelectedWeekday(null);
     setSkipClassDraft(false);
@@ -654,17 +547,17 @@ export function ActionPlanForm({
       />
       <span data-testid="planner-attendance-locked" data-locked={attendanceLocked ? "true" : "false"} hidden />
 
-      <div className="fm-planner-summary text-sm leading-6 text-stone-700">
+      <div className="rounded-2xl border border-[var(--border)] bg-white/70 p-4 text-sm leading-6 text-stone-700">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="font-semibold text-stone-900">第 {currentWeek} 周安排</p>
           {missingCount > 0 ? (
-            <FmBadge tone="neutral">
+            <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-700">
               还差 {missingCount} 天没点，确认时会自动补成摆烂 / 发呆
-            </FmBadge>
+            </span>
           ) : (
-            <FmBadge tone="academic">
+            <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
               这一周已经全部排完
-            </FmBadge>
+            </span>
           )}
         </div>
         <p className="mt-2">
@@ -679,7 +572,7 @@ export function ActionPlanForm({
             ))}
           </ul>
         ) : null}
-        <div className="fm-planner-summary__hint">
+        <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">
           <p className="font-semibold">{statusGuidance.summary}</p>
           <p className="mt-1">{statusGuidance.strategy}</p>
         </div>
@@ -688,18 +581,15 @@ export function ActionPlanForm({
       {activeFeedback ? <FeedbackBanner feedback={activeFeedback} /> : null}
 
       {plannerSavePending ? (
-        <div className="fm-planner-save-note">
-          <FmLoadingState
-            inline
-            title="正在保存最近安排"
-            body={`后台还在写回 ${queuedSaveCount} 天安排。你可以继续点开下一天，但确认本周前会先全部保存完成。`}
-          />
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+          <p className="font-semibold">正在保存最近安排</p>
+          <p className="mt-1">后台还在写回 {queuedSaveCount} 天安排。你可以继续点开下一天，但确认本周前会先全部保存完成。</p>
         </div>
       ) : null}
 
       <form
         action={submitActionTurnAction}
-        className="fm-form-card space-y-4"
+        className="space-y-4 rounded-2xl border border-[var(--border)] bg-white/80 p-4"
         data-testid="attendance-form"
       >
         <input type="hidden" name="runId" value={runId} />
@@ -732,7 +622,7 @@ export function ActionPlanForm({
         </div>
       </form>
 
-      <div className="fm-day-grid">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {plannerDays.map((day) => {
           const isHighlighted = highlightedWeekday === day.weekday;
           const isPlanned = Boolean(day.plannedActionLabel);
@@ -747,9 +637,16 @@ export function ActionPlanForm({
                   : isPlanned
                     ? "已安排"
                     : "可排";
-          const cardClassName = `fm-day-card ${isHighlighted ? "fm-day-card--highlight" : ""} ${isPlanned ? "fm-day-card--planned" : ""} ${
-            !attendanceLocked ? "fm-day-card--disabled" : ""
-          }`.trim();
+          const badgeClassName =
+            saveState === "saving"
+              ? "bg-sky-100 text-sky-800"
+              : saveState === "error"
+                ? "bg-rose-100 text-rose-800"
+                : day.eventTitle
+                  ? "bg-amber-100 text-amber-800"
+                  : isPlanned
+                    ? "bg-emerald-100 text-emerald-800"
+                    : "bg-stone-900 text-stone-50";
 
           return (
             <div
@@ -763,44 +660,36 @@ export function ActionPlanForm({
               onClick={() => openDayPlanner(day)}
               onKeyDown={(event) => handlePlannerDayKeyDown(event, () => openDayPlanner(day))}
               data-testid={`planner-day-${day.weekday}`}
-              className={cardClassName}
+              className={`rounded-2xl border p-4 text-left transition ${
+                isHighlighted
+                  ? "border-emerald-300 bg-emerald-50/90 shadow-[0_16px_32px_rgba(16,185,129,0.15)]"
+                  : isPlanned
+                    ? "border-amber-300 bg-amber-50/70"
+                    : "border-[var(--border)] bg-white/80 hover:border-amber-300 hover:bg-amber-50/70"
+              }`}
             >
-              <div className="fm-day-card__top">
+              <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="fm-day-card__title">{day.label}</p>
-                  <p className="fm-day-card__status">{day.status}</p>
+                  <p className="text-sm font-semibold text-stone-900">{day.label}</p>
+                  <p className="mt-1 text-xs text-stone-500">{day.status}</p>
                 </div>
-                <FmBadge
-                  tone={
-                    saveState === "saving"
-                      ? "ending"
-                      : saveState === "error"
-                        ? "danger"
-                        : day.eventTitle
-                          ? "event"
-                          : isPlanned
-                            ? "academic"
-                            : "neutral"
-                  }
-                >
-                  {badgeText}
-                </FmBadge>
+                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${badgeClassName}`}>{badgeText}</span>
               </div>
-              <p className="fm-day-card__body" data-testid={`planner-day-action-${day.weekday}`}>
+              <p className="mt-3 text-sm leading-6 text-stone-700" data-testid={`planner-day-action-${day.weekday}`}>
                 {day.plannedActionLabel ? `已安排：${day.plannedActionLabel}` : day.effectiveTypeLabel}
               </p>
-              {day.eventTitle ? <p className="fm-day-card__meta">{day.eventTitle}</p> : null}
+              {day.eventTitle ? <p className="mt-2 text-xs leading-5 text-amber-700">{day.eventTitle}</p> : null}
               {saveState === "saving" ? (
-                <p className="fm-day-card__meta">这一天正在写回存档，可以先继续安排别的日期。</p>
+                <p className="mt-2 text-xs leading-5 text-sky-700">这一天正在写回存档，可以先继续安排别的日期。</p>
               ) : null}
               {saveState === "error" ? (
-                <p className="fm-day-card__meta">上一次保存没有成功，重新点开这一天后可以再试一次。</p>
+                <p className="mt-2 text-xs leading-5 text-rose-700">上一次保存没有成功，重新点开这一天后可以再试一次。</p>
               ) : null}
               {day.hasCashRisk ? (
-                <p className="fm-day-card__meta">这周现金有点紧，赚钱或止损行动会优先显示。</p>
+                <p className="mt-2 text-xs leading-5 text-rose-700">这周现金有点紧，赚钱或止损行动会优先显示。</p>
               ) : null}
               {!attendanceLocked ? (
-                <p className="fm-day-card__meta">先定课程态度，再点这一天。</p>
+                <p className="mt-3 text-xs leading-5 text-stone-500">先定课程态度，再点这一天。</p>
               ) : null}
             </div>
           );
@@ -809,7 +698,7 @@ export function ActionPlanForm({
 
       <form
         action={submitActionTurnAction}
-        className="fm-confirm-card space-y-3"
+        className="space-y-3 rounded-2xl border border-[var(--border)] bg-white/80 p-4"
         data-testid="confirm-week-form"
       >
         <input type="hidden" name="runId" value={runId} />
@@ -826,7 +715,7 @@ export function ActionPlanForm({
           />
           {attendanceLocked ? (
             <span className="text-sm text-stone-500">
-              没点到的日期会自动补成&ldquo;摆烂 / 发呆&rdquo;，不会因为漏选卡住。
+              没点到的日期会自动补成“摆烂 / 发呆”，不会因为漏选卡住。
             </span>
           ) : (
             <span className="text-sm text-stone-500">先把这周课程态度锁定，系统才能结算这一周。</span>
@@ -933,9 +822,12 @@ export function ActionPlanForm({
                               {option.badges.length > 0 ? (
                                 <div className="mt-2 flex flex-wrap gap-2">
                                   {option.badges.map((badge) => (
-                                    <FmBadge key={`${option.optionId}-${badge}`} tone={badgeTone(badge)}>
+                                    <span
+                                      key={`${option.optionId}-${badge}`}
+                                      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${badgeClassName(badge)}`}
+                                    >
                                       {badge}
-                                    </FmBadge>
+                                    </span>
                                   ))}
                                 </div>
                               ) : null}
@@ -951,22 +843,6 @@ export function ActionPlanForm({
                             </button>
                           </div>
                           <p>{option.description}</p>
-                          <div className="fm-option-effects">
-                            {buildActionEffects(option.action).map((effect) => (
-                              <span key={`${option.optionId}-${effect.label}`} className={`fm-option-effect fm-option-effect--${effect.tone}`}>
-                                <span className="fm-trend-stack" aria-hidden="true">
-                                  {Array.from({ length: effect.level }).map((_, index) => (
-                                    <FmIcon
-                                      key={`${option.optionId}-${effect.label}-${index}`}
-                                      name={effectDirectionIcon(effect.direction)}
-                                      className="h-3 w-3"
-                                    />
-                                  ))}
-                                </span>
-                                {effect.label}
-                              </span>
-                            ))}
-                          </div>
                           {option.progressText ? (
                             <p className="mt-2 text-xs leading-5 text-stone-500">{option.progressText}</p>
                           ) : null}
