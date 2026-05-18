@@ -94,17 +94,19 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
     .reverse()
     .map((state) => ({
       id: `${state.id}-growth`,
-      ...buildGrowthJournalEntry(state.snapshot_json, state.year, state.month),
+      ...(state.snapshot_json
+        ? buildGrowthJournalEntry(state.snapshot_json, state.year, state.month)
+        : { badge: "成长日志", periodLabel: formatMonthLabel(state.year, state.month), title: "数据不完整", message: "这条月度记录的快照数据不完整，无法生成成长日志。", details: [] as string[] }),
     }));
 
   const latestState = bundle.monthlyStates.at(-1) ?? null;
   const latestReport = latestState
     ? monthlyReports.find((report) => report.year === latestState.year && report.month === latestState.month) ?? null
     : null;
-  const latestDigest = latestState
+  const latestDigest = latestState?.snapshot_json
     ? buildMonthlyDiaryDigest(latestState.snapshot_json, latestState.year, latestState.month)
     : null;
-  const latestRulesFallback = latestState
+  const latestRulesFallback = latestState?.snapshot_json
     ? buildMonthlyJournalRulesFallback({
         kind: "monthly_journal",
         runId: bundle.run.id,
@@ -171,17 +173,11 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
                       <span className="fm-paper__stat tone-rose">压力 {latestDigest.endState.stress}</span>
                     </div>
                     <div className="fm-paper__date">{latestRulesFallback.monthLabel}</div>
-                    <h2 className="fm-paper__title">月记规则摘要</h2>
+                    <h2 className="fm-paper__title">{latestRulesFallback.title}</h2>
                     <div className="fm-paper__copy">
-                      <p>{latestRulesFallback.intro}</p>
-                      <ul className="mt-3 space-y-2">
-                        {latestRulesFallback.sections.map((section) => (
-                          <li key={section.label}>
-                            <strong>{section.label}</strong>
-                            {`：${section.text}`}
-                          </li>
-                        ))}
-                      </ul>
+                      {latestRulesFallback.diary.split("\n\n").map((paragraph, i) => (
+                        <p key={i}>{paragraph}</p>
+                      ))}
                     </div>
                     <div className="fm-paper__footer">{latestRulesFallback.endStateLine}</div>
                   </article>

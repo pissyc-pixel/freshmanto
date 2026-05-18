@@ -139,6 +139,7 @@ export function buildMonthlyJournalPrompt(input: MonthlyJournalPromptInput): AiP
           "不要解释规则如何计算，也不要出现“系统”“规则层”“eventIds”“statsDelta”之类幕后说法。",
           "避免总结报告腔、鸡汤腔和宏大抒情，不要写成系统播报。",
           "正文建议 250-500 字，2-4 段，每段不要太长。",
+          "每段之间用空行分开，段落不要太长，像给自己写的日记而不是报告。",
         ].join("\n"),
       },
       {
@@ -161,7 +162,7 @@ export function buildMonthlyJournalPrompt(input: MonthlyJournalPromptInput): AiP
               "语气像大学生月底写给自己的月记，不要写成系统播报或总结报告",
               "如果某周没有主动安排，只能说它被自动补成摆烂 / 发呆，不要编出额外活动",
             ],
-            preferredStructure: ["标题", "2-4 段第一人称正文", "结尾一句收束"],
+            preferredStructure: ["标题（一行）", "正文（2-4 段，第一人称，有生活感）", "结尾一句收束或留白"],
             compactInput,
           },
           null,

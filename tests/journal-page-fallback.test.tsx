@@ -148,11 +148,10 @@ describe("journal page fallback", () => {
       }),
     );
 
-    expect(markup).toContain("这个月的月记暂时没写出来，但本月规则摘要仍然保留。");
-    expect(markup).toContain("学业变化");
-    expect(markup).toContain("压力 / 心情变化");
-    expect(markup).toContain("金钱变化");
-    expect(markup).toContain("重要事件");
-    expect(markup).toContain("方向变化");
+    expect(markup).toContain("fm-paper__title");
+    expect(markup).toContain("fm-paper__copy");
+    expect(markup).toContain("月底状态");
+    expect(markup).not.toContain("学业变化");
+    expect(markup).not.toContain("压力 / 心情变化");
   });
 });

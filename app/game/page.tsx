@@ -31,10 +31,11 @@ import {
 import { buildRunHref, resolveActiveRunId } from "@/lib/demo/active-run";
 import { buildGrowthJournalEntry } from "@/lib/demo/monthly-digest";
 import { formatMonthLabel } from "@/lib/demo/options";
+import { getWeeklyLivingExpense } from "@/data/events";
 import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
 import { getServerGameBundle } from "@/lib/demo/server";
 import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
-import type { DynamicStats, TimeBlockKind } from "@/types/game";
+import type { DynamicStats, GameRun, TimeBlockKind } from "@/types/game";
 
 export const dynamic = "force-dynamic";
 
@@ -46,28 +47,32 @@ function clampProgress(value: number, max = 100) {
   return Math.max(0, Math.min(value / max, 1));
 }
 
-function buildMetricItems(stats: DynamicStats) {
+function buildMetricItems(stats: DynamicStats, run?: GameRun) {
+  const weeklyLivingCost = run ? getWeeklyLivingExpense(run) : 200;
   return [
     {
       label: "金钱",
       value: `${stats.money}`,
-      tone: stats.money < 300 ? "amber" : "teal",
+      tone: stats.money < weeklyLivingCost ? "red" : stats.money < weeklyLivingCost * 1.2 ? "amber" : "teal",
       icon: "chart" as const,
       progress: clampProgress(stats.money, 2400),
+      warning: stats.money < weeklyLivingCost ? "本周基础开销可能不够" : stats.money < weeklyLivingCost * 1.2 ? "现金有点紧" : undefined,
     },
     {
       label: "心情",
       value: `${stats.mood}`,
-      tone: "mint",
+      tone: stats.mood <= 35 ? "rose" : stats.mood <= 50 ? "amber" : "mint",
       icon: "moon" as const,
       progress: clampProgress(stats.mood),
+      warning: stats.mood <= 35 ? "心情已经很低" : stats.mood <= 50 ? "心情偏低" : undefined,
     },
     {
       label: "压力",
       value: `${stats.stress}`,
-      tone: stats.stress >= 70 ? "rose" : "blue",
+      tone: stats.stress >= 75 ? "rose" : stats.stress >= 60 ? "amber" : "blue",
       icon: "alert" as const,
       progress: clampProgress(stats.stress),
+      warning: stats.stress >= 75 ? "压力过高" : stats.stress >= 60 ? "压力偏高" : undefined,
     },
     {
       label: "学业",
@@ -172,7 +177,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
   const plannerLines = buildPlannerFeedbackLines(currentWeekState);
   const weeklySettlement = buildWeeklySettlementView(activeMonth?.latestWeekSettlement);
   const latestMonthlyState = bundle.monthlyStates.at(-1);
-  const latestGrowthLog = latestMonthlyState
+  const latestGrowthLog = latestMonthlyState?.snapshot_json
     ? buildGrowthJournalEntry(latestMonthlyState.snapshot_json, latestMonthlyState.year, latestMonthlyState.month)
     : null;
   const latestSystemLogs = bundle.logs.slice(-6).reverse().map((log) => ({
@@ -212,7 +217,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
     >
       <div className="fm-stack" data-testid="game-page">
         <ActiveRunSync runId={bundle.run.id} />
-        <FmMetricStrip items={buildMetricItems(hydratedRun.stats)} />
+        <FmMetricStrip items={buildMetricItems(hydratedRun.stats, hydratedRun)} />
 
         <div className="fm-grid-2">
           <div className="fm-stack">

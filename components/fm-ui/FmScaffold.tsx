@@ -32,7 +32,7 @@ type SidebarLink = {
 const sidebarLinks: SidebarLink[] = [
   {
     key: "game",
-    label: "鏈懆鍛ㄥ巻",
+    label: "本周周历",
     href: "/game",
     icon: "calendar",
     readiness: "weeklyPlanner",
@@ -40,7 +40,7 @@ const sidebarLinks: SidebarLink[] = [
   },
   {
     key: "journal",
-    label: "鎴愰暱鏃ュ織",
+    label: "成长日志",
     href: "/journal",
     icon: "book",
     readiness: "journal",
@@ -48,7 +48,7 @@ const sidebarLinks: SidebarLink[] = [
   },
   {
     key: "resume",
-    label: "涓汉灞ュ巻",
+    label: "履历档案",
     href: "/resume",
     icon: "file",
     readiness: "resume",
@@ -56,7 +56,7 @@ const sidebarLinks: SidebarLink[] = [
   },
   {
     key: "ending",
-    label: "缁撳眬棰勮",
+    label: "结局预览",
     href: "/ending",
     icon: "chart",
     readiness: "endingPreview",
@@ -249,6 +249,7 @@ export function FmMetricStrip({
     tone: string;
     icon: IconName;
     progress: number;
+    warning?: string;
   }>;
 }) {
   return (
@@ -263,6 +264,11 @@ export function FmMetricStrip({
           <div className="fm-meter">
             <span className={`tone-${item.tone}`} style={{ width: `${Math.max(0, Math.min(item.progress, 1)) * 100}%` }} />
           </div>
+          {item.warning ? (
+            <div style={{ fontSize: "0.7rem", color: item.tone === "red" || item.tone === "rose" ? "#ea4032" : item.tone === "amber" ? "#c58a16" : "#627074", marginTop: "2px" }}>
+              {item.warning}
+            </div>
+          ) : null}
         </div>
       ))}
     </section>
