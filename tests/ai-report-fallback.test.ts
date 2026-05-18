@@ -103,4 +103,50 @@ describe("AI report fallback", () => {
     expect(report.usedFallback).toBe(true);
     expect(report.markdown).toContain("第 1 学年 第 1 月");
   });
+  it("falls back to chat completions when the compatible endpoint does not support responses.create", async () => {
+    vi.stubEnv("OPENAI_MODEL", "mimo-compatible-model");
+    vi.doMock("@/lib/ai/config", () => ({
+      aiConfig: {
+        apiKey: "test-key",
+        baseUrl: "https://example.test/v1",
+        model: "mimo-compatible-model",
+        reportTimeoutMs: 200,
+      },
+      isAiConfigured: () => true,
+      getAiReportTimeoutMs: () => 200,
+    }));
+    vi.doMock("@/lib/ai/client", () => ({
+      createAiClient: () => ({
+        responses: {
+          create: async () => {
+            throw Object.assign(new Error("responses not supported"), {
+              status: 404,
+              code: "not_found",
+            });
+          },
+        },
+        chat: {
+          completions: {
+            create: async () => ({
+              choices: [
+                {
+                  message: {
+                    content: "compat chat markdown",
+                  },
+                },
+              ],
+            }),
+          },
+        },
+      }),
+    }));
+    const { generateAiReport } = await import("@/lib/ai/reports");
+
+    const report = await generateAiReport(createMonthlyInput());
+
+    expect(report.kind).toBe("monthly_journal");
+    expect(report.usedFallback).toBe(false);
+    expect(report.markdown).toBe("compat chat markdown");
+    expect(report.model).toBe("mimo-compatible-model");
+  });
 });

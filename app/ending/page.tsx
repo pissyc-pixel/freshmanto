@@ -1,4 +1,4 @@
-import { ActiveRunSync } from "@/components/active-run-sync";
+﻿import { ActiveRunSync } from "@/components/active-run-sync";
 import { AppShell } from "@/components/app-shell";
 import { FactList } from "@/components/fact-list";
 import { ReportPreview } from "@/components/report-preview";
@@ -131,6 +131,15 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
   const endingFacts = bundle.endingSummary.notableFacts.map(formatEndingNotableFact);
   const pathLabel = formatPathLabel(bundle.endingSummary.graduationPath);
   const pathResultLabel = formatPathResultLabel(bundle.endingSummary.pathResult);
+  const finalStats = bundle.run.stats ?? {
+    money: 0,
+    mood: 0,
+    stress: 0,
+    fulfillment: 0,
+    social: 0,
+    semesterAcademics: 0,
+  };
+  const resumeCount = bundle.run.resume?.length ?? 0;
   const positionLabel = formatEndingPosition({
     status: bundle.run.status,
     currentYear: bundle.run.currentYear,
@@ -143,9 +152,9 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
       ? `最终已结算 GPA：${academicProfile.gpa.toFixed(2)}`
       : "最终 GPA：暂无已结算成绩",
     `长期学业均值：${bundle.endingSummary.longTermAcademicAverage}`,
-    `毕业时手头余额：${bundle.run.stats.money} 元`,
-    `毕业时心情 / 压力：${bundle.run.stats.mood} / ${bundle.run.stats.stress}`,
-    `累积履历条目：${bundle.run.resume.length} 条`,
+    `毕业时手头余额：${finalStats.money} 元`,
+    `毕业时心情 / 压力：${finalStats.mood} / ${finalStats.stress}`,
+    `累积履历条目：${resumeCount} 条`,
     `长期主导倾向：${formatDirectionLabel(bundle.endingSummary.dominantDirection)}`,
   ];
 

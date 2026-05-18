@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { createWeeklyCalendar } from "@/core/game-engine";
+import { createInitialGameRun, createWeeklyCalendar, selectWeekAttendanceStrategy } from "@/core/game-engine";
 import { buildPlannerWeekdays } from "@/core/resolvers/schedule";
 import {
   buildCurrentActionFeedback,
+  buildPlannerDaysView,
   buildWeeklyScheduleBlocks,
 } from "@/app/game/view-model";
 import type { ActionTurnSummary, ActiveWeekState, DynamicStats } from "@/types/game";
@@ -124,5 +125,37 @@ describe("game page view-model helpers", () => {
     expect(feedback.eventLines.join(" ")).toContain("宣讲");
     expect(feedback.eventLines.join(" ")).not.toContain("mon");
     expect(feedback.eventLines.join(" ")).not.toContain("wed");
+  });
+  it("shows visible competition progress on planner cards", () => {
+    const baseRun = createInitialGameRun({
+      id: "competition-progress-view-run",
+      discipline: "engineering",
+      randomValues: [0.22, 0.31, 0.48, 0.57, 0.61, 0.19, 0.26, 0.4],
+    });
+    const activeProjectRun = selectWeekAttendanceStrategy(
+      {
+        ...baseRun,
+        competitionProjects: baseRun.competitionProjects?.map((project, index) =>
+          index === 0
+            ? {
+                ...project,
+                status: "active",
+                investedDays: 2,
+                minimumEffortDays: 4,
+                title: "电赛准备",
+              }
+            : project,
+        ),
+      },
+      "mixed",
+    );
+
+    const plannerDays = buildPlannerDaysView(activeProjectRun.activeMonth!.currentWeekState, activeProjectRun);
+    const saturday = plannerDays.find((day) => day.weekday === "sat");
+    const competitionOption = saturday?.normalOptions.find((option) => option.action === "competition_project");
+
+    expect(competitionOption).toBeDefined();
+    expect(competitionOption?.progressText).toContain("2 / 4");
+    expect(competitionOption?.progressText).toContain("达到 4 次后");
   });
 });

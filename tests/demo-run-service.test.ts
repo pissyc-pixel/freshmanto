@@ -712,7 +712,7 @@ describe("demo run service", () => {
     await planDemoWeekday({
       repository,
       runId: run.id,
-      weekday: "wed",
+      weekday: "sat",
       optionId: "relax",
     });
 
@@ -725,7 +725,7 @@ describe("demo run service", () => {
       persistedWeekState?.days?.find((day) => day.weekday === "tue")?.plannedAction?.action,
     ).toBe("social");
     expect(
-      persistedWeekState?.days?.find((day) => day.weekday === "wed")?.plannedAction?.action,
+      persistedWeekState?.days?.find((day) => day.weekday === "sat")?.plannedAction?.action,
     ).toBe("relax");
 
     const result = await confirmDemoWeek({
@@ -737,7 +737,7 @@ describe("demo run service", () => {
 
     expect(settlement?.dailyResults.find((day) => day.weekday === "mon")?.resolvedAction.action).toBe("study");
     expect(settlement?.dailyResults.find((day) => day.weekday === "tue")?.resolvedAction.action).toBe("social");
-    expect(settlement?.dailyResults.find((day) => day.weekday === "wed")?.resolvedAction.action).toBe("relax");
+    expect(settlement?.dailyResults.find((day) => day.weekday === "sat")?.resolvedAction.action).toBe("relax");
     expect(settlement?.dailyResults.filter((day) => day.resolvedAction.action === "idle")).toHaveLength(4);
   });
 
@@ -856,7 +856,7 @@ describe("demo run service", () => {
     await planDemoWeekday({
       repository,
       runId: run.id,
-      weekday: "wed",
+      weekday: "sat",
       optionId: "relax",
     });
 
@@ -869,10 +869,10 @@ describe("demo run service", () => {
     const settlement = result.run.activeMonth?.latestWeekSettlement;
 
     expect(settlement?.dailyResults.find((day) => day.weekday === "mon")?.resolvedAction.action).toBe("study");
-    expect(settlement?.dailyResults.find((day) => day.weekday === "wed")?.resolvedAction.action).toBe("relax");
+    expect(settlement?.dailyResults.find((day) => day.weekday === "sat")?.resolvedAction.action).toBe("relax");
     expect(
       settlement?.dailyResults.filter((day) => day.resolvedAction.action === "idle").map((day) => day.weekday),
-    ).toEqual(["tue", "thu", "fri", "sat", "sun"]);
+    ).toEqual(["tue", "wed", "thu", "fri", "sun"]);
   });
 
   it("finalizes the month after the fourth week is actually completed and then writes the monthly artifacts", async () => {

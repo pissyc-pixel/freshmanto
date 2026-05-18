@@ -1,4 +1,4 @@
-import { createElement } from "react";
+﻿import { createElement } from "react";
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -465,12 +465,12 @@ describe("player-facing narrative helpers", () => {
 
     expect(report.usedFallback).toBe(true);
     expect(report.markdown).toContain("# 第 2 学年 第 3 月");
-    expect(report.markdown).toContain("这个月我主要把时间放在");
-    expect(report.markdown).toContain("月底再看账和状态");
-    expect(report.markdown).toContain("和月初比起来");
-    expect(report.markdown).toContain("组织院系分享会");
-    expect(report.markdown).toContain("我还记得的几件事");
-    expect(report.markdown).not.toContain("规则层");
+    expect(report.markdown).toContain("这个月的月记暂时没写出来，但本月规则摘要仍然保留。");
+    expect(report.markdown).toContain("- 学业变化：");
+    expect(report.markdown).toContain("- 压力 / 心情变化：");
+    expect(report.markdown).toContain("- 金钱变化：");
+    expect(report.markdown).toContain("- 重要事件：");
+    expect(report.markdown).toContain("- 方向变化：");
     expect(report.markdown).not.toContain("statsDelta");
     expect(report.markdown).not.toContain("eventIds");
   });

@@ -72,9 +72,9 @@ export const weeklyActionCatalog: WeeklyActionOption[] = [
   createDefaultOption({
     optionId: "relax",
     action: "relax",
-    label: "回家休息 / 放松",
-    description: "先让自己缓一口气，假期里更像高质量休息；压力越高，这段时间越有价值。",
-    availability: ["night", "half_day", "full_day"],
+    label: "休息一天",
+    description: "把这一天留给休息和恢复，不推进学业和履历，但能明显回心情、去压力。",
+    availability: ["full_day"],
     source: "default",
   }),
   createDefaultOption({

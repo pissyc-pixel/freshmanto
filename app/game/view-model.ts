@@ -49,6 +49,102 @@ function uniqueLines(lines: Array<string | undefined | null>): string[] {
   return [...new Set(lines.filter((line): line is string => Boolean(line && line.trim().length > 0)))];
 }
 
+function buildActionTrendText(action: WeeklySettlementSummary["dailyResults"][number]["resolvedAction"]["action"]) {
+  switch (action) {
+    case "study":
+      return "学业 ↑ · 压力 ↑ · 心情 ↓";
+    case "writing_research":
+      return "学业 ↑ · 履历 ↑ · 压力 ↑";
+    case "job_prep":
+      return "履历 ↑ · 金钱 ↓ · 压力 ↑";
+    case "postgraduate_prep":
+      return "学业 ↑ · 深造 ↑ · 压力 ↑";
+    case "public_exam_prep":
+      return "公考 ↑ · 金钱 ↓ · 压力 ↑";
+    case "competition_project":
+      return "履历 ↑ · 学业 ↑ · 压力 ↑";
+    case "part_time":
+      return "金钱 ↑ · 压力 ↑ · 心情 ↓";
+    case "social":
+      return "社交 ↑ · 心情 ↑ · 金钱 ↓";
+    case "relax":
+      return "心情 ↑ · 压力 ↓ · 学业 -";
+    case "big_meal":
+      return "心情 ↑ · 压力 ↓ · 金钱 ↓";
+    case "student_activity":
+      return "社交 ↑ · 履历 ↑ · 压力 ↓";
+    case "remedy":
+      return "学业 ↑ · 压力 ↓ · 金钱 ↓";
+    case "ask_family":
+      return "金钱 ↑ · 压力 ↑";
+    default:
+      return "状态微调";
+  }
+}
+
+function buildCompetitionProgressText(run: GameRun | undefined) {
+  const activeProject = run?.competitionProjects?.find((project) => project.status === "active");
+
+  if (!activeProject) {
+    return undefined;
+  }
+
+  return `当前投入 ${activeProject.investedDays} / ${activeProject.minimumEffortDays}，达到 ${activeProject.minimumEffortDays} 次后可形成参赛成果。`;
+}
+
+function formatCompetitionProgressFact(fact: string) {
+  if (fact.startsWith("competition-progress-ready:")) {
+    const [, title, current, minimum] = fact.split(":");
+    return `${title}已达到最低参赛门槛，目前 ${current} / ${minimum}，继续投入会提高奖项概率和上限。`;
+  }
+
+  if (fact.startsWith("competition-progress:")) {
+    const [, title, current, minimum, remaining] = fact.split(":");
+    return `${title}进度 +1，目前 ${current} / ${minimum}，距离最低参赛门槛还差 ${remaining} 次。`;
+  }
+
+  return undefined;
+}
+
+function buildDailyMoneySummary(turn: WeeklySettlementSummary["dailyResults"][number]) {
+  const breakdown = turn.moneyBreakdown;
+
+  if (!breakdown) {
+    return undefined;
+  }
+
+  const actionLabel = turn.resolvedAction.label ?? formatActionType(turn.resolvedAction.action);
+  const clauses = [`今天基础生活开销 -${breakdown.baseLivingCost}`];
+
+  if (breakdown.actionCost > 0) {
+    clauses.push(`${actionLabel}额外花费 -${breakdown.actionCost}`);
+  }
+
+  if (breakdown.actionIncome > 0) {
+    clauses.push(
+      turn.resolvedAction.action === "part_time"
+        ? `兼职收入 +${breakdown.actionIncome}`
+        : `${actionLabel}收入 +${breakdown.actionIncome}`,
+    );
+  }
+
+  if (breakdown.specialCost > 0) {
+    clauses.push(`特殊事件支出 -${breakdown.specialCost}`);
+  }
+
+  if (breakdown.specialIncome > 0) {
+    clauses.push(`特殊事件收入 +${breakdown.specialIncome}`);
+  }
+
+  const netLine =
+    breakdown.netChange >= 0
+      ? `当天净变化 +${breakdown.netChange}。`
+      : `所以当天共减少 ${breakdown.netChange}。`;
+
+  return `${clauses.join("，")}，${netLine}`;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function describeExpectedImpact(option: { action: WeeklySettlementSummary["dailyResults"][number]["resolvedAction"]["action"]; source: "default" | "weekly_event"; }, run?: GameRun) {
   const track = run?.profile.collegeTrack;
 
@@ -185,7 +281,7 @@ export function buildPlannerDaysView(currentWeekState: ActiveWeekState, run?: Ga
         optionId: option.optionId,
         action: option.action,
         label: option.label,
-        description: uniqueLines([option.description, describeExpectedImpact(option, run)]).join(" "),
+        description: buildActionTrendText(option.action),
         source: option.source,
         sourceEventId: option.sourceEventId,
         selected:
@@ -200,7 +296,7 @@ export function buildPlannerDaysView(currentWeekState: ActiveWeekState, run?: Ga
         optionId: option.optionId,
         action: option.action,
         label: option.label,
-        description: uniqueLines([option.description, describeExpectedImpact(option, run)]).join(" "),
+        description: buildActionTrendText(option.action),
         source: option.source,
         sourceEventId: option.sourceEventId,
         selected:
@@ -226,8 +322,14 @@ export function buildPlannerDaysView(currentWeekState: ActiveWeekState, run?: Ga
       eventAttendSummary: currentWeekState.event?.weekday === day.weekday ? currentWeekState.event.attendSummary ?? null : null,
       eventSkipSummary: currentWeekState.event?.weekday === day.weekday ? currentWeekState.event.skipSummary ?? null : null,
       hasCashRisk,
-      normalOptions: prioritizedNormalOptions,
-      skipOptions: prioritizedSkipOptions,
+      normalOptions: prioritizedNormalOptions.map((option) => ({
+        ...option,
+        progressText: option.action === "competition_project" ? buildCompetitionProgressText(run) : undefined,
+      })),
+      skipOptions: prioritizedSkipOptions.map((option) => ({
+        ...option,
+        progressText: option.action === "competition_project" ? buildCompetitionProgressText(run) : undefined,
+      })),
     };
   });
 }
@@ -251,13 +353,29 @@ export function buildWeeklySettlementView(settlement?: WeeklySettlementSummary) 
       : formatPlannerReason(turn.resolvedAction.reason),
     statsDelta: turn.statsDelta,
   }));
+  const enrichedDayLines = dayLines.map((line, index) => {
+    const turn = settlement.dailyResults[index];
+    const moneySummary = turn ? buildDailyMoneySummary(turn) : undefined;
+    const progressSummary = turn
+      ? uniqueLines(
+          turn.notableFacts.map((fact) =>
+            fact.startsWith("competition-progress") ? formatCompetitionProgressFact(fact) : undefined,
+          ),
+        ).join(" ")
+      : "";
+
+    return {
+      ...line,
+      summary: [moneySummary, progressSummary, line.summary].filter(Boolean).join(" "),
+    };
+  });
 
   return {
     title: `第 ${settlement.week} 周结算`,
     subtitle: `课程态度：${formatAttendanceStrategy(settlement.attendanceStrategy)}`,
     eventTitle: settlement.event?.title ?? null,
     eventSummary: settlement.event?.summary ?? null,
-    dayLines,
+    dayLines: enrichedDayLines,
     totalLines: [
       { label: "钱", value: settlement.totals.money },
       { label: "心情", value: settlement.totals.mood },

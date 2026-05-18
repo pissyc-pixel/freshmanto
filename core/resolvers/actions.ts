@@ -1,10 +1,10 @@
-import { getWeeklyAllowance, getWeeklyLivingExpense } from "@/data/events";
 import { resolveActionLinkedEvent } from "@/core/resolvers/events";
 import type {
   ActionType,
   DynamicStats,
   FamilyBackground,
   GameRun,
+  MoneyBreakdown,
   MonthlyActionPlan,
   ResolvedAction,
   ResumeItem,
@@ -21,6 +21,7 @@ type ActionResolution = {
   flags: string[];
   resumeAdditions: ResumeItem[];
   askFamilyUsed: boolean;
+  moneyBreakdown: MoneyBreakdown;
 };
 
 type ResolveActionPlanOptions = {
@@ -55,6 +56,37 @@ function addRisk(base: RiskState, delta: RiskState): RiskState {
     academicRisk: Math.max(0, base.academicRisk + delta.academicRisk),
     burnout: Math.max(0, base.burnout + delta.burnout),
   };
+}
+
+function createEmptyMoneyBreakdown(): MoneyBreakdown {
+  return {
+    baseLivingCost: 0,
+    actionCost: 0,
+    actionIncome: 0,
+    specialCost: 0,
+    specialIncome: 0,
+    netChange: 0,
+  };
+}
+
+function addMoneyEntry(breakdown: MoneyBreakdown, value: number, bucket: "action" | "special") {
+  if (value === 0) {
+    return;
+  }
+
+  if (bucket === "action") {
+    if (value > 0) {
+      breakdown.actionIncome += value;
+    } else {
+      breakdown.actionCost += Math.abs(value);
+    }
+  } else if (value > 0) {
+    breakdown.specialIncome += value;
+  } else {
+    breakdown.specialCost += Math.abs(value);
+  }
+
+  breakdown.netChange += value;
 }
 
 function familySupportAmount(background: FamilyBackground): number {
@@ -252,19 +284,6 @@ function resolveWritingResearchTrackBonus(run: GameRun) {
   }
 }
 
-function shouldApplyWeeklySettlement(run: GameRun, action: SupportedAction): boolean {
-  if (action === "big_meal" || action === "ask_family" || action === "skip_class" || action === "idle") {
-    return false;
-  }
-
-  const activeMonth = run.activeMonth;
-  if (!activeMonth) {
-    return true;
-  }
-
-  return !activeMonth.turns.some((turn) => turn.week === activeMonth.currentWeek && turn.advancesCalendar);
-}
-
 function projectRun(run: GameRun, statsDelta: DynamicStats, moneyDelta: number, riskDelta: RiskState): GameRun {
   return {
     ...run,
@@ -281,6 +300,7 @@ export function resolveActionPlan(
   plan: MonthlyActionPlan,
   options: ResolveActionPlanOptions = {},
 ): ActionResolution {
+  void options;
   const stats = emptyStatsDelta();
   const risk: RiskState = {
     academicRisk: 0,
@@ -293,35 +313,10 @@ export function resolveActionPlan(
   let askFamilyUsed = false;
   let studyCountThisMonth = 0;
   let projectedRun = run;
-  let monthlyAllowanceCorrected = projectedRun.activeMonth?.allowanceApplied ?? false;
-  let weeklySettlementHandled = false;
+  const moneyBreakdown = createEmptyMoneyBreakdown();
 
   for (const requestedAction of plan.actions) {
     const action = requestedAction.action as SupportedAction;
-
-    if (!monthlyAllowanceCorrected && !options.suppressAllowanceCorrection) {
-      moneyDelta -= projectedRun.profile.monthlyAllowance;
-      monthlyAllowanceCorrected = true;
-      projectedRun = projectRun(projectedRun, emptyStatsDelta(), -projectedRun.profile.monthlyAllowance, {
-        academicRisk: 0,
-        burnout: 0,
-      });
-    }
-
-    if (
-      !options.suppressWeeklySettlement &&
-      !weeklySettlementHandled &&
-      shouldApplyWeeklySettlement(projectedRun, action)
-    ) {
-      const weeklyBudgetDelta = getWeeklyAllowance(projectedRun) - getWeeklyLivingExpense(projectedRun);
-
-      moneyDelta += weeklyBudgetDelta;
-      weeklySettlementHandled = true;
-      projectedRun = projectRun(projectedRun, emptyStatsDelta(), weeklyBudgetDelta, {
-        academicRisk: 0,
-        burnout: 0,
-      });
-    }
 
     if (action === "part_time" && requestedAction.time === "night") {
       resolvedActions.push({
@@ -355,6 +350,7 @@ export function resolveActionPlan(
       const support = familySupportAmount(projectedRun.profile.familyBackground);
 
       moneyDelta += support;
+      addMoneyEntry(moneyBreakdown, support, "action");
       stats.stress += 12;
       stats.mood -= 2;
       askFamilyUsed = true;
@@ -548,6 +544,7 @@ export function resolveActionPlan(
     risk.academicRisk += actionRiskDelta.academicRisk;
     risk.burnout += actionRiskDelta.burnout;
     moneyDelta += actionMoneyDelta;
+    addMoneyEntry(moneyBreakdown, actionStatsDelta.money + actionMoneyDelta, "action");
 
     projectedRun = projectRun(projectedRun, actionStatsDelta, actionMoneyDelta, actionRiskDelta);
 
@@ -565,6 +562,7 @@ export function resolveActionPlan(
     risk.academicRisk += actionEvent.risk.academicRisk;
     risk.burnout += actionEvent.risk.burnout;
     moneyDelta += actionEvent.moneyDelta;
+    addMoneyEntry(moneyBreakdown, actionEvent.stats.money + actionEvent.moneyDelta, "special");
     resumeAdditions.push(...actionEvent.resumeAdditions);
 
     projectedRun = projectRun(projectedRun, actionEvent.stats, actionEvent.moneyDelta, actionEvent.risk);
@@ -580,5 +578,6 @@ export function resolveActionPlan(
     flags,
     resumeAdditions,
     askFamilyUsed,
+    moneyBreakdown,
   };
 }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 
 import {
   createInitialGameRun,
@@ -22,6 +22,7 @@ import {
 import { evaluateSemesterFeedback } from "@/core/resolvers";
 import { getMonthlyEventWeight } from "@/core/resolvers/events";
 import { resolveAvailableWeeklyActions } from "@/core/resolvers/schedule";
+import { buildPlannerDaysView, buildWeeklySettlementView } from "@/app/game/view-model";
 import { getMonthlyLivingExpense, getWeeklyAllowance, getWeeklyLivingExpense } from "@/data/events";
 import type {
   CourseAttendanceStrategy,
@@ -244,9 +245,6 @@ describe("monthly resolution", () => {
       }),
       3,
     );
-    const weeklyAllowance = getWeeklyAllowance(run);
-    const weeklyExpense = getWeeklyLivingExpense(run);
-
     const mealBeforeWeek = resolveActionTurn(run, {
       attendanceStrategy: "mixed",
       action: createBigMealAction(),
@@ -273,7 +271,7 @@ describe("monthly resolution", () => {
     expect(mealBeforeWeek.turnSummary.statsDelta.stress).toBe(-7);
 
     expect(firstWeekStudy.turnSummary.advancesCalendar).toBe(true);
-    expect(firstWeekStudy.turnSummary.moneyDelta).toBe(weeklyAllowance - weeklyExpense);
+    expect(firstWeekStudy.turnSummary.moneyDelta).toBe(0);
     expect(firstWeekStudy.run.activeMonth?.currentWeek).toBe(1);
     expect(firstWeekStudy.turnSummary.weekTimeAfter).toBeLessThan(firstWeekStudy.turnSummary.weekTimeBefore!);
 
@@ -284,7 +282,7 @@ describe("monthly resolution", () => {
     expect(mealBetweenWeeks.run.activeMonth?.currentWeek).toBe(2);
 
     expect(secondWeekStudy.turnSummary.advancesCalendar).toBe(true);
-    expect(secondWeekStudy.turnSummary.moneyDelta).toBe(weeklyAllowance - weeklyExpense);
+    expect(secondWeekStudy.turnSummary.moneyDelta).toBe(0);
     expect(secondWeekStudy.run.activeMonth?.currentWeek).toBe(2);
   });
 
@@ -402,8 +400,6 @@ describe("monthly resolution", () => {
       }),
       4,
     );
-    const weeklyBudgetDelta = getWeeklyAllowance(run) - getWeeklyLivingExpense(run);
-
     const mealTurn = resolveActionTurn(run, {
       attendanceStrategy: "mixed",
       action: createBigMealAction(),
@@ -412,7 +408,7 @@ describe("monthly resolution", () => {
 
     expect(mealTurn.turnSummary.advancesCalendar).toBe(false);
     expect(endedWeek.run.activeMonth?.currentWeek).toBe(2);
-    expect(endedWeek.run.stats.money).toBe(run.stats.money - 180 + weeklyBudgetDelta);
+    expect(endedWeek.run.stats.money).toBe(run.stats.money - 180);
   });
 
   it("reduces study gains across repeated weekly turns in the same month", () => {
@@ -785,7 +781,7 @@ describe("semester and ending evaluation", () => {
           academicYear: 2,
           level: "high",
           amount: 5000,
-          title: "高等级奖学金",
+          title: "楂樼瓑绾у瀛﹂噾",
           reason: "Strong performance.",
         },
       ],
@@ -924,7 +920,7 @@ describe("semester and ending evaluation", () => {
 
     expect(result.turnSummary.resolvedAction.accepted).toBe(true);
     expect(result.run.stats.semesterAcademics).toBeGreaterThan(laterRun.stats.semesterAcademics);
-    expect(result.run.resume.some((item) => item.category === "research" && item.title.includes("写作 / 调研"))).toBe(true);
+    expect(result.run.resume.some((item) => item.category === "research")).toBe(true);
   });
 
   it("treats vacation months as full-day weeks with a vacation-oriented action pool", () => {
@@ -968,7 +964,7 @@ describe("semester and ending evaluation", () => {
           ...withAttendance.activeMonth!.currentWeekState,
           event: {
             id: "weekly-class-meeting",
-            title: "班会 / 导员通知",
+            title: "鐝細 / 瀵煎憳閫氱煡",
             summary: "这周有一段时间会被班会和材料确认占掉。",
             weekday: "mon",
             effectDescription: "周一会被班会切掉一部分时间。",
@@ -1003,8 +999,8 @@ describe("semester and ending evaluation", () => {
     const result = confirmPlannedWeek(withAttendance);
     const settlement = result.run.activeMonth?.latestWeekSettlement;
 
-    expect(settlement?.budgetLines?.some((line) => line.includes("生活费到账"))).toBe(true);
-    expect(settlement?.budgetLines?.some((line) => line.includes(`${getWeeklyLivingExpense(withAttendance)} 元`))).toBe(true);
+    expect(settlement?.budgetLines?.some((line) => line.includes("基础生活成本"))).toBe(true);
+    expect(settlement?.budgetLines?.some((line) => line.includes(`${getWeeklyLivingExpense(withAttendance)}`))).toBe(true);
     expect(settlement?.dailyResults.every((day) => day.notableFacts.some((fact) => fact.startsWith("daily-living-cost:")))).toBe(true);
   });
 
@@ -1093,7 +1089,7 @@ describe("semester and ending evaluation", () => {
     const warnings = withAttendance.activeMonth?.currentWeekState.planningWarnings ?? [];
 
     expect(warnings.length).toBeGreaterThan(0);
-    expect(warnings.join(" ")).toMatch(/固定开销|现金|赚钱|危险线/);
+    expect(warnings.join(" ")).toMatch(/基础开销|现金|赚钱|危险/);
   });
 
   it("keeps exactly four weekly settlements in the monthly summary after four planned weeks", () => {
@@ -1170,7 +1166,7 @@ describe("semester and ending evaluation", () => {
                   plannedAction: {
                     action: "social" as const,
                     optionId: "social",
-                    label: "社交 / 关系",
+                    label: "绀句氦 / 鍏崇郴",
                     time: "day" as const,
                     weekday: "sat" as const,
                   },
@@ -1187,5 +1183,126 @@ describe("semester and ending evaluation", () => {
 
     expect(updatedProject?.status).toBe("expired");
     expect(saturdayResult?.notableFacts).toContain(`weekly-event:competition-skipped:${project!.title}`);
+  });
+
+  it("adds next-month allowance once at month rollover and does not repay it in weekly settlement", () => {
+    let run = createInitialGameRun({
+      id: "monthly-allowance-once-run",
+      randomValues: [0.27, 0.34, 0.41, 0.52, 0.68, 0.19, 0.28, 0.41],
+    });
+    let monthCompletedResult: ReturnType<typeof confirmPlannedWeek> | undefined;
+
+    for (let week = 0; week < 4; week += 1) {
+      const withAttendance = selectWeekAttendanceStrategy(run, "mixed");
+      monthCompletedResult = confirmPlannedWeek(withAttendance);
+      run = monthCompletedResult.run;
+    }
+
+    expect(monthCompletedResult?.monthCompleted).toBe(true);
+    expect(monthCompletedResult?.monthlySummary).toBeDefined();
+    expect(monthCompletedResult?.run.stats.money).toBe(
+      monthCompletedResult!.monthlySummary!.statsAfter.money + run.profile.monthlyAllowance,
+    );
+
+    const monthTwoWeekOne = confirmPlannedWeek(selectWeekAttendanceStrategy(monthCompletedResult!.run, "mixed"));
+    const settlement = monthTwoWeekOne.run.activeMonth?.latestWeekSettlement;
+
+    expect(settlement?.moneyDelta).toBe(-getWeeklyLivingExpense(monthCompletedResult!.run));
+    expect(settlement?.budgetLines?.join(" ")).not.toContain("生活费到账");
+  });
+
+  it("splits daily cash copy between base living cost and extra action spending or income", () => {
+    const socialRun = selectWeekAttendanceStrategy(
+      createInitialGameRun({
+        id: "money-breakdown-social-run",
+        randomValues: [0.22, 0.31, 0.48, 0.57, 0.61, 0.19, 0.26, 0.4],
+      }),
+      "mixed",
+    );
+    const plannedSocial = planWeeklyDayAction({
+      run: socialRun,
+      weekday: "mon",
+      optionId: "social",
+    });
+    const socialSettlement = buildWeeklySettlementView(confirmPlannedWeek(plannedSocial).run.activeMonth?.latestWeekSettlement);
+    const socialLine = socialSettlement?.dayLines.find((line) => line.actionLabel.includes("社交"));
+
+    expect(socialLine?.summary).toContain("基础生活开销");
+    expect(socialLine?.summary).toContain("额外花费");
+    expect(socialLine?.summary).toContain("当天共减少");
+
+    const partTimeRun = selectWeekAttendanceStrategy(
+      createInitialGameRun({
+        id: "money-breakdown-income-run",
+        randomValues: [0.31, 0.28, 0.4, 0.55, 0.73, 0.51, 0.22, 0.44],
+      }),
+      "mixed",
+    );
+    const plannedPartTime = planWeeklyDayAction({
+      run: partTimeRun,
+      weekday: "sat",
+      optionId: "part_time",
+    });
+    const partTimeSettlement = buildWeeklySettlementView(confirmPlannedWeek(plannedPartTime).run.activeMonth?.latestWeekSettlement);
+    const partTimeLine = partTimeSettlement?.dayLines.find((line) => line.actionLabel.includes("兼职"));
+
+    expect(partTimeLine?.summary).toContain("基础生活开销");
+    expect(partTimeLine?.summary).toContain("兼职收入");
+    expect(partTimeLine?.summary).toContain("当天净变化");
+  });
+
+  it("shows rest-day only on full-day schedules and never on busy or half-day class days", () => {
+    const baseRun = selectWeekAttendanceStrategy(
+      createInitialGameRun({
+        id: "rest-day-availability-run",
+        randomValues: [0.31, 0.28, 0.4, 0.55, 0.73, 0.51, 0.22, 0.44],
+      }),
+      "mixed",
+    );
+    const monday = baseRun.activeMonth?.currentWeekState.days?.find((day) => day.weekday === "mon");
+    const tuesday = baseRun.activeMonth?.currentWeekState.days?.find((day) => day.weekday === "tue");
+    const saturday = baseRun.activeMonth?.currentWeekState.days?.find((day) => day.weekday === "sat");
+
+    expect(
+      resolveAvailableWeeklyActions({
+        day: monday!,
+        event: baseRun.activeMonth?.currentWeekState.event,
+        run: baseRun,
+      }).some((option) => option.optionId === "relax"),
+    ).toBe(false);
+    expect(
+      resolveAvailableWeeklyActions({
+        day: tuesday!,
+        event: baseRun.activeMonth?.currentWeekState.event,
+        run: baseRun,
+      }).some((option) => option.optionId === "relax"),
+    ).toBe(false);
+
+    const saturdayOptions = resolveAvailableWeeklyActions({
+      day: saturday!,
+      event: baseRun.activeMonth?.currentWeekState.event,
+      run: baseRun,
+    });
+    const restOption = saturdayOptions.find((option) => option.optionId === "relax");
+
+    expect(restOption?.label).toBe("休息一天");
+  });
+
+  it("renames the engineering research action instead of exposing bare 鍐欎綔 / 璋冪爺", () => {
+    const engineeringRun = selectWeekAttendanceStrategy(
+      createInitialGameRun({
+        id: "engineering-action-pool-run",
+        discipline: "engineering",
+        randomValues: [0.31, 0.28, 0.4, 0.55, 0.73, 0.51, 0.22, 0.44],
+      }),
+      "mixed",
+    );
+    const plannerDays = buildPlannerDaysView(engineeringRun.activeMonth!.currentWeekState, engineeringRun);
+    const saturday = plannerDays.find((day) => day.weekday === "sat");
+    const engineeringResearch = saturday?.normalOptions.find((option) => option.action === "writing_research");
+
+    expect(engineeringResearch).toBeDefined();
+    expect(engineeringResearch?.label).not.toBe("鍐欎綔 / 璋冪爺");
+    expect(`${engineeringResearch?.label} ${engineeringResearch?.description}`).toMatch(/技术调研|实验记录|项目|建模/);
   });
 });
