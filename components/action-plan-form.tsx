@@ -13,6 +13,7 @@ import { useFormStatus } from "react-dom";
 
 import { planWeekdayActionAction, submitActionTurnAction } from "@/app/actions";
 import { FmIcon } from "@/components/fm-ui/FmScaffold";
+import { LoadingOverlay } from "@/components/loading-overlay";
 import { buildPlannerEventNotice } from "@/lib/planner-option-priority";
 import { buildStatusGuidance } from "@/lib/status-guidance";
 import type { ActionType, CourseAttendanceStrategy } from "@/types/game";
@@ -104,6 +105,21 @@ function PendingHint({ text }: { text: string }) {
   }
 
   return <p className="text-sm leading-6 text-amber-700">{text}</p>;
+}
+
+function ConfirmWeekOverlay() {
+  const { pending } = useFormStatus();
+
+  if (!pending) {
+    return null;
+  }
+
+  return (
+    <LoadingOverlay
+      title="正在整理这个月的记录"
+      body="系统正在结算本周安排。如果这是月末，AI 也在把本月经历写成月记，可能需要几秒钟。失败时会自动保留规则摘要。"
+    />
+  );
 }
 
 function SubmitButton(props: {
@@ -440,7 +456,7 @@ export function ActionPlanForm({
         setLocalFeedback({
           kind: "success",
           title: `${request.dayLabel} 已保存`,
-          message: `“${request.optionLabel}”已经写回本周安排。你可以继续安排后面的日期。`,
+          message: `"${request.optionLabel}"已经写回本周安排。你可以继续安排后面的日期。`,
         });
       } catch {
         setOptimisticPlans((currentPlans) => {
@@ -513,7 +529,7 @@ export function ActionPlanForm({
     setLocalFeedback({
       kind: "success",
       title: `${day.label} 已安排`,
-      message: `已经把“${option.label}”排到这一天，后台会按顺序写回存档。`,
+      message: `已经把"${option.label}"排到这一天，后台会按顺序写回存档。`,
     });
     setSelectedWeekday(null);
     setSkipClassDraft(false);
@@ -699,13 +715,14 @@ export function ActionPlanForm({
           />
           {attendanceLocked ? (
             <span className="text-sm text-stone-500">
-              没点到的日期会自动补成“摆烂 / 发呆”，不会因为漏选卡住。
+              没点到的日期会自动补成&ldquo;摆烂 / 发呆&rdquo;，不会因为漏选卡住。
             </span>
           ) : (
             <span className="text-sm text-stone-500">先把这周课程态度锁定，系统才能结算这一周。</span>
           )}
         </div>
         <PendingHint text="正在统一结算本周安排；如果这是月末，也会顺带生成 AI 月记 / 月度总结。" />
+        <ConfirmWeekOverlay />
       </form>
 
       {selectedDay ? (

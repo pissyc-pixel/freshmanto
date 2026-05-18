@@ -76,7 +76,43 @@ function ensureDynamicStats(stats: Partial<Record<keyof ReturnType<typeof emptyS
   };
 }
 
-export function normalizeMonthlySummary(summary: StructuredMonthlySummary): StructuredMonthlySummary {
+export function normalizeMonthlySummary(summary: StructuredMonthlySummary | null | undefined): StructuredMonthlySummary {
+  if (!summary || typeof summary !== "object") {
+    return {
+      month: 0,
+      actions: [],
+      attendanceStrategy: "mixed",
+      schedule: [],
+      weeklyCalendar: [],
+      statsBefore: emptyStats(),
+      statsAfter: emptyStats(),
+      statsDelta: emptyStats(),
+      moneyDelta: 0,
+      academicFeedback: "stable",
+      eventIds: [],
+      resumeAdditions: [],
+      notableFacts: [],
+      resolvedActions: [],
+      flags: [],
+      weeklySettlements: [],
+      cooldowns: { askFamilyMonths: 0 },
+      course: {
+        strategy: "mixed",
+        attendanceCounted: true,
+        directRollCallPenalty: 0,
+        rollCallRiskDelta: 0,
+        usualScoreRiskDelta: 0,
+        proxyCost: 0,
+        remedyPressure: 0,
+        academicRiskDelta: 0,
+        academicGain: 0,
+        moodDelta: 0,
+        stressDelta: 0,
+      },
+      turns: [],
+    };
+  }
+
   return {
     ...summary,
     actions: summary.actions ?? [],

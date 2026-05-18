@@ -212,7 +212,7 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
                     const matchingState = bundle.monthlyStates.find(
                       (state) => state.year === report.year && state.month === report.month,
                     );
-                    const digest = matchingState
+                    const digest = matchingState?.snapshot_json
                       ? buildMonthlyDiaryDigest(matchingState.snapshot_json, matchingState.year, matchingState.month)
                       : null;
 
