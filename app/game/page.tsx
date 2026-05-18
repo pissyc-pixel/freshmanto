@@ -10,6 +10,8 @@ import {
 } from "@/app/game/view-model";
 import { ActiveRunSync } from "@/components/active-run-sync";
 import { ActionPlanForm } from "@/components/action-plan-form";
+import { FmBadge } from "@/components/fm-ui/FmBadge";
+import { FmMotionSection } from "@/components/fm-ui/FmMotionSection";
 import { LogFeed } from "@/components/log-feed";
 import { ScrollIntoView } from "@/components/scroll-into-view";
 import { WeeklySettlementCard } from "@/components/weekly-settlement-card";
@@ -56,7 +58,8 @@ function buildMetricItems(stats: DynamicStats, run?: GameRun) {
       tone: stats.money < weeklyLivingCost ? "red" : stats.money < weeklyLivingCost * 1.2 ? "amber" : "teal",
       icon: "chart" as const,
       progress: clampProgress(stats.money, 2400),
-      warning: stats.money < weeklyLivingCost ? "本周基础开销可能不够" : stats.money < weeklyLivingCost * 1.2 ? "现金有点紧" : undefined,
+      warning: stats.money < weeklyLivingCost ? "本周可能不够花" : stats.money < weeklyLivingCost * 1.2 ? "现金有点紧" : undefined,
+      state: stats.money < weeklyLivingCost ? ("danger" as const) : stats.money < weeklyLivingCost * 1.2 ? ("warning" as const) : ("normal" as const),
     },
     {
       label: "心情",
@@ -64,7 +67,8 @@ function buildMetricItems(stats: DynamicStats, run?: GameRun) {
       tone: stats.mood <= 35 ? "rose" : stats.mood <= 50 ? "amber" : "mint",
       icon: "moon" as const,
       progress: clampProgress(stats.mood),
-      warning: stats.mood <= 35 ? "心情已经很低" : stats.mood <= 50 ? "心情偏低" : undefined,
+      warning: stats.mood <= 35 ? "状态很低" : stats.mood <= 50 ? "有点疲惫" : undefined,
+      state: stats.mood <= 35 ? ("danger" as const) : stats.mood <= 50 ? ("warning" as const) : ("normal" as const),
     },
     {
       label: "压力",
@@ -73,6 +77,7 @@ function buildMetricItems(stats: DynamicStats, run?: GameRun) {
       icon: "alert" as const,
       progress: clampProgress(stats.stress),
       warning: stats.stress >= 75 ? "压力过高" : stats.stress >= 60 ? "压力偏高" : undefined,
+      state: stats.stress >= 75 ? ("danger" as const) : stats.stress >= 60 ? ("warning" as const) : ("normal" as const),
     },
     {
       label: "学业",
@@ -80,6 +85,7 @@ function buildMetricItems(stats: DynamicStats, run?: GameRun) {
       tone: "cyan",
       icon: "book" as const,
       progress: clampProgress(stats.semesterAcademics),
+      state: "normal" as const,
     },
     {
       label: "社交",
@@ -87,6 +93,7 @@ function buildMetricItems(stats: DynamicStats, run?: GameRun) {
       tone: "amber",
       icon: "calendar" as const,
       progress: clampProgress(stats.social),
+      state: "normal" as const,
     },
   ];
 }
@@ -217,11 +224,14 @@ export default async function GamePage({ searchParams }: GamePageProps) {
     >
       <div className="fm-stack" data-testid="game-page">
         <ActiveRunSync runId={bundle.run.id} />
-        <FmMetricStrip items={buildMetricItems(hydratedRun.stats, hydratedRun)} />
+        <FmMotionSection delay={40}>
+          <FmMetricStrip items={buildMetricItems(hydratedRun.stats, hydratedRun)} />
+        </FmMotionSection>
 
         <div className="fm-grid-2">
           <div className="fm-stack">
-            <FmPanel>
+            <FmMotionSection delay={90}>
+              <FmPanel>
               <FmSectionHead
                 title={vacationMonth ? "安排这个假期周" : "安排这一周"}
                 copy={
@@ -245,25 +255,29 @@ export default async function GamePage({ searchParams }: GamePageProps) {
                   days={plannerDays}
                 />
               </div>
-            </FmPanel>
+              </FmPanel>
+            </FmMotionSection>
 
             {weeklySettlement ? (
               <>
                 <ScrollIntoView targetId="weekly-settlement" active={focusParam === "weekly-settlement"} />
                 <div id="weekly-settlement">
-                  <FmPanel>
+                  <FmMotionSection delay={130}>
+                    <FmPanel>
                     <FmSectionHead title="上周结算" copy="这里只读取已经落地的统一周结算结果，不会重算，也不会猜玩家选择。" />
                     <div className="mt-6">
                       <WeeklySettlementCard {...weeklySettlement} />
                     </div>
-                  </FmPanel>
+                    </FmPanel>
+                  </FmMotionSection>
                 </div>
               </>
             ) : null}
           </div>
 
           <div className="fm-stack">
-            <FmPanel>
+            <FmMotionSection delay={120}>
+              <FmPanel>
               <FmSectionHead
                 title={vacationMonth ? "本月假期节奏" : "本月周历"}
                 copy={
@@ -273,20 +287,32 @@ export default async function GamePage({ searchParams }: GamePageProps) {
                 }
               />
               <div className="mt-6 fm-week-grid">
-                {schedule.map((week) => (
-                  <section key={week.label} className={`fm-panel fm-week-card ${week.isCurrent ? "is-current" : ""}`}>
+                {schedule.map((week) => {
+                  const weekNumber = Number(week.label.replace(/\D/g, "")) || 0;
+                  const weekState = week.isCurrent ? "current" : weekNumber < currentWeek ? "completed" : "upcoming";
+
+                  return (
+                  <section
+                    key={week.label}
+                    className={`fm-card fm-week-card ${weekState === "current" ? "is-current" : ""} ${weekState === "completed" ? "is-completed" : ""} ${weekState === "upcoming" ? "is-upcoming" : ""}`}
+                  >
                     <div className="fm-week-card__header">
                       <div>
                         <h3>{week.label}</h3>
                         <p>{week.detail}</p>
                       </div>
-                      {week.isCurrent ? <span className="fm-week-badge">当前周</span> : null}
+                      {weekState === "current" ? <FmBadge tone="ending">当前周</FmBadge> : null}
+                      {weekState === "completed" ? <FmBadge tone="academic">已结算</FmBadge> : null}
+                      {weekState === "upcoming" ? <FmBadge tone="neutral">还没轮到</FmBadge> : null}
                     </div>
 
                     <div className="fm-week-card__grid">
                       <div className="fm-day-stack">
                         {week.days.slice(0, 4).map((day) => (
-                          <div key={`${week.label}-${day.label}`} className="fm-day-chip">
+                          <div
+                            key={`${week.label}-${day.label}`}
+                            className={`fm-day-chip ${day.detail.startsWith("已安排") ? "is-planned" : ""} ${day.detail.includes("事件") ? "is-event" : ""} ${weekState === "completed" ? "is-settled" : ""} ${weekState === "upcoming" ? "is-locked" : ""}`}
+                          >
                             <div className="fm-day-chip__row">
                               <strong>{day.label}</strong>
                               <span className={`fm-pill tone-${toneForDay(day.kind)}`}>
@@ -300,7 +326,10 @@ export default async function GamePage({ searchParams }: GamePageProps) {
 
                       <div className="fm-day-stack">
                         {week.days.slice(4).map((day) => (
-                          <div key={`${week.label}-${day.label}`} className="fm-day-chip">
+                          <div
+                            key={`${week.label}-${day.label}`}
+                            className={`fm-day-chip ${day.detail.startsWith("已安排") ? "is-planned" : ""} ${day.detail.includes("事件") ? "is-event" : ""} ${weekState === "completed" ? "is-settled" : ""} ${weekState === "upcoming" ? "is-locked" : ""}`}
+                          >
                             <div className="fm-day-chip__row">
                               <strong>{day.label}</strong>
                               <span className={`fm-pill tone-${toneForDay(day.kind)}`}>
@@ -313,11 +342,13 @@ export default async function GamePage({ searchParams }: GamePageProps) {
                       </div>
                     </div>
                   </section>
-                ))}
+                )})}
               </div>
-            </FmPanel>
+              </FmPanel>
+            </FmMotionSection>
 
-            <FmPanel>
+            <FmMotionSection delay={160}>
+              <FmPanel>
               <FmSectionHead
                 title="后半程方向"
                 copy="这里只帮你看清当前的倾向变化，不会提前把这一局的最终去向说死。"
@@ -343,23 +374,28 @@ export default async function GamePage({ searchParams }: GamePageProps) {
                   </div>
                 </article>
               </div>
-            </FmPanel>
+              </FmPanel>
+            </FmMotionSection>
 
             {latestGrowthLog ? (
-              <FmPanel>
+              <FmMotionSection delay={190}>
+                <FmPanel>
                 <FmSectionHead title="最近一条成长日志" copy="这里只读取最近一次真实月结算留下来的记录。" />
                 <div className="mt-6">
                   <LogFeed items={[latestGrowthLog]} variant="player" />
                 </div>
-              </FmPanel>
+                </FmPanel>
+              </FmMotionSection>
             ) : null}
 
-            <FmPanel>
+            <FmMotionSection delay={220}>
+              <FmPanel>
               <FmSectionHead title="最近动态" copy="这里会保留最近的行动、事件和结算记录，方便你回看这局刚刚发生了什么。" />
               <div className="mt-6">
                 <LogFeed items={latestSystemLogs} emptyMessage="目前还没有系统日志留档。" />
               </div>
-            </FmPanel>
+              </FmPanel>
+            </FmMotionSection>
 
             <div className="flex flex-wrap gap-3">
               <Link href={buildRunHref("/settlement", bundle.run.id)} className="fm-button-secondary">

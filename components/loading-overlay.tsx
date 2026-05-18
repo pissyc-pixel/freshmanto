@@ -1,7 +1,9 @@
 "use client";
 
-import { createPortal } from "react-dom";
 import { useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
+
+import { FmLoadingState } from "@/components/fm-ui/FmLoadingState";
 
 type LoadingOverlayProps = {
   title: string;
@@ -20,11 +22,9 @@ export function LoadingOverlay({ title, body }: LoadingOverlayProps) {
   }
 
   return createPortal(
-    <div className="fm-loading-overlay" data-testid="loading-overlay">
+    <div className="fm-loading-overlay" data-testid="loading-overlay" role="status" aria-live="polite">
       <div className="fm-loading-overlay__card">
-        <div className="fm-loading-overlay__spinner" />
-        <h2 className="fm-loading-overlay__title">{title}</h2>
-        <p className="fm-loading-overlay__body">{body}</p>
+        <FmLoadingState title={title} body={body} />
       </div>
     </div>,
     document.body,

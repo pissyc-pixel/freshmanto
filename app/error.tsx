@@ -17,26 +17,22 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
   }, [error]);
 
   return (
-    <main className="min-h-screen bg-[#f7efe3] px-6 py-12 text-stone-900">
-      <section className="mx-auto max-w-2xl rounded-[32px] border border-stone-200 bg-white/85 p-8 shadow-sm">
-        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-700">测试版提示</p>
-        <h1 className="mt-4 text-3xl font-semibold">这一页刚刚没跑起来</h1>
+    <main className="fm-app-root fm-app-root--centered px-6 py-12">
+      <section className="fm-card fm-card--pad fm-card--warning w-full max-w-2xl">
+        <p className="fm-enroll-eyebrow">内测提示</p>
+        <h1 className="mt-4 text-3xl font-semibold text-[var(--fm-brand-dark)]">这一页刚刚没跑起来</h1>
         <p className="mt-4 leading-7 text-stone-700">
-          朋友内测版还在打磨中。这个错误通常和测试库、环境变量或刚才的操作状态有关，不代表存档一定坏了。
-          你可以先重试，或者回到首页重新开一局。
+          可能是本地存档、测试数据或刚才的操作状态没接上。你可以重试，或者回到首页继续。
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <button
             type="button"
             onClick={reset}
-            className="rounded-full bg-amber-600 px-5 py-3 font-semibold text-white transition hover:bg-amber-700"
+            className="fm-button-primary min-h-0 w-auto px-5 py-3 text-base"
           >
             重试这一页
           </button>
-          <Link
-            href="/"
-            className="rounded-full border border-stone-300 bg-white px-5 py-3 font-semibold text-stone-800 transition hover:bg-stone-50"
-          >
+          <Link href="/" className="fm-button-secondary px-5 py-3">
             回到首页
           </Link>
         </div>

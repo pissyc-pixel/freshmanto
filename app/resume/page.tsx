@@ -1,6 +1,8 @@
 import { ActiveRunSync } from "@/components/active-run-sync";
+import { FmBadge } from "@/components/fm-ui/FmBadge";
 import { FmEmptyState } from "@/components/fm-ui/FmEmptyState";
 import { FmPartialNotice } from "@/components/fm-ui/FmPartialNotice";
+import { FmMotionSection } from "@/components/fm-ui/FmMotionSection";
 import { ProfileSummary } from "@/components/profile-summary";
 import {
   FmIcon,
@@ -20,10 +22,10 @@ import {
 } from "@/core/resolvers/progression";
 import { resolveActiveRunId } from "@/lib/demo/active-run";
 import { buildGrowthJournalEntry } from "@/lib/demo/monthly-digest";
-import { formatCityTier, formatCollegeTrack, formatMonthLabel, formatSchoolTier } from "@/lib/demo/options";
+import { formatMonthLabel } from "@/lib/demo/options";
+import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
 import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
 import { getServerResumeBundle } from "@/lib/demo/server";
-import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +39,7 @@ function formatAcademicValue(value: number | null) {
 
 function formatRankPercentile(rank: number | null, percentile: number | null) {
   if (rank === null || percentile === null) {
-    return "暂无排名 / 百分位";
+    return "暂无排名 / 百分比";
   }
 
   return `前 ${rank} · ${percentile}%`;
@@ -63,7 +65,7 @@ function buildCoreAbilityTags(items: {
     tags.push("项目推进");
   }
   if (items.internshipCount > 0) {
-    tags.push("实务经历");
+    tags.push("实践经历");
   }
   if (items.scholarshipCount > 0) {
     tags.push("阶段回报");
@@ -73,6 +75,15 @@ function buildCoreAbilityTags(items: {
   }
 
   return [...new Set(tags)];
+}
+
+function countProjects(items: Array<{ category: string; tags: string[] }>) {
+  return items.filter(
+    (item) =>
+      item.category === "competition" ||
+      item.category === "project" ||
+      item.tags.some((tag) => hasKeyword(tag, ["项目", "比赛", "竞赛"])),
+  ).length;
 }
 
 export default async function ResumePage({ searchParams }: ResumePageProps) {
@@ -88,8 +99,8 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
       <FmShellLayout
         active="resume"
         runId={runId}
-        title="个人履历"
-        subtitle="这里会把真实形成的 GPA、排名、履历条目和成长痕迹整理出来。没有数据时，只展示空状态，不会直接报错。"
+        title="履历档案"
+        subtitle="这里记录能慢慢写进简历和未来选择里的东西。没有数据时，只展示空状态，不会直接报错。"
         headerMeta={
           <>
             <FmInlineStat tone="teal" icon="chart" label="GPA" value="暂无 GPA" />
@@ -100,12 +111,12 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
         <FmPanel>
           <FmSectionHead
             title="个人履历"
-            copy="这里只会展示已经形成的履历证据，学校、排名和项目都不会被前端伪造。"
+            copy="这里会慢慢长成你的履历档案。学校、排名、奖项和项目只会读取真实存档，不会被前端伪造。"
           />
           <div className="mt-6">
             <FmEmptyState
               title="还没有足够的履历证据"
-              body="这条线索还没有在你的大学生活中出现。先回到首页创建一局，再从真实流程里慢慢积累。"
+              body="这条线索还没在你的大学生活里出现。先回到首页创建一局，再从真实流程里慢慢积累。"
             />
           </div>
         </FmPanel>
@@ -139,7 +150,7 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
     (item) =>
       item.category === "internship" ||
       hasKeyword(item.title, ["实习"]) ||
-      hasKeyword(item.summary, ["实习"]),
+      hasKeyword(item.summary, ["实习", "实践"]),
   );
   const scholarshipItems = resumeItems.filter(
     (item) =>
@@ -165,57 +176,62 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
     directionLabel: directionPerception.primary.label,
     gpa: academicProfile.gpa,
   });
+  const projectCount = countProjects(resumeItems);
 
   return (
     <FmShellLayout
       active="resume"
       runId={runId}
-      title="个人履历"
-      subtitle="履历页只整理已经形成的证据，帮助你看清现在这局真实地在往哪条路上偏。"
-      sidebarSummary="这里展示的是当前存档的真实画像：GPA、履历条目、方向线索与阶段日志。"
+      title="履历档案"
+      subtitle="这里记录能慢慢写进简历和未来选择里的东西。它更像学生档案夹，而不是一张后台字段表。"
+      sidebarSummary="这里展示的是当前存档已经形成的真实档案：GPA、排名、履历条目、机会线索和阶段日志。"
       headerMeta={
         <>
           <FmInlineStat tone="teal" icon="chart" label="GPA" value={formatAcademicValue(academicProfile.gpa)} />
-          <FmInlineStat
-            tone="amber"
-            icon="file"
-            label="履历证据"
-            value={`${resumeItems.length} 条`}
-          />
-          <FmInlineStat
-            tone="cyan"
-            icon="calendar"
-            label="月度记录"
-            value={`${bundle.monthlyStates.length} 月`}
-          />
+          <FmInlineStat tone="amber" icon="file" label="履历证据" value={`${resumeItems.length} 条`} />
+          <FmInlineStat tone="cyan" icon="calendar" label="月度记录" value={`${bundle.monthlyStates.length} 月`} />
         </>
       }
     >
       <div className="fm-grid-2">
         <ActiveRunSync runId={bundle.run.id} />
+
         <div className="fm-stack">
-          <FmPanel padded={false}>
-            <section className="fm-resume-head">
-              <div className="fm-resume-name">个人履历</div>
-              <div className="fm-resume-meta">
-                <span>{formatCollegeTrack(hydratedRun.profile.collegeTrack)}</span>
-                <span>·</span>
-                <span>{formatSchoolTier(hydratedRun.profile.schoolTier)}</span>
-                <span>·</span>
-                <span>{formatCityTier(hydratedRun.profile.cityTier)}</span>
+          <FmMotionSection delay={40}>
+            <FmPanel>
+              <FmSectionHead
+                title="履历档案"
+                copy="这里记录能慢慢写进简历和未来选择里的东西。个人履历会随着项目、成绩、奖学金和实践经历慢慢成形。"
+              />
+              <div className="mt-6 fm-resume-kpis">
+                <article className="fm-resume-kpi">
+                  <div className="fm-resume-kpi__label">GPA</div>
+                  <div className="fm-resume-kpi__value">{formatAcademicValue(academicProfile.gpa)}</div>
+                  <div className="fm-resume-kpi__note">学业表现会直接影响推免、考研和部分机会线。</div>
+                </article>
+                <article className="fm-resume-kpi">
+                  <div className="fm-resume-kpi__label">排名 / 百分比</div>
+                  <div className="fm-resume-kpi__value">
+                    {formatRankPercentile(academicProfile.rank, academicProfile.percentile)}
+                  </div>
+                  <div className="fm-resume-kpi__note">这是学业竞争力最直观的一层证据。</div>
+                </article>
+                <article className="fm-resume-kpi">
+                  <div className="fm-resume-kpi__label">奖学金</div>
+                  <div className="fm-resume-kpi__value">{scholarshipItems.length}</div>
+                  <div className="fm-resume-kpi__note">阶段性回报会先在这里留下痕迹。</div>
+                </article>
+                <article className="fm-resume-kpi">
+                  <div className="fm-resume-kpi__label">比赛 / 项目</div>
+                  <div className="fm-resume-kpi__value">{projectCount}</div>
+                  <div className="fm-resume-kpi__note">项目成果会慢慢把这份档案托起来。</div>
+                </article>
+                <article className="fm-resume-kpi">
+                  <div className="fm-resume-kpi__label">实习 / 实践</div>
+                  <div className="fm-resume-kpi__value">{internshipItems.length}</div>
+                  <div className="fm-resume-kpi__note">越靠近就业，这部分就越关键。</div>
+                </article>
               </div>
-
-              <div className="fm-score-strip">
-                <div className="fm-score-box">
-                  <span className="fm-score-box__label">GPA</span>
-                  <span className="fm-score-box__value">{formatAcademicValue(academicProfile.gpa)}</span>
-                </div>
-                <div className="fm-score-box">
-                  <span className="fm-score-box__label">排名 / 百分位</span>
-                  <span className="fm-score-box__value">{formatRankPercentile(academicProfile.rank, academicProfile.percentile)}</span>
-                </div>
-              </div>
-
               <div className="mt-6">
                 {coreAbilityTags.length > 0 ? (
                   <div className="fm-tag-row">
@@ -233,160 +249,216 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
                   />
                 )}
               </div>
-            </section>
-          </FmPanel>
+            </FmPanel>
+          </FmMotionSection>
 
-          <FmPanel>
-            <FmSectionHead
-              title="基础画像 / 入学档案"
-              copy="学院、学校、城市、家庭资源和初始特质都只读取当前存档的真实字段，缺失时保守展示。"
-            />
-            <div className="mt-6">
-              <ProfileSummary profile={hydratedRun.profile} />
-            </div>
-          </FmPanel>
+          <FmMotionSection delay={100}>
+            <FmPanel>
+              <FmSectionHead
+                title="基础画像 / 入学档案"
+                copy="学校、专业方向、城市层级和初始背景都只来自当前存档字段。这里负责整理，不会替你补写经历。"
+              />
+              <div className="mt-6">
+                <ProfileSummary profile={hydratedRun.profile} />
+              </div>
+            </FmPanel>
+          </FmMotionSection>
 
-          <FmPanel>
-            <FmSectionHead
-              title="个人履历时间线"
-              copy="履历条目按形成月份排列。没有的经历不会被前端补写进来。"
-            />
-            <div className="mt-6">
-              {resumeItems.length > 0 ? (
-                <div className="fm-resume-lines">
-                  {resumeItems.map((item) => (
-                    <article key={item.id} className="fm-resume-line">
-                      <div className="fm-resume-line__icon">
-                        <FmIcon name="file" className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <div className="fm-resume-line__title">{item.title}</div>
-                        <div className="fm-resume-line__body">{item.summary}</div>
-                        {item.tags.length > 0 ? (
-                          <div className="mt-4 fm-tag-row">
-                            {item.tags.map((tag) => (
-                              <span key={tag} className="fm-tag">
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                      <div className="fm-resume-line__date">M{item.month}</div>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <FmEmptyState
-                  title="还没有足够的履历证据"
-                  body="比赛、项目、实习、奖学金和校内经历都要先在这局存档里真实发生，这里才会出现。"
-                />
-              )}
-            </div>
-          </FmPanel>
+          <FmMotionSection delay={160}>
+            <FmPanel>
+              <FmSectionHead
+                title="证据板"
+                copy="这里先收你已经留下的项目、比赛、实习和经历。没有发生过的内容，不会为了好看硬补出来。"
+              />
+              <div className="mt-6">
+                {resumeItems.length > 0 ? (
+                  <div className="fm-resume-lines">
+                    {resumeItems.map((item) => (
+                      <article key={item.id} className="fm-resume-line">
+                        <div className="fm-resume-line__icon">
+                          <FmIcon name="file" className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <div className="fm-resume-line__title">{item.title}</div>
+                          <div className="fm-resume-line__body">{item.summary}</div>
+                          {item.tags.length > 0 ? (
+                            <div className="mt-4 fm-tag-row">
+                              {item.tags.map((tag) => (
+                                <span key={tag} className="fm-tag">
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                        <div className="fm-resume-line__date">M{item.month}</div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <FmEmptyState
+                    title="还没有能写进履历的经历"
+                    body="这里还没有能写进履历的经历。后面参加比赛、项目、实习后会慢慢出现。"
+                  />
+                )}
+              </div>
+            </FmPanel>
+          </FmMotionSection>
         </div>
 
         <div className="fm-stack">
-          <FmPanel>
-            <FmSectionHead
-              title="当前画像"
-              copy="这不是结论书，只是把当前已有的真实信号翻译成你能看懂的阶段描述。"
-              aside={<span className="fm-chip fm-chip--brand">{directionPerception.primary.label}</span>}
-            />
+          <FmMotionSection delay={70}>
+            <FmPanel>
+              <FmSectionHead
+                title="为什么你正在接近某条路"
+                copy="这里不提前下定论，只把现阶段已经看得见的倾向、支撑证据和缺口整理给你。"
+                aside={<FmBadge tone="ending">{directionPerception.primary.label}</FmBadge>}
+              />
 
-            <div className="mt-6 fm-stat-grid">
-              <article className="fm-stat-card">
-                <div className="fm-stat-card__label">履历概况</div>
-                <div className="fm-stat-card__value">{resumeItems.length} 条</div>
-                <div className="fm-stat-card__copy">{directionPerception.summary}</div>
-              </article>
-              <article className="fm-stat-card">
-                <div className="fm-stat-card__label">推免线索</div>
-                <div className="fm-stat-card__value">{recommendationExplanation.summary}</div>
-              </article>
-              <article className="fm-stat-card">
-                <div className="fm-stat-card__label">公考线索</div>
-                <div className="fm-stat-card__value">{publicExamExplanation.summary}</div>
-              </article>
-            </div>
-          </FmPanel>
+              <div className="mt-6 fm-evidence-list">
+                <div className="fm-evidence-row">
+                  <div className="fm-evidence-row__title">推免</div>
+                  <div className="fm-evidence-row__copy">
+                    当前倾向：{recommendationExplanation.summary} 支撑证据：
+                    {recommendationExplanation.strengths.join(" ") || "学业和综合画像还在积累。"} 缺口：
+                    {recommendationExplanation.gaps.join(" ") || "当前没有明显缺口暴露出来。"}
+                  </div>
+                  <FmBadge tone="academic">
+                    {directionPerception.primary.key === "recommendation" ? "当前更靠近" : "仍在观察"}
+                  </FmBadge>
+                </div>
 
-          <FmPanel>
-            <FmSectionHead
-              title="证据拆分"
-              copy="三类证据都只来自当前存档的真实累计，不会为了页面完整去借不存在的数据。"
-            />
+                <div className="fm-evidence-row">
+                  <div className="fm-evidence-row__title">就业</div>
+                  <div className="fm-evidence-row__copy">
+                    当前倾向：
+                    {directionPerception.primary.key === "employment"
+                      ? "方向已经明显在向就业靠。"
+                      : "就业线还在慢慢形成。"}
+                    支撑证据：{resumeEvidence.practice.join(" ")} 缺口：
+                    {internshipItems.length > 0
+                      ? "实践已经起步，但高质量履历还可以继续补。"
+                      : "实践经历还少，就业竞争力暂时偏薄。"}
+                  </div>
+                  <FmBadge tone="resume">
+                    {directionPerception.primary.key === "employment" ? "当前更靠近" : "需要积累"}
+                  </FmBadge>
+                </div>
 
-            <div className="mt-6 fm-stack">
-              <article className="fm-stat-card">
-                <div className="fm-stat-card__label">学业积累</div>
-                <div className="fm-stat-card__copy">{resumeEvidence.academic.join(" ")}</div>
-              </article>
-              <article className="fm-stat-card">
-                <div className="fm-stat-card__label">履历积累</div>
-                <div className="fm-stat-card__copy">{resumeEvidence.practice.join(" ")}</div>
-              </article>
-              <article className="fm-stat-card">
-                <div className="fm-stat-card__label">机会线索</div>
-                <div className="fm-stat-card__copy">{resumeEvidence.opportunities.join(" ")}</div>
-              </article>
-            </div>
-          </FmPanel>
+                <div className="fm-evidence-row">
+                  <div className="fm-evidence-row__title">考研</div>
+                  <div className="fm-evidence-row__copy">
+                    当前倾向：
+                    {directionPerception.primary.key === "postgraduate"
+                      ? "学习节奏已经在往考研这条路收拢。"
+                      : "考研线还没完全定型。"}
+                    支撑证据：{directionPerception.reasons.join(" ") || directionPerception.summary} 缺口：
+                    {directionPerception.blockers.join(" ") || "还需要更持续的投入，才会更像稳定备考。"}
+                  </div>
+                  <FmBadge tone="ending">
+                    {directionPerception.primary.key === "postgraduate" ? "正在形成" : "暂未坐实"}
+                  </FmBadge>
+                </div>
 
-          <FmPanel>
-            <FmSectionHead
-              title="阶段日志"
-              copy="最近几个月的成长记录会在这里给履历做旁证。"
-            />
-            <div className="mt-6">
-              {playerLogs.length > 0 ? (
-                <div className="fm-timeline">
-                  {playerLogs.map((log, index) => (
-                    <article key={log.id} className="fm-timeline-entry">
-                      <div className={`fm-timeline-node ${index % 2 === 0 ? "tone-teal" : "tone-mint"}`}>
-                        <FmIcon name="book" className="h-4 w-4" />
-                      </div>
-                      <div className="fm-journal-card">
-                        <div className="fm-journal-card__head">
-                          <div>
-                            <div className="fm-journal-card__month">{log.periodLabel}</div>
-                            <h3 className="fm-journal-card__title">{log.title}</h3>
-                          </div>
-                          <span className="fm-chip">{formatMonthLabel(bundle.run.currentYear, bundle.run.currentMonth)}</span>
+                <div className="fm-evidence-row">
+                  <div className="fm-evidence-row__title">考公</div>
+                  <div className="fm-evidence-row__copy">
+                    当前倾向：{publicExamExplanation.summary} 支撑证据：
+                    {publicExamExplanation.signals.join(" ")} 缺口：
+                    {publicExamExplanation.progress >= 25
+                      ? "已经不是空想，但后面仍要看能不能把准备坚持下去。"
+                      : "目前还在起步阶段，更多是方向线索，不是稳定路线。"}
+                  </div>
+                  <FmBadge tone={publicExamExplanation.progress >= 25 ? "event" : "warning"}>
+                    {publicExamExplanation.progress >= 25 ? "已起步" : "较早期"}
+                  </FmBadge>
+                </div>
+              </div>
+            </FmPanel>
+          </FmMotionSection>
+
+          <FmMotionSection delay={140}>
+            <FmPanel>
+              <FmSectionHead
+                title="履历证据拆分"
+                copy="把学业、实践和机会线索拆开看，会更容易明白这份档案为什么长成现在这样。"
+              />
+
+              <div className="mt-6 fm-stack">
+                <article className="fm-stat-card">
+                  <div className="fm-stat-card__label">学业积累</div>
+                  <div className="fm-stat-card__copy">{resumeEvidence.academic.join(" ")}</div>
+                </article>
+                <article className="fm-stat-card">
+                  <div className="fm-stat-card__label">履历积累</div>
+                  <div className="fm-stat-card__copy">{resumeEvidence.practice.join(" ")}</div>
+                </article>
+                <article className="fm-stat-card">
+                  <div className="fm-stat-card__label">机会线索</div>
+                  <div className="fm-stat-card__copy">{resumeEvidence.opportunities.join(" ")}</div>
+                </article>
+              </div>
+            </FmPanel>
+          </FmMotionSection>
+
+          <FmMotionSection delay={200}>
+            <FmPanel>
+              <FmSectionHead
+                title="阶段日志"
+                copy="最近几个月的成长记录会在这里给履历做旁证，帮助你把档案和过程对上。"
+              />
+              <div className="mt-6">
+                {playerLogs.length > 0 ? (
+                  <div className="fm-timeline">
+                    {playerLogs.map((log, index) => (
+                      <article key={log.id} className="fm-timeline-entry">
+                        <div className={`fm-timeline-node ${index % 2 === 0 ? "tone-teal" : "tone-mint"}`}>
+                          <FmIcon name="book" className="h-4 w-4" />
                         </div>
-                        <p className="fm-journal-card__copy">{log.message}</p>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <FmEmptyState
-                  title="当前还没有月度日志"
-                  body="先把真实流程推进到月末，这里才会出现能给履历作证的阶段记录。"
-                />
-              )}
-            </div>
-          </FmPanel>
+                        <div className="fm-journal-card">
+                          <div className="fm-journal-card__head">
+                            <div>
+                              <div className="fm-journal-card__month">{log.periodLabel}</div>
+                              <h3 className="fm-journal-card__title">{log.title}</h3>
+                            </div>
+                            <FmBadge tone="neutral">{log.badge}</FmBadge>
+                          </div>
+                          <p className="fm-journal-card__copy">{log.message}</p>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <FmEmptyState
+                    title="当前还没有月度日志"
+                    body="先把真实流程推进到月末，这里才会出现能给履历作证的阶段记录。"
+                  />
+                )}
+              </div>
+            </FmPanel>
+          </FmMotionSection>
 
-          <FmPanel>
-            <FmSectionHead title="方向线索" copy="这些线索只反映当前存档已有的倾向，不预示最终结果。" />
-            <div className="mt-6">
-              {directionSignals.length > 0 ? (
-                <div className="fm-tag-row">
-                  {directionSignals.map((signal) => (
-                    <span key={signal} className="fm-tag">
-                      {signal}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <FmPartialNotice
-                  title="当前阶段尚未形成明确方向"
-                  body="目前还没有足够的学业与履历证据去支撑更明确的路径判断。"
-                />
-              )}
-            </div>
-          </FmPanel>
+          <FmMotionSection delay={250}>
+            <FmPanel>
+              <FmSectionHead title="方向线索" copy="这些线索只反映当前存档已有的倾向，不预示最终结果。" />
+              <div className="mt-6">
+                {directionSignals.length > 0 ? (
+                  <div className="fm-tag-row">
+                    {directionSignals.map((signal) => (
+                      <span key={signal} className="fm-tag">
+                        {signal}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <FmPartialNotice
+                    title="当前阶段尚未形成明确方向"
+                    body="目前还没有足够的学业与履历证据去支撑更明确的路径判断。"
+                  />
+                )}
+              </div>
+            </FmPanel>
+          </FmMotionSection>
         </div>
       </div>
     </FmShellLayout>

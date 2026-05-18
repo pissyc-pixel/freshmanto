@@ -1,12 +1,14 @@
 ﻿import Link from "next/link";
 import { ComponentPropsWithoutRef, ReactNode } from "react";
 
+import { FmCard } from "@/components/fm-ui/FmCard";
 import { buildRunHref } from "@/lib/demo/active-run";
 import { featureReadiness, isFeatureRoutedForPlayers, type FeatureKey } from "@/lib/feature-readiness";
 
 type IconName =
   | "alert"
   | "book"
+  | "briefcase"
   | "calendar"
   | "chart"
   | "check"
@@ -17,8 +19,9 @@ type IconName =
   | "minus"
   | "moon"
   | "spark"
-  | "trending-down"
-  | "trending-up"
+  | "trend-down"
+  | "trend-up"
+  | "trophy"
   | "users";
 
 type SidebarPageKey = "game" | "journal" | "resume" | "ending";
@@ -139,6 +142,14 @@ export function FmIcon({
           <path d="M8 16v-4M12 16V8M16 16v-7" />
         </svg>
       );
+    case "briefcase":
+      return (
+        <svg className={className} {...common}>
+          <rect x="3" y="7" width="18" height="13" rx="3" />
+          <path d="M9 7V5.8A1.8 1.8 0 0 1 10.8 4h2.4A1.8 1.8 0 0 1 15 5.8V7" />
+          <path d="M3 12h18" />
+        </svg>
+      );
     case "compass":
       return (
         <svg className={className} {...common}>
@@ -166,6 +177,33 @@ export function FmIcon({
           <path d="M20 13.2A8 8 0 1 1 10.8 4 6.2 6.2 0 0 0 20 13.2Z" />
         </svg>
       );
+    case "trend-up":
+      return (
+        <svg className={className} {...common}>
+          <path d="M4 16 10 10l4 4 6-7" />
+          <path d="M16 7h4v4" />
+        </svg>
+      );
+    case "trend-down":
+      return (
+        <svg className={className} {...common}>
+          <path d="m4 8 6 6 4-4 6 7" />
+          <path d="M16 17h4v-4" />
+        </svg>
+      );
+    case "minus":
+      return (
+        <svg className={className} {...common}>
+          <path d="M5 12h14" />
+        </svg>
+      );
+    case "trophy":
+      return (
+        <svg className={className} {...common}>
+          <path d="M8 4h8v3a4 4 0 0 1-8 0Z" />
+          <path d="M9 17h6M10 20h4M7 7H5a2 2 0 0 0 2 3M17 7h2a2 2 0 0 1-2 3" />
+        </svg>
+      );
     case "check":
       return (
         <svg className={className} {...common}>
@@ -177,26 +215,6 @@ export function FmIcon({
       return (
         <svg className={className} {...common}>
           <path d="m10 7 5 5-5 5" />
-        </svg>
-      );
-    case "trending-up":
-      return (
-        <svg className={className} {...common}>
-          <path d="m3 17 6-6 4 4 8-8" />
-          <path d="M17 7h4v4" />
-        </svg>
-      );
-    case "trending-down":
-      return (
-        <svg className={className} {...common}>
-          <path d="m3 7 6 6 4-4 8 8" />
-          <path d="M17 17h4v-4" />
-        </svg>
-      );
-    case "minus":
-      return (
-        <svg className={className} {...common}>
-          <path d="M5 12h14" />
         </svg>
       );
     default:
@@ -236,7 +254,11 @@ export function FmPanel({
   className?: string;
   padded?: boolean;
 }) {
-  return <section className={`fm-panel ${padded ? "fm-panel--pad" : ""} ${className}`.trim()}>{children}</section>;
+  return (
+    <FmCard variant="normal" padded={padded} className={`fm-panel ${className}`.trim()}>
+      {children}
+    </FmCard>
+  );
 }
 
 export function FmInlineStat({
@@ -273,26 +295,27 @@ export function FmMetricStrip({
     icon: IconName;
     progress: number;
     warning?: string;
+    state?: "normal" | "warning" | "danger";
   }>;
 }) {
   return (
-    <section className="fm-panel fm-metric-strip">
+    <section className="fm-card fm-card--normal fm-card--pad fm-metric-strip">
       {items.map((item) => (
-        <div key={item.label}>
+        <article key={item.label} className={`fm-status-card fm-status-card--${item.state ?? "normal"}`}>
           <div className={`fm-inline-stat__icon tone-${item.tone}`}>
             <FmIcon name={item.icon} />
           </div>
-          <div className="fm-stat-card__label">{item.label}</div>
-          <div className="fm-stat-card__value">{item.value}</div>
+          <div className="fm-status-card__label">{item.label}</div>
+          <div className="fm-status-card__value">{item.value}</div>
           <div className="fm-meter">
             <span className={`tone-${item.tone}`} style={{ width: `${Math.max(0, Math.min(item.progress, 1)) * 100}%` }} />
           </div>
           {item.warning ? (
-            <div style={{ fontSize: "0.7rem", color: item.tone === "red" || item.tone === "rose" ? "#ea4032" : item.tone === "amber" ? "#c58a16" : "#627074", marginTop: "2px" }}>
+            <div className="fm-status-card__warning">
               {item.warning}
             </div>
           ) : null}
-        </div>
+        </article>
       ))}
     </section>
   );
