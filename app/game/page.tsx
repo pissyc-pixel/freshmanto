@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { startNewRunAction } from "@/app/actions";
 import {
   buildPlannerDaysView,
   buildPlannerFeedbackLines,
@@ -98,31 +97,6 @@ function formatDirectionStage(stage: "undecided" | "forming" | "clear") {
   }
 }
 
-function buildPlannerFormKey(
-  runId: string,
-  currentWeek: number,
-  currentWeekState: ReturnType<typeof resolveCurrentWeekState>,
-) {
-  const daySignature = (currentWeekState.days ?? [])
-    .map((day) =>
-      [
-        day.weekday,
-        day.planningStatus,
-        day.plannedAction?.action ?? "none",
-        day.skipClassSelected ? "skip" : "keep",
-      ].join(":"),
-    )
-    .join("|");
-
-  return [
-    runId,
-    currentWeek,
-    currentWeekState.attendanceLocked ? "locked" : "open",
-    currentWeekState.attendanceStrategy,
-    daySignature,
-  ].join("::");
-}
-
 function toneForDay(kind: TimeBlockKind) {
   switch (kind) {
     case "free":
@@ -196,7 +170,6 @@ export default async function GamePage({ searchParams }: GamePageProps) {
   const plannerDays = buildPlannerDaysView(currentWeekState, hydratedRun);
   const plannerStatusText = buildPlannerStatusText(currentWeekState);
   const plannerLines = buildPlannerFeedbackLines(currentWeekState);
-  const plannerFormKey = buildPlannerFormKey(bundle.run.id, currentWeek, currentWeekState);
   const weeklySettlement = buildWeeklySettlementView(activeMonth?.latestWeekSettlement);
   const latestMonthlyState = bundle.monthlyStates.at(-1);
   const latestGrowthLog = latestMonthlyState
@@ -249,12 +222,11 @@ export default async function GamePage({ searchParams }: GamePageProps) {
                 copy={
                   vacationMonth
                     ? "假期周不再按普通课表锁白天，但依然按周逐天安排，再统一确认这一周。"
-                    : "课程态度、逐天排程和确认本周都还是原来的状态管理与 payload，只把入口做得更稳、更易懂。"
+                    : "先确定这周课程态度，再逐天安排行动。没点到的日期会在确认本周时自动补成默认安排。"
                 }
               />
               <div className="mt-6">
                 <ActionPlanForm
-                  key={plannerFormKey}
                   runId={bundle.run.id}
                   currentWeek={Math.min(currentWeek, 4)}
                   currentMood={hydratedRun.stats.mood}
@@ -343,7 +315,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
             <FmPanel>
               <FmSectionHead
                 title="后半程方向"
-                copy="这里只翻译趋势，不提前剧透结局，也不替规则层做结果判定。"
+                copy="这里只帮你看清当前的倾向变化，不会提前把这一局的最终去向说死。"
                 aside={<span className="fm-chip fm-chip--brand">{formatDirectionStage(directionPerception.stage)}</span>}
               />
               <div className="mt-6 fm-stack">
@@ -378,7 +350,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
             ) : null}
 
             <FmPanel>
-              <FmSectionHead title="后台日志" copy="这里保留动作、事件和结算留档，便于排查这局存档的推进过程。" />
+              <FmSectionHead title="最近动态" copy="这里会保留最近的行动、事件和结算记录，方便你回看这局刚刚发生了什么。" />
               <div className="mt-6">
                 <LogFeed items={latestSystemLogs} emptyMessage="目前还没有系统日志留档。" />
               </div>
@@ -391,11 +363,9 @@ export default async function GamePage({ searchParams }: GamePageProps) {
               <Link href={buildRunHref("/resume", bundle.run.id)} className="fm-button-secondary">
                 履历与成长日志
               </Link>
-              <form action={startNewRunAction}>
-                <button type="submit" className="fm-button-secondary">
-                  重新开局
-                </button>
-              </form>
+              <Link href="/new-game" className="fm-button-secondary">
+                重新开局
+              </Link>
             </div>
           </div>
         </div>

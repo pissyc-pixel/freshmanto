@@ -2,8 +2,8 @@ import Link from "next/link";
 
 import { ActiveRunSync } from "@/components/active-run-sync";
 import { FmEmptyState } from "@/components/fm-ui/FmEmptyState";
-import { FmPartialNotice } from "@/components/fm-ui/FmPartialNotice";
 import { FmAppRoot, FmBrandMark, FmIcon } from "@/components/fm-ui/FmScaffold";
+import { ProfileSummary } from "@/components/profile-summary";
 import { buildAdmissionViewModel } from "@/lib/admission-view-model";
 import { resolveActiveRunId } from "@/lib/demo/active-run";
 import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
@@ -32,10 +32,9 @@ export default async function AdmissionPage({ searchParams }: AdmissionPageProps
             <aside className="fm-side-sheet">
               <FmBrandMark />
               <div className="mt-6">
-                <FmPartialNotice
-                  title="开局确认页"
-                  body="这一步只展示当前存档已有的真实字段。没有存档的时候，不会伪造录取信息。"
-                />
+                <p className="fm-muted-note">
+                  这里会展示这一局已经生成好的入学档案。没有存档时，不会凭空补出一份录取通知。
+                </p>
               </div>
             </aside>
 
@@ -65,14 +64,9 @@ export default async function AdmissionPage({ searchParams }: AdmissionPageProps
         <div className="fm-page-grid">
           <aside className="fm-side-sheet">
             <FmBrandMark />
-            <p className="mt-4 fm-muted-note">这一页只承接开局仪式，不改任何规则结果，也不额外生成角色事实。</p>
-
-            <div className="mt-6">
-              <FmPartialNotice
-                title="当前为阶段接入"
-                body="真实流程里目前只有学校层级、城市层级和学科方向等基础画像；姓名、院系、专业、校区等字段暂未记录。"
-              />
-            </div>
+            <p className="mt-4 fm-muted-note">
+              你的大学生活档案已建立。确认入学后，会从第一周开始安排课程态度和每日行动。
+            </p>
 
             <div className="mt-6 fm-stack">
               <div className="fm-stat-card">
@@ -109,41 +103,13 @@ export default async function AdmissionPage({ searchParams }: AdmissionPageProps
               </p>
               <p>{viewModel.statement}</p>
               <p>
-                你已被纳入本局大学生活模拟流程，后续每周行动、月末结算、成长日志、月记与履历都将只基于这局真实推进结果呈现。
-              </p>
-              <p>
-                尚未被规则层确认的字段将暂以保守文案保留，不会以 UI 需要为理由补写成完整学校、专业或校区。
+                接下来，你将从第一周开始安排课程态度、每日行动，并在周末查看本周结果。以下信息会影响你的大学资源、
+                生活成本、机会密度与行动选择。
               </p>
             </div>
 
-            <div className="fm-admission-footer">
-              <div className="fm-info-box">
-                <table>
-                  <tbody>
-                    <tr>
-                      <td>录取单位</td>
-                      <td>{viewModel.schoolName}</td>
-                    </tr>
-                    <tr>
-                      <td>院系</td>
-                      <td>{viewModel.departmentName}</td>
-                    </tr>
-                    <tr>
-                      <td>专业</td>
-                      <td>{viewModel.majorName}</td>
-                    </tr>
-                    <tr>
-                      <td>校区</td>
-                      <td>{viewModel.campusName}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="fm-signature">
-                <p>Freshmanto 模拟教务中心</p>
-                <p className="mt-16">大学生活流程已确认</p>
-              </div>
+            <div className="mt-8">
+              <ProfileSummary profile={run.profile} />
             </div>
 
             <div className="fm-doc-actions">
@@ -155,13 +121,13 @@ export default async function AdmissionPage({ searchParams }: AdmissionPageProps
                 <FmIcon name="check" />
                 <span>确认入学</span>
               </Link>
-              <button type="button" className="fm-doc-button fm-doc-button--disabled" disabled aria-disabled="true">
+              <button type="button" className="fm-doc-button" data-testid="admission-share">
                 <FmIcon name="file" />
-                <span>分享功能后续开放</span>
+                <span>分享</span>
               </button>
               <div className="fm-official">
                 <FmIcon name="file" className="h-4 w-4" />
-                <span>正式存档页</span>
+                <span>新生档案</span>
               </div>
             </div>
           </section>

@@ -7,7 +7,8 @@ describe("real pages use freshmanto ui shells safely", () => {
     const markup = renderToStaticMarkup(await pageModule.default());
 
     expect(markup).toContain("Freshmanto");
-    expect(markup).toContain("开始新档");
+    expect(markup).toContain("/new-game");
+    expect(markup).toContain("新生建档");
     expect(markup).toContain("大学生活模拟器");
   });
 

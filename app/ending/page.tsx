@@ -118,7 +118,7 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
       >
         <SectionCard title="暂无结局" description="先创建存档并继续推进月份。">
           <p className="text-sm leading-6 text-stone-600">
-            在四年完整结束前，这里只会显示当前规则层已经能看出来的结局预估。
+            在四年完整结束前，这里只会显示当前已经能看出来的结局预估。
           </p>
         </SectionCard>
       </AppShell>
@@ -156,7 +156,7 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
       title={completed ? "正式结局回望" : "当前结局预览"}
       description={
         completed
-          ? "四年已经走完，这里只回顾规则层已经真实落地的毕业结果、去向与关键轨迹。"
+          ? "四年已经走完，这里只回顾已经真实落地的毕业结果、去向与关键轨迹。"
           : "这里先展示目前已经能确定的结局线索；等毕业结算真正落地后，AI 才会把这些事实整理成完整回望。"
       }
     >

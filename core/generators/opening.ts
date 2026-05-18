@@ -141,16 +141,18 @@ function createInitialStats(profile: StarterProfile): DynamicStats {
 
 export function createStarterProfile(options: InitialGameRunOptions = {}): StarterProfile {
   const random = createRandomSource(options.randomValues);
+  const trimmedName = options.name?.trim();
 
   const talents = pickTalents(random);
   const familyBackground = pickFromTable(FAMILY_BACKGROUNDS, random());
   const luck = Math.round(20 + random() * 75);
-  const collegeTrack = pickFromTable(COLLEGE_TRACKS, random());
+  const collegeTrack = options.discipline ?? pickFromTable(COLLEGE_TRACKS, random());
   const schoolTier = rollSchoolTier(random());
   const cityTier = rollCityTier(schoolTier, random());
   const monthlyAllowance = calculateAllowance(familyBackground, luck, random());
 
   return {
+    name: trimmedName && trimmedName.length > 0 ? trimmedName : undefined,
     talents,
     familyBackground,
     monthlyAllowance,

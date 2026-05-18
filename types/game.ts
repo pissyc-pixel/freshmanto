@@ -107,6 +107,7 @@ export type EventTriggerCondition =
   | "academic_streak_high";
 
 export type StarterProfile = {
+  name?: string;
   talents: Talent[];
   familyBackground: FamilyBackground;
   monthlyAllowance: number;
@@ -513,6 +514,8 @@ export type GameRun = {
 export type InitialGameRunOptions = {
   id?: string;
   randomValues?: number[];
+  name?: string;
+  discipline?: CollegeTrack;
 };
 
 export type ResolvedMonthResult = {

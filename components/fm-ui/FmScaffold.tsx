@@ -275,7 +275,7 @@ export function FmShellLayout({
   title,
   subtitle,
   sidebarTitle = "大学生活模拟器",
-  sidebarSubtitle = "真实流程只展示规则层已经产出的内容",
+  sidebarSubtitle = "这里整理的是当前存档已经形成的内容。",
   sidebarSummary,
   headerMeta,
   children,
@@ -288,7 +288,7 @@ export function FmShellLayout({
   sidebarSubtitle?: string;
   sidebarSummary?: string;
   headerMeta?: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
 }) {
   return (
     <FmAppRoot>
@@ -302,7 +302,7 @@ export function FmShellLayout({
           <section className="fm-profile-card">
             <div className="fm-profile-card__title">{sidebarTitle}</div>
             <p className="fm-profile-card__sub">
-              {sidebarSummary ?? "未形成的系统不会伪装成已经完成，只保留真实可用入口。"}
+              {sidebarSummary ?? "从新生建档、周安排到月末汇总，都会按这局存档的实际推进逐步展开。"}
             </p>
           </section>
 
@@ -327,7 +327,7 @@ export function FmShellLayout({
                 >
                   <FmIcon name={link.icon} />
                   <span>{link.label}</span>
-                  {readiness.status === "partial" ? <span className="fm-nav-link__meta">阶段中</span> : null}
+                  {readiness.status === "partial" ? <span className="fm-nav-link__meta">进行中</span> : null}
                 </Link>
               );
             })}

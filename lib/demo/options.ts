@@ -76,7 +76,7 @@ const trackLabels: Record<CollegeTrack, string> = {
   science: "理科",
   engineering: "工科",
   business: "商科",
-  medicine: "医学",
+  medicine: "医科",
 };
 
 const schoolTierLabels: Record<SchoolTier, string> = {
@@ -118,7 +118,7 @@ const timeBlockLabels: Record<TimeBlockKind, string> = {
 const weeklyDayTypeLabels: Record<WeeklyDayType, string> = {
   night_only: "白天满课，默认只有夜里可以安排",
   half_day: "这天只有半天空档",
-  full_day: "这天基本能自己支配",
+  full_day: "这天时间较完整，可以安排更重的行动",
 };
 
 const statLabels: Record<keyof DynamicStats, string> = {

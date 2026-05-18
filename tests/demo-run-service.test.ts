@@ -787,6 +787,94 @@ describe("demo run service", () => {
     expect(store.aiReports[0]?.report_type).toBe("monthly_journal");
   });
 
+  it("merges a client weekday snapshot before confirming the week so explicit choices beat idle autofill", async () => {
+    const store = createStore();
+    const run = createInitialGameRun({
+      id: "run-confirm-snapshot",
+      randomValues: [0.29, 0.41, 0.52, 0.63, 0.17, 0.38, 0.49, 0.58],
+    });
+    store.run = {
+      id: run.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      status: "active",
+      current_year: run.currentYear,
+      current_month: run.currentMonth,
+      profile_json: run.profile,
+      current_state_json: run,
+    };
+
+    const repository = createRepository(store);
+
+    await setDemoWeekAttendance({
+      repository,
+      runId: run.id,
+      attendanceStrategy: "mixed",
+    });
+
+    const result = await confirmDemoWeek({
+      repository,
+      runId: run.id,
+      generateReport: fakeAiReport,
+      plannedActionsSnapshot: [
+        { weekday: "mon", optionId: "study" },
+        { weekday: "tue", optionId: "social" },
+      ],
+    });
+    const settlement = result.run.activeMonth?.latestWeekSettlement;
+
+    expect(settlement?.dailyResults.find((day) => day.weekday === "mon")?.resolvedAction.action).toBe("study");
+    expect(settlement?.dailyResults.find((day) => day.weekday === "tue")?.resolvedAction.action).toBe("social");
+    expect(settlement?.dailyResults.filter((day) => day.resolvedAction.action === "idle")).toHaveLength(5);
+  });
+
+  it("applies snapshot updates only to the weekdays the client actually selected", async () => {
+    const store = createStore();
+    const run = createInitialGameRun({
+      id: "run-confirm-snapshot-partial",
+      randomValues: [0.21, 0.32, 0.43, 0.54, 0.16, 0.27, 0.38, 0.49],
+    });
+    store.run = {
+      id: run.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      status: "active",
+      current_year: run.currentYear,
+      current_month: run.currentMonth,
+      profile_json: run.profile,
+      current_state_json: run,
+    };
+
+    const repository = createRepository(store);
+
+    await setDemoWeekAttendance({
+      repository,
+      runId: run.id,
+      attendanceStrategy: "mixed",
+    });
+
+    await planDemoWeekday({
+      repository,
+      runId: run.id,
+      weekday: "wed",
+      optionId: "relax",
+    });
+
+    const result = await confirmDemoWeek({
+      repository,
+      runId: run.id,
+      generateReport: fakeAiReport,
+      plannedActionsSnapshot: [{ weekday: "mon", optionId: "study" }],
+    });
+    const settlement = result.run.activeMonth?.latestWeekSettlement;
+
+    expect(settlement?.dailyResults.find((day) => day.weekday === "mon")?.resolvedAction.action).toBe("study");
+    expect(settlement?.dailyResults.find((day) => day.weekday === "wed")?.resolvedAction.action).toBe("relax");
+    expect(
+      settlement?.dailyResults.filter((day) => day.resolvedAction.action === "idle").map((day) => day.weekday),
+    ).toEqual(["tue", "thu", "fri", "sat", "sun"]);
+  });
+
   it("finalizes the month after the fourth week is actually completed and then writes the monthly artifacts", async () => {
     const store = createStore();
     const run = createInitialGameRun({

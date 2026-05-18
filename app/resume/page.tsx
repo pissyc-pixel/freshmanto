@@ -100,7 +100,7 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
         <FmPanel>
           <FmSectionHead
             title="个人履历"
-            copy="只有规则层已经产出的履历证据才会出现，学校、排名和项目都不会被前端伪造。"
+            copy="这里只会展示已经形成的履历证据，学校、排名和项目都不会被前端伪造。"
           />
           <div className="mt-6">
             <FmEmptyState
@@ -277,7 +277,7 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
               ) : (
                 <FmEmptyState
                   title="还没有足够的履历证据"
-                  body="比赛、项目、实习、奖学金和校内经历都必须先被规则层记录下来，这里才会出现。"
+                  body="比赛、项目、实习、奖学金和校内经历都要先在这局存档里真实发生，这里才会出现。"
                 />
               )}
             </div>
@@ -312,7 +312,7 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
           <FmPanel>
             <FmSectionHead
               title="证据拆分"
-              copy="三类证据都只来自当前存档的真实累计，不从 PRD 或设计稿里借数据。"
+              copy="三类证据都只来自当前存档的真实累计，不会为了页面完整去借不存在的数据。"
             />
 
             <div className="mt-6 fm-stack">

@@ -21,7 +21,7 @@ export function ReportPreview({
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-300">{contractLabel}</p>
         <h3 className="mt-2 text-lg font-semibold">{title}</h3>
         <p className="mt-3 text-sm leading-6 text-stone-300">
-          AI 只能读取规则层已经算出的结构化事实来组织语言，不会新增关键事件，也不会参与任何规则判定。
+          AI 只会根据已经落地的事实来组织语言，不会新增关键事件，也不会改写这局的真实结果。
         </p>
         {showPromptInput && promptInput !== undefined ? (
           <pre className="mt-4 overflow-x-auto rounded-2xl bg-stone-900/80 p-4 text-xs leading-6 text-stone-200">

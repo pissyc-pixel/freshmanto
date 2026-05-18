@@ -41,7 +41,7 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
         active="journal"
         runId={runId}
         title="成长日志"
-        subtitle="这里会收集每个月的 AI 月记，也会把规则层已经确认过的成长痕迹按时间整理出来。"
+        subtitle="这里会收集每个月的 AI 月记，也会把已经发生过的成长痕迹按时间整理出来。"
         headerMeta={
           <>
             <FmInlineStat tone="teal" icon="book" label="月记归档" value="0 篇" />
@@ -66,7 +66,7 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
           <FmPanel>
             <FmSectionHead
               title="成长日志"
-              copy="当规则层开始留下月度事实之后，这里会按时间线把它们串起来。"
+              copy="当这局存档逐渐留下月度经历之后，这里会按时间线把它们串起来。"
             />
             <div className="mt-6">
               <FmEmptyState
@@ -109,7 +109,7 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
       active="journal"
       runId={runId}
       title="成长日志"
-      subtitle="这里会收集每个月的 AI 月记，也会把规则层已经确认过的成长痕迹按时间整理出来。"
+      subtitle="这里会收集每个月的 AI 月记，也会把已经发生过的成长痕迹按时间整理出来。"
       sidebarSummary="已开放页面只展示真实月度状态、AI 月记归档与履历证据，不补写不存在的经历。"
       headerMeta={
         <>
@@ -212,7 +212,7 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
         <FmPanel>
           <FmSectionHead
             title="成长时间线"
-            copy="这部分偏事实层，展示规则层已经结算出来的月度变化，不拿 AI 去补事件。"
+            copy="这里会按时间线整理已经落地的月度变化，不会为了好看去补写不存在的经历。"
           />
 
           <div className="mt-6">
@@ -246,7 +246,7 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
             ) : (
               <FmEmptyState
                 title="还没有足够的成长证据"
-                body="规则层还没有产生足够的月度事实，所以这里不会编造时间线。"
+                body="这局存档暂时还没有积累出足够的月度经历，所以这里不会编造时间线。"
               />
             )}
           </div>

@@ -43,14 +43,23 @@ function createRun(overrides: Partial<GameRun> = {}): GameRun {
 }
 
 describe("buildAdmissionViewModel", () => {
-  it("uses safe fallbacks for fields the real run does not have", () => {
+  it("uses the stored player name when it exists", () => {
+    const viewModel = buildAdmissionViewModel(
+      createRun({
+        profile: {
+          ...createRun().profile,
+          name: "林舒恒",
+        },
+      }),
+    );
+
+    expect(viewModel.studentName).toBe("林舒恒");
+  });
+
+  it("uses a player-facing fallback name for older saves", () => {
     const viewModel = buildAdmissionViewModel(createRun());
 
-    expect(viewModel.studentName).toBe("待生成");
-    expect(viewModel.schoolName).toBe("暂未确认");
-    expect(viewModel.departmentName).toBe("未记录");
-    expect(viewModel.majorName).toBe("未记录");
-    expect(viewModel.campusName).toBe("暂未确认");
+    expect(viewModel.studentName).toBe("新生");
   });
 
   it("preserves real profile-derived facts without pretending they are exact institutions", () => {
@@ -59,7 +68,15 @@ describe("buildAdmissionViewModel", () => {
     expect(viewModel.schoolTierLabel).toContain("985");
     expect(viewModel.cityTierLabel).toBeTruthy();
     expect(viewModel.trackLabel).toBeTruthy();
-    expect(viewModel.schoolName).not.toContain("大学");
-    expect(viewModel.majorName).not.toContain("计算机");
+  });
+
+  it("does not leak internal stage copy into the player-facing statement", () => {
+    const viewModel = buildAdmissionViewModel(createRun());
+
+    expect(viewModel.statement).toContain("你的大学生活档案已建立");
+    expect(viewModel.statement).not.toContain("规则层");
+    expect(viewModel.statement).not.toContain("暂未记录");
+    expect(viewModel.statement).not.toContain("暂未确认");
+    expect(viewModel.statement).not.toContain("待生成");
   });
 });

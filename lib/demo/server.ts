@@ -6,17 +6,25 @@ import {
   advanceDemoTurn,
   confirmDemoWeek,
   createDemoRun,
+  type PlannedActionSnapshotEntry,
   planDemoWeekday,
   setDemoWeekAttendance,
 } from "@/lib/demo/run-service";
 import { evaluateGraduationOutcome } from "@/core/game-engine";
-import type { ActionTurnPlan, MonthlyActionPlan, Weekday } from "@/types/game";
+import type { ActionTurnPlan, CollegeTrack, MonthlyActionPlan, Weekday } from "@/types/game";
 
-export async function createServerDemoRun() {
+export async function createServerDemoRun(input?: {
+  name?: string;
+  discipline?: CollegeTrack;
+}) {
   await ensureDemoSchema();
   const repository = createServerSupabaseRepository();
 
-  return createDemoRun({ repository });
+  return createDemoRun({
+    repository,
+    name: input?.name,
+    discipline: input?.discipline,
+  });
 }
 
 export async function advanceServerDemoMonth(runId: string, plan: MonthlyActionPlan) {
@@ -72,7 +80,7 @@ export async function planServerWeekdayAction(
   });
 }
 
-export async function confirmServerWeek(runId: string) {
+export async function confirmServerWeek(runId: string, plannedActionsSnapshot?: PlannedActionSnapshotEntry[]) {
   await ensureDemoSchema();
   const repository = createServerSupabaseRepository();
 
@@ -80,6 +88,7 @@ export async function confirmServerWeek(runId: string) {
     repository,
     runId,
     generateReport: generateAiReport,
+    plannedActionsSnapshot,
   });
 }
 

@@ -16,6 +16,7 @@ import type { AiReportRequest, AiReportResult } from "@/types/ai";
 import type {
   ActionTurnPlan,
   ActionTurnSummary,
+  CollegeTrack,
   GameRun,
   MonthlyActionPlan,
   ResumeItem,
@@ -129,6 +130,12 @@ export type UpdateDemoWeekPlanResult = {
   playedYear: number;
   playedMonth: number;
   playedWeek: number;
+};
+
+export type PlannedActionSnapshotEntry = {
+  weekday: Weekday;
+  optionId: string;
+  skipClass?: boolean;
 };
 
 type ReportGenerator = (input: AiReportRequest) => Promise<AiReportResult>;
@@ -449,14 +456,43 @@ async function persistMonthArtifacts(input: {
   };
 }
 
+function applyPlannedActionsSnapshot(run: GameRun, plannedActionsSnapshot?: PlannedActionSnapshotEntry[]) {
+  if (!plannedActionsSnapshot || plannedActionsSnapshot.length === 0) {
+    return run;
+  }
+
+  const latestByWeekday = new Map<Weekday, PlannedActionSnapshotEntry>();
+
+  for (const entry of plannedActionsSnapshot) {
+    latestByWeekday.set(entry.weekday, entry);
+  }
+
+  let nextRun = run;
+
+  for (const snapshot of latestByWeekday.values()) {
+    nextRun = planWeeklyDayAction({
+      run: nextRun,
+      weekday: snapshot.weekday,
+      optionId: snapshot.optionId,
+      skipClass: snapshot.skipClass,
+    });
+  }
+
+  return nextRun;
+}
+
 export async function createDemoRun(input: {
   repository: DemoRepository;
   runId?: string;
   randomValues?: number[];
+  name?: string;
+  discipline?: CollegeTrack;
 }) {
   const run = createInitialGameRun({
     id: input.runId ?? randomUUID(),
     randomValues: input.randomValues,
+    name: input.name,
+    discipline: input.discipline,
   });
 
   await input.repository.createRun({
@@ -574,6 +610,7 @@ export async function confirmDemoWeek(input: {
   repository: DemoRepository;
   runId: string;
   generateReport: ReportGenerator;
+  plannedActionsSnapshot?: PlannedActionSnapshotEntry[];
 }): Promise<EndDemoWeekResult> {
   const existing = await input.repository.getRun(input.runId);
 
@@ -581,7 +618,7 @@ export async function confirmDemoWeek(input: {
     throw new Error(`Run ${input.runId} was not found.`);
   }
 
-  const baseRun = existing.current_state_json;
+  const baseRun = applyPlannedActionsSnapshot(existing.current_state_json, input.plannedActionsSnapshot);
   const playedYear = baseRun.currentYear;
   const playedMonth = baseRun.currentMonth;
   const playedWeek = baseRun.activeMonth?.currentWeek ?? 1;

@@ -28,10 +28,14 @@ function ensureScreenshotDir() {
 
 async function saveShot(page: Page, filename: string) {
   ensureScreenshotDir();
-  await page.screenshot({
-    path: path.join(SCREENSHOT_DIR, filename),
-    fullPage: true,
-  });
+  try {
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, filename),
+      fullPage: true,
+    });
+  } catch {
+    // Screenshots are helpful for regression review, but a file-lock hiccup should not fail the gameplay smoke test itself.
+  }
 }
 
 async function openDayModal(page: Page, weekday: "mon" | "tue" | "wed") {
@@ -78,16 +82,23 @@ test("image2 weekly planner smoke flow", async ({ page }) => {
   await expect(page.getByText("Freshmanto")).toBeVisible();
   await saveShot(page, "01-home.png");
 
-  await page.getByTestId("start-new-run-submit").click();
+  await page.getByTestId("start-new-run-link").click();
+  await page.waitForURL(/\/new-game/);
+  await expect(page.getByTestId("new-game-page")).toBeVisible();
+  await page.getByTestId("new-game-name").fill("林舒恒");
+  await page.getByTestId("discipline-option-arts").click();
+  await page.getByTestId("new-game-submit").click();
   await page.waitForURL(/\/admission\?runId=/);
 
   const runId = page.url().match(/runId=([^&]+)/)?.[1];
   expect(runId).toBeTruthy();
 
   await expect(page.getByTestId("admission-page")).toBeVisible();
-  await expect(page.getByText("正式存档页")).toBeVisible();
-  await expect(page.getByText("FIRST-YEAR STUDENT")).toHaveCount(0);
-  await expect(page.getByText("Daily Planner")).toHaveCount(0);
+  await expect(page.getByText("林舒恒")).toBeVisible();
+  await expect(page.locator("text=文科").first()).toBeVisible();
+  await expect(page.getByTestId("admission-share")).toBeVisible();
+  await expect(page.getByText("阶段接入")).toHaveCount(0);
+  await expect(page.getByText("规则层")).toHaveCount(0);
   await saveShot(page, "02-admission.png");
 
   await page.getByTestId("admission-confirm").click();
@@ -133,11 +144,24 @@ test("image2 weekly planner smoke flow", async ({ page }) => {
   await expect(page.getByTestId("action-modal")).toBeHidden();
   await expect(page.getByTestId("planner-day-action-mon")).toHaveText(mondayActionCopy);
 
-  const chosenLabels = [
-    await planDay(page, "mon"),
-    await planDay(page, "tue"),
-    await planDay(page, "wed"),
-  ];
+  const mondayLabel = await planDay(page, "mon");
+  const tuesdayModal = await openDayModal(page, "tue");
+  await page.waitForLoadState("networkidle");
+  await expect(tuesdayModal).toBeVisible();
+  let chosenTuesdayCard = "";
+  for (const optionId of preferredOptionIds) {
+    const option = tuesdayModal.getByTestId(`action-option-${optionId}`);
+    if ((await option.count()) > 0) {
+      chosenTuesdayCard = (await option.getByTestId("action-option-label").textContent())?.trim() ?? optionId;
+      await option.getByTestId("action-option-submit").click();
+      break;
+    }
+  }
+  expect(chosenTuesdayCard).toBeTruthy();
+  await page.waitForLoadState("networkidle");
+  await expect(page.getByTestId("planner-day-action-mon")).toContainText(mondayLabel);
+  await expect(page.getByTestId("planner-day-action-tue")).toContainText(chosenTuesdayCard);
+  const chosenLabels = [mondayLabel, chosenTuesdayCard, await planDay(page, "wed")];
 
   await expect(page).toHaveURL(new RegExp(`/game\\?runId=${runId}`));
   await expect(page.getByTestId("weekly-settlement-card")).toHaveCount(0);

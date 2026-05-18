@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { buildPlannerDaysView } from "@/app/game/view-model";
 import { ensureDemoSchema } from "@/db/ensure-schema";
 import { generateAiReport } from "@/lib/ai/reports";
 import { ACTIVE_RUN_COOKIE } from "@/lib/demo/active-run";
@@ -15,7 +16,7 @@ import {
 } from "@/lib/demo/server";
 import { endDemoWeek } from "@/lib/demo/run-service";
 import { createServerSupabaseRepository } from "@/lib/supabase";
-import type { ActionTime, ActionType, CourseAttendanceStrategy } from "@/types/game";
+import type { ActionTime, ActionType, CollegeTrack, CourseAttendanceStrategy } from "@/types/game";
 
 const attendanceSchema = z.enum([
   "serious",
@@ -42,6 +43,16 @@ const actionSchema = z.enum([
 
 const timeSchema = z.enum(["day", "night"]);
 const weekdaySchema = z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
+const newRunSchema = z.object({
+  name: z.string().trim().min(2).max(12),
+  discipline: z.enum(["arts", "science", "engineering", "business", "medicine"]),
+});
+const plannedActionSnapshotEntrySchema = z.object({
+  weekday: weekdaySchema,
+  optionId: z.string().min(1),
+  skipClass: z.boolean().optional(),
+});
+const plannedActionSnapshotSchema = z.array(plannedActionSnapshotEntrySchema);
 
 function readString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -72,10 +83,78 @@ function parseActionTurn(formData: FormData) {
   };
 }
 
-export async function startNewRunAction() {
-  const result = await createServerDemoRun();
+function parsePlannedActionsSnapshot(formData: FormData) {
+  const raw = readString(formData, "plannedActionsSnapshot");
+
+  if (!raw) {
+    return [];
+  }
+
+  try {
+    const parsed = plannedActionSnapshotSchema.safeParse(JSON.parse(raw));
+
+    if (!parsed.success) {
+      return [];
+    }
+
+    const latestByWeekday = new Map<string, z.infer<typeof plannedActionSnapshotEntrySchema>>();
+
+    for (const entry of parsed.data) {
+      latestByWeekday.set(entry.weekday, entry);
+    }
+
+    return [...latestByWeekday.values()];
+  } catch {
+    return [];
+  }
+}
+
+export async function startNewRunAction(formData?: FormData) {
+  if (!formData) {
+    redirect("/new-game");
+  }
+
+  const parsed = newRunSchema.safeParse({
+    name: readString(formData, "name"),
+    discipline: readString(formData, "discipline"),
+  });
+
+  if (!parsed.success) {
+    redirect("/new-game");
+  }
+
+  const result = await createServerDemoRun({
+    name: parsed.data.name,
+    discipline: parsed.data.discipline as CollegeTrack,
+  });
   await persistActiveRun(result.run.id);
   redirect(`/admission?runId=${result.run.id}`);
+}
+
+export async function planWeekdayActionAction(input: {
+  runId: string;
+  weekday: z.infer<typeof weekdaySchema>;
+  optionId: string;
+  skipClass?: boolean;
+}) {
+  const runId = z.string().min(1).parse(input.runId);
+  const weekday = weekdaySchema.parse(input.weekday);
+  const optionId = z.string().min(1).parse(input.optionId);
+  const skipClass = Boolean(input.skipClass);
+
+  await persistActiveRun(runId);
+
+  const result = await planServerWeekdayAction(runId, {
+    weekday,
+    optionId,
+    skipClass,
+  });
+  const currentWeekState = result.run.activeMonth?.currentWeekState;
+  const savedDay = currentWeekState
+    ? buildPlannerDaysView(currentWeekState, result.run).find((day) => day.weekday === weekday) ?? null
+    : null;
+
+  return { savedDay };
 }
 
 export async function submitActionTurnAction(formData: FormData) {
@@ -105,7 +184,8 @@ export async function submitActionTurnAction(formData: FormData) {
   }
 
   if (intent === "confirm_week") {
-    const result = await confirmServerWeek(runId);
+    const plannedActionsSnapshot = parsePlannedActionsSnapshot(formData);
+    const result = await confirmServerWeek(runId, plannedActionsSnapshot);
 
     if (result.monthCompleted) {
       redirect(`/settlement?runId=${runId}&year=${result.playedYear}&month=${result.playedMonth}`);

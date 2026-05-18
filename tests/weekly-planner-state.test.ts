@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import {
   applyOptimisticPlan,
   buildPlannerDayAriaLabel,
+  buildPlannedActionsSnapshot,
   countUnplannedDays,
   handlePlannerDayKeyDown,
   resolvePendingPlanStatus,
@@ -24,20 +25,31 @@ function createPlannerDay(overrides?: Partial<PlannerDayView>): PlannerDayView {
     skipClassSelected: false,
     eventTitle: null,
     eventSummary: null,
+    hasCashRisk: false,
     normalOptions: [
       {
         optionId: "study",
+        action: "study",
         label: "复习 / 学习",
         description: "稳步推进学业。",
         selected: false,
+        source: "default",
+        badges: [],
+        isEventRelated: false,
+        isCashRiskAction: false,
       },
     ],
     skipOptions: [
       {
         optionId: "study",
+        action: "study",
         label: "复习 / 学习",
         description: "稳步推进学业。",
         selected: false,
+        source: "default",
+        badges: [],
+        isEventRelated: false,
+        isCashRiskAction: false,
       },
     ],
     ...overrides,
@@ -200,12 +212,17 @@ describe("weekly planner state helpers", () => {
     expect(plannedLabel).not.toContain("需先确认本周课程态度");
   });
 
-  it("closes the day-planning modal immediately after marking the plan as pending", () => {
+  it("does not globally lock the next day cards while another day is still saving", () => {
     const source = readFileSync("components/action-plan-form.tsx", "utf-8");
 
-    expect(source).toMatch(
-      /onSubmit=\{\(\) => \{\s*markPlanAsPending\(selectedDay, option\);\s*setSelectedWeekday\(null\);/s,
-    );
+    expect(source).not.toContain("等这一天写回周排程后");
+    expect(source).not.toContain("aria-disabled={!attendanceLocked || plannerSavePending}");
+  });
+
+  it("does not remount the whole planner form from the server after each saved day", () => {
+    const source = readFileSync("app/game/page.tsx", "utf-8");
+
+    expect(source).not.toContain("key={plannerFormKey}");
   });
 
   it("renders planner day cards as keyboard-focusable dialog buttons with aria metadata", () => {
@@ -214,7 +231,7 @@ describe("weekly planner state helpers", () => {
     expect(source).toContain('role="button"');
     expect(source).toContain("tabIndex={0}");
     expect(source).toContain('aria-haspopup="dialog"');
-    expect(source).toContain("aria-disabled={!attendanceLocked || plannerSavePending}");
+    expect(source).toContain("aria-disabled={!attendanceLocked}");
     expect(source).toContain("aria-label={buildPlannerDayAriaLabel(day, attendanceLocked)}");
   });
 
@@ -223,5 +240,92 @@ describe("weekly planner state helpers", () => {
 
     expect(source).toContain('role="dialog"');
     expect(source).toContain('aria-modal="true"');
+  });
+
+  it("builds a lightweight confirm-week snapshot from only the weekdays the player actually selected", () => {
+    const snapshot = buildPlannedActionsSnapshot([
+      createPlannerDay({
+        weekday: "mon",
+        plannedActionLabel: "复习 / 学习",
+        normalOptions: [
+          {
+            optionId: "study",
+            action: "study",
+            label: "复习 / 学习",
+            description: "稳步推进学业。",
+            selected: true,
+            source: "default",
+            badges: [],
+            isEventRelated: false,
+            isCashRiskAction: false,
+          },
+        ],
+      }),
+      createPlannerDay({
+        weekday: "tue",
+        skipClassSelected: true,
+        plannedActionLabel: "求职准备",
+        normalOptions: [
+          {
+            optionId: "social",
+            action: "social",
+            label: "社交",
+            description: "放松一下。",
+            selected: false,
+            source: "default",
+            badges: [],
+            isEventRelated: false,
+            isCashRiskAction: false,
+          },
+        ],
+        skipOptions: [
+          {
+            optionId: "job_prep",
+            action: "job_prep",
+            label: "求职准备",
+            description: "推进求职。",
+            selected: true,
+            source: "default",
+            badges: [],
+            isEventRelated: false,
+            isCashRiskAction: false,
+          },
+        ],
+      }),
+      createPlannerDay({
+        weekday: "wed",
+        normalOptions: [
+          {
+            optionId: "study",
+            action: "study",
+            label: "复习 / 学习",
+            description: "稳步推进学业。",
+            selected: true,
+            source: "default",
+            badges: [],
+            isEventRelated: false,
+            isCashRiskAction: false,
+          },
+        ],
+      }),
+    ]);
+
+    expect(snapshot).toEqual([
+      { weekday: "mon", optionId: "study", skipClass: false },
+      { weekday: "tue", optionId: "job_prep", skipClass: true },
+    ]);
+  });
+
+  it("includes the plannedActionsSnapshot hidden field in the confirm-week form", () => {
+    const source = readFileSync("components/action-plan-form.tsx", "utf-8");
+
+    expect(source).toContain('name="plannedActionsSnapshot"');
+  });
+
+  it("keeps the confirm-week submit disabled while planner saves are still pending", () => {
+    const source = readFileSync("components/action-plan-form.tsx", "utf-8");
+
+    expect(source).toContain("const readyToConfirmNow = attendanceLocked && !plannerSavePending");
+    expect(source).toContain("disabled={!readyToConfirmNow}");
   });
 });
