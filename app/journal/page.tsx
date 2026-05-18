@@ -1,22 +1,24 @@
 import { ActiveRunSync } from "@/components/active-run-sync";
+import { FmBadge } from "@/components/fm-ui/FmBadge";
 import { FmEmptyState } from "@/components/fm-ui/FmEmptyState";
-import { FmPartialNotice } from "@/components/fm-ui/FmPartialNotice";
+import { FmLoadingState } from "@/components/fm-ui/FmLoadingState";
+import { FmMotionSection } from "@/components/fm-ui/FmMotionSection";
 import {
-  FmIcon,
   FmInlineStat,
   FmPanel,
   FmSectionHead,
   FmShellLayout,
 } from "@/components/fm-ui/FmScaffold";
-import { resolveActiveRunId } from "@/lib/demo/active-run";
-import { buildJournalOverview } from "@/lib/journal-overview";
 import { buildMonthlyJournalRulesFallback } from "@/lib/ai/reports";
+import { resolveActiveRunId } from "@/lib/demo/active-run";
 import { buildGrowthJournalEntry, buildMonthlyDiaryDigest } from "@/lib/demo/monthly-digest";
 import { formatMonthLabel } from "@/lib/demo/options";
+import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
 import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
 import { getServerJournalBundle } from "@/lib/demo/server";
-import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
+import { buildJournalOverview } from "@/lib/journal-overview";
 import { sanitizePlayerFacingText } from "@/lib/player-facing-text";
+import type { StructuredMonthlySummary } from "@/types/game";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +28,35 @@ type JournalPageProps = {
 
 function formatMoney(value: number) {
   return `${value >= 0 ? "+" : ""}${value}`;
+}
+
+function buildTimelineTags(summary: StructuredMonthlySummary | null | undefined) {
+  if (!summary) {
+    return [];
+  }
+
+  const tags: string[] = [];
+
+  if ((summary.statsDelta?.semesterAcademics ?? 0) >= 6) {
+    tags.push("学业推进");
+  }
+  if ((summary.statsAfter?.money ?? 0) <= 350 || (summary.statsDelta?.money ?? 0) <= -450) {
+    tags.push("现金紧张");
+  }
+  if ((summary.statsAfter?.stress ?? 0) >= 68 || (summary.statsDelta?.stress ?? 0) >= 6) {
+    tags.push("压力升高");
+  }
+  if ((summary.statsDelta?.social ?? 0) >= 5) {
+    tags.push("社交变多");
+  }
+  if ((summary.progression?.dominantDirection ?? "undecided") === "undecided") {
+    tags.push("方向未定");
+  }
+  if ((summary.resumeAdditions ?? []).length > 0) {
+    tags.push("履历增加");
+  }
+
+  return [...new Set(tags)].slice(0, 4);
 }
 
 export default async function JournalPage({ searchParams }: JournalPageProps) {
@@ -59,7 +90,7 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
             <div className="mt-6">
               <FmEmptyState
                 title="先回到首页创建一局"
-                body="这条线索还没有在你的大学生活中出现。没有存档的时候，这里会优先显示空状态，而不是直接报错。"
+                body="这条线索还没在你的大学生活里出现。没有存档的时候，这里会优先显示空状态，而不是直接报错。"
               />
             </div>
           </FmPanel>
@@ -94,9 +125,16 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
     .reverse()
     .map((state) => ({
       id: `${state.id}-growth`,
+      state,
       ...(state.snapshot_json
         ? buildGrowthJournalEntry(state.snapshot_json, state.year, state.month)
-        : { badge: "成长日志", periodLabel: formatMonthLabel(state.year, state.month), title: "数据不完整", message: "这条月度记录的快照数据不完整，无法生成成长日志。", details: [] as string[] }),
+        : {
+            badge: "成长日志",
+            periodLabel: formatMonthLabel(state.year, state.month),
+            title: "数据还没接完整",
+            message: "这个月的快照信息不完整，所以这里只保留一个温和的占位说明。",
+            details: [] as string[],
+          }),
     }));
 
   const latestState = bundle.monthlyStates.at(-1) ?? null;
@@ -122,7 +160,7 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
       runId={runId}
       title="成长日志"
       subtitle="这里会收集每个月的 AI 月记，也会把已经发生过的成长痕迹按时间整理出来。"
-      sidebarSummary="已开放页面只展示真实月度状态、AI 月记归档与履历证据，不补写不存在的经历。"
+      sidebarSummary="这里更像一本大学生活档案册。月记、成长线和归档内容都只会读取这局存档里真实发生过的东西。"
       headerMeta={
         <>
           <FmInlineStat tone="teal" icon="book" label="月记归档" value={`${overview.monthlyJournalCount} 篇`} />
@@ -133,155 +171,187 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
     >
       <div className="fm-grid-2">
         <ActiveRunSync runId={bundle.run.id} />
-        <div className="fm-stack">
-          <FmPanel>
-            <FmSectionHead
-              title="本月月记"
-              copy="月记只负责表达，不负责决定结果。它写的是已经发生过的真实月份。"
-              aside={
-                latestDigest ? (
-                  <span className="fm-chip fm-chip--brand">{latestDigest.monthLabel}</span>
-                ) : null
-              }
-            />
 
-            <div className="mt-6 fm-month-paper-scene">
-              {latestReport && latestDigest ? (
-                <div className="fm-paper-stack">
-                  <article className="fm-paper">
-                    <div className="fm-paper__tape" />
-                    <div className="fm-paper__stats">
-                      <span className="fm-paper__stat tone-teal">学业 {latestDigest.endState.feedback}</span>
-                      <span className="fm-paper__stat tone-amber">资金 {formatMoney(latestDigest.endState.money)}</span>
-                      <span className="fm-paper__stat tone-rose">压力 {latestDigest.endState.stress}</span>
-                    </div>
-                    <div className="fm-paper__date">{formatMonthLabel(latestReport.year, latestReport.month ?? 1)}</div>
-                    <h2 className="fm-paper__title">月记</h2>
-                    <div className="fm-paper__copy">{sanitizePlayerFacingText(latestReport.output_markdown)}</div>
-                    <div className="fm-paper__footer">
-                      方向线索：{latestDigest.directionSignal}
-                    </div>
-                  </article>
-                </div>
-              ) : latestRulesFallback && latestDigest ? (
-                <div className="fm-paper-stack">
-                  <article className="fm-paper">
-                    <div className="fm-paper__tape" />
-                    <div className="fm-paper__stats">
-                      <span className="fm-paper__stat tone-teal">学业 {latestDigest.endState.feedback}</span>
-                      <span className="fm-paper__stat tone-amber">资金 {formatMoney(latestDigest.endState.money)}</span>
-                      <span className="fm-paper__stat tone-rose">压力 {latestDigest.endState.stress}</span>
-                    </div>
-                    <div className="fm-paper__date">{latestRulesFallback.monthLabel}</div>
-                    <h2 className="fm-paper__title">{latestRulesFallback.title}</h2>
-                    <div className="fm-paper__copy">
-                      {latestRulesFallback.diary.split("\n\n").map((paragraph, i) => (
-                        <p key={i}>{paragraph}</p>
-                      ))}
-                    </div>
-                    <div className="fm-paper__footer">{latestRulesFallback.endStateLine}</div>
-                  </article>
-                </div>
-              ) : pendingMonths.length > 0 ? (
-                <FmPartialNotice
-                  title="月记还在生成中"
-                  body={`当前月份已经有真实结算，但 AI 月记还没落档：${pendingMonths
-                    .map((state) => formatMonthLabel(state.year, state.month))
-                    .join("、")}。`}
-                />
-              ) : (
-                <FmEmptyState
-                  title="还没有第一篇月记"
-                  body="月记不会凭空生成。等完成至少一次月末结算后，这里才会出现第一篇真实归档。"
-                />
-              )}
-            </div>
-          </FmPanel>
+        <div className="fm-journal-board">
+          <FmMotionSection delay={40}>
+            <FmPanel>
+              <FmSectionHead
+                title="本月记"
+                copy="像翻开一页纸一样回看这个月。这里的内容只负责表达已发生的经历，不会替规则层改写结果。"
+                aside={latestDigest ? <FmBadge tone="ending">{latestDigest.monthLabel}</FmBadge> : undefined}
+              />
 
-          <FmPanel>
-            <FmSectionHead
-              title="月记归档"
-              copy="旧月份保留为归档，不会用后来的信息回填早先不存在的内容。"
-            />
-            <div className="mt-6 fm-stack">
-              {monthlyReports.length > 1 ? (
-                monthlyReports
-                  .slice(0, -1)
-                  .reverse()
-                  .map((report) => {
-                    const matchingState = bundle.monthlyStates.find(
-                      (state) => state.year === report.year && state.month === report.month,
-                    );
-                    const digest = matchingState?.snapshot_json
-                      ? buildMonthlyDiaryDigest(matchingState.snapshot_json, matchingState.year, matchingState.month)
-                      : null;
-
-                    return (
-                      <article key={report.id} className="fm-journal-card">
-                        <div className="fm-journal-card__head">
-                          <div>
-                            <div className="fm-journal-card__month">
-                              {formatMonthLabel(report.year, report.month ?? 1)}
-                            </div>
-                            <h3 className="fm-journal-card__title">归档月记</h3>
-                          </div>
-                          <span className="fm-chip">{report.model ?? "fallback"}</span>
-                        </div>
-                        <p className="fm-journal-card__copy">
-                          {digest?.directionSignal ?? "当前月份已经留档，但方向线索尚未整理完成。"}
-                        </p>
-                      </article>
-                    );
-                  })
-              ) : (
-                <p className="fm-muted-note">第一篇真实月记出现之后，后续归档会继续在这里累积。</p>
-              )}
-            </div>
-          </FmPanel>
-        </div>
-
-        <FmPanel>
-          <FmSectionHead
-            title="成长时间线"
-            copy="这里会按时间线整理已经落地的月度变化，不会为了好看去补写不存在的经历。"
-          />
-
-          <div className="mt-6">
-            {growthEntries.length > 0 ? (
-              <div className="fm-timeline">
-                {growthEntries.map((entry, index) => (
-                  <article key={entry.id} className="fm-timeline-entry">
-                    <div className={`fm-timeline-node ${index % 2 === 0 ? "tone-teal" : "tone-cyan"}`}>
-                      <FmIcon name="book" className="h-4 w-4" />
-                    </div>
-                    <div className="fm-journal-card">
-                      <div className="fm-journal-card__head">
-                        <div>
-                          <div className="fm-journal-card__month">{entry.periodLabel}</div>
-                          <h3 className="fm-journal-card__title">{entry.title}</h3>
-                        </div>
-                        <span className="fm-chip">{entry.badge}</span>
+              <div className="mt-6 fm-month-paper-scene">
+                {latestReport && latestDigest ? (
+                  <div className="fm-paper-stack fm-paper-stack--fixed">
+                    <article className="fm-paper">
+                      <div className="fm-paper__clip" aria-hidden="true" />
+                      <div className="fm-paper__stats">
+                        <span className="fm-paper__stat tone-teal">学业 {latestDigest.endState.feedback}</span>
+                        <span className="fm-paper__stat tone-amber">现金 {formatMoney(latestDigest.endState.money)}</span>
+                        <span className="fm-paper__stat tone-rose">压力 {latestDigest.endState.stress}</span>
                       </div>
-                      <p className="fm-journal-card__copy">{entry.message}</p>
-                      <div className="fm-journal-card__details">
-                        {entry.details.map((detail) => (
-                          <div key={detail} className="fm-journal-card__detail">
-                            {detail}
-                          </div>
+                      <div className="fm-paper__date">{formatMonthLabel(latestReport.year, latestReport.month ?? 1)}</div>
+                      <h2 className="fm-paper__title">本月记</h2>
+                      <div className="fm-paper__copy fm-paper__copy--scroll">
+                        {sanitizePlayerFacingText(latestReport.output_markdown)}
+                      </div>
+                      <div className="fm-paper__fade" aria-hidden="true" />
+                      <div className="fm-paper__footer">方向线索：{latestDigest.directionSignal}</div>
+                    </article>
+                  </div>
+                ) : latestRulesFallback && latestDigest ? (
+                  <div className="fm-paper-stack fm-paper-stack--fixed">
+                    <article className="fm-paper">
+                      <div className="fm-paper__clip" aria-hidden="true" />
+                      <div className="fm-paper__stats">
+                        <span className="fm-paper__stat tone-teal">学业 {latestDigest.endState.feedback}</span>
+                        <span className="fm-paper__stat tone-amber">现金 {formatMoney(latestDigest.endState.money)}</span>
+                        <span className="fm-paper__stat tone-rose">压力 {latestDigest.endState.stress}</span>
+                      </div>
+                      <div className="fm-paper__date">{latestRulesFallback.monthLabel}</div>
+                      <h2 className="fm-paper__title">{latestRulesFallback.title}</h2>
+                      <div className="fm-paper__copy fm-paper__copy--scroll">
+                        {latestRulesFallback.diary.split("\n\n").map((paragraph, index) => (
+                          <p key={index}>{paragraph}</p>
                         ))}
                       </div>
-                    </div>
-                  </article>
-                ))}
+                      <div className="fm-paper__fade" aria-hidden="true" />
+                      <div className="fm-paper__footer">{latestRulesFallback.endStateLine}</div>
+                    </article>
+                  </div>
+                ) : pendingMonths.length > 0 ? (
+                  <div className="fm-paper-stack fm-paper-stack--fixed">
+                    <article className="fm-paper">
+                      <div className="fm-paper__clip" aria-hidden="true" />
+                      <div className="fm-paper__stats">
+                        <span className="fm-paper__stat tone-cyan">已结算 {pendingMonths.length} 月</span>
+                        <span className="fm-paper__stat tone-mint">等待补写</span>
+                      </div>
+                      <div className="fm-paper__date">
+                        {formatMonthLabel(pendingMonths.at(-1)!.year, pendingMonths.at(-1)!.month)}
+                      </div>
+                      <h2 className="fm-paper__title">月记稍后补上</h2>
+                      <div className="fm-paper__copy fm-paper__copy--scroll">
+                        <FmLoadingState
+                          title="AI 月记生成中"
+                          body={`已经完成真实结算的月份会优先留在这里。现在还在补写：${pendingMonths
+                            .map((state) => formatMonthLabel(state.year, state.month))
+                            .join("、")}。`}
+                        />
+                      </div>
+                    </article>
+                  </div>
+                ) : (
+                  <FmEmptyState
+                    title="还没有第一篇月记"
+                    body="月记不会凭空生成。等完成至少一次月末结算后，这里才会出现第一篇真实归档。"
+                  />
+                )}
               </div>
-            ) : (
-              <FmEmptyState
-                title="还没有足够的成长证据"
-                body="这局存档暂时还没有积累出足够的月度经历，所以这里不会编造时间线。"
+            </FmPanel>
+          </FmMotionSection>
+
+          <FmMotionSection delay={110}>
+            <FmPanel>
+              <FmSectionHead
+                title="月记归档"
+                copy="旧月份会稳定留在下面，不会因为后面的变化回填成更好看的版本。"
               />
-            )}
-          </div>
-        </FmPanel>
+              <div className="mt-6 fm-stack">
+                {monthlyReports.length > 1 ? (
+                  monthlyReports
+                    .slice(0, -1)
+                    .reverse()
+                    .map((report) => {
+                      const matchingState = bundle.monthlyStates.find(
+                        (state) => state.year === report.year && state.month === report.month,
+                      );
+                      const digest = matchingState
+                        ? buildMonthlyDiaryDigest(matchingState.snapshot_json, matchingState.year, matchingState.month)
+                        : null;
+
+                      return (
+                        <article key={report.id} className="fm-journal-card">
+                          <div className="fm-journal-card__head">
+                            <div>
+                              <div className="fm-journal-card__month">
+                                {formatMonthLabel(report.year, report.month ?? 1)}
+                              </div>
+                              <h3 className="fm-journal-card__title">归档月记</h3>
+                            </div>
+                            <FmBadge tone="neutral">{report.model ?? "fallback"}</FmBadge>
+                          </div>
+                          <p className="fm-journal-card__copy">
+                            {digest?.directionSignal ?? "这个月已经归档，但方向线索还没有整理完整。"}
+                          </p>
+                        </article>
+                      );
+                    })
+                ) : (
+                  <p className="fm-archive-note">旧月份会慢慢收进这里。</p>
+                )}
+              </div>
+            </FmPanel>
+          </FmMotionSection>
+        </div>
+
+        <FmMotionSection delay={180}>
+          <FmPanel>
+            <FmSectionHead
+              title="成长时间线"
+              copy="这里更像一条时间轴。每个月留下来的标题、摘要和变化标签，会按顺序帮你看清这局是怎么长出来的。"
+            />
+
+            <div className="mt-6">
+              {growthEntries.length > 0 ? (
+                <div className="fm-timeline">
+                  {growthEntries.map((entry, index) => (
+                    <article
+                      key={entry.id}
+                      className={`fm-timeline-entry ${index === 0 ? "is-current" : ""}`}
+                    >
+                      <div className={`fm-timeline-node ${index === 0 ? "tone-teal" : "tone-cyan"}`} />
+                      <div className="fm-journal-card">
+                        <div className="fm-journal-card__head">
+                          <div>
+                            <div className="fm-journal-card__month">{entry.periodLabel}</div>
+                            <h3 className="fm-journal-card__title">{entry.title}</h3>
+                          </div>
+                          <FmBadge tone={index === 0 ? "ending" : "neutral"}>
+                            {index === 0 ? "当前月" : entry.badge}
+                          </FmBadge>
+                        </div>
+                        {buildTimelineTags(entry.state.snapshot_json).length > 0 ? (
+                          <div className="fm-timeline-tags">
+                            {buildTimelineTags(entry.state.snapshot_json).map((tag) => (
+                              <span key={`${entry.id}-${tag}`} className="fm-timeline-tag">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                        <p className="fm-journal-card__copy">{entry.message}</p>
+                        <div className="fm-journal-card__details">
+                          {entry.details.slice(0, 3).map((detail) => (
+                            <div key={detail} className="fm-journal-card__detail">
+                              {detail}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <FmEmptyState
+                  title="还没有足够的成长证据"
+                  body="这局存档暂时还没有积累出足够的月度经历，所以这里不会编造时间线。"
+                />
+              )}
+            </div>
+          </FmPanel>
+        </FmMotionSection>
       </div>
     </FmShellLayout>
   );

@@ -52,33 +52,33 @@ function uniqueLines(lines: Array<string | undefined | null>): string[] {
 function buildActionTrendText(action: WeeklySettlementSummary["dailyResults"][number]["resolvedAction"]["action"]) {
   switch (action) {
     case "study":
-      return "↗学业 ↗压力 ↘心情";
+      return "学业提升 · 压力上升 · 心情下降";
     case "writing_research":
-      return "↗学业 ↗履历 ↗压力";
+      return "学业提升 · 履历积累 · 压力上升";
     case "job_prep":
-      return "↗履历 ↘金钱 ↗压力";
+      return "履历积累 · 金钱下降 · 压力上升";
     case "postgraduate_prep":
-      return "↗学业 ↗深造 ↗压力";
+      return "学业提升 · 深造推进 · 压力上升";
     case "public_exam_prep":
-      return "↗公考 ↘金钱 ↗压力";
+      return "公考推进 · 金钱下降 · 压力上升";
     case "competition_project":
-      return "↗履历 ↗学业 ↗压力";
+      return "履历积累 · 学业提升 · 压力上升";
     case "part_time":
-      return "↗金钱 ↗压力 ↘心情";
+      return "金钱提升 · 压力上升 · 心情下降";
     case "social":
-      return "↗社交 ↗心情 ↘金钱";
+      return "社交提升 · 心情回升 · 金钱下降";
     case "relax":
-      return "↗心情 ↘压力";
+      return "心情回升 · 压力下降";
     case "big_meal":
-      return "↗心情 ↘压力 ↘金钱";
+      return "心情回升 · 压力下降 · 金钱下降";
     case "student_activity":
-      return "↗社交 ↗履历 ↘压力";
+      return "社交提升 · 履历积累 · 压力下降";
     case "remedy":
-      return "↗学业 ↘压力 ↘金钱";
+      return "学业止损 · 压力下降 · 金钱下降";
     case "ask_family":
-      return "↗金钱 ↗压力";
+      return "金钱提升 · 压力上升";
     default:
-      return "→状态";
+      return "状态微调";
   }
 }
 
