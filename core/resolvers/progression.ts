@@ -6,13 +6,17 @@
   CompetitionAward,
   DirectionKey,
   DirectionTendencyMap,
+  EndingEvidence,
+  FutureOffer,
   GraduationPath,
   GraduationPathResult,
   GameRun,
+  InternshipRecord,
   RecommendationQualification,
   ResumeItem,
   ScholarshipRecord,
   StarterProfile,
+  TimelineNode,
   StructuredMonthlySummary,
 } from "@/types/game";
 
@@ -81,6 +85,10 @@ export function createDefaultCareerRouteState(): CareerRouteState {
     recommendationQualification: "pending",
     latestHints: [],
   };
+}
+
+function monthIndexFromYearMonth(year: number, month: number): number {
+  return (year - 1) * 12 + month;
 }
 
 function schoolTierScore(profile: StarterProfile): number {
@@ -182,7 +190,16 @@ function hasSettledAcademicProfile(profile: AcademicProfileSnapshot): boolean {
   return profile.gpa !== null && profile.rank !== null && profile.percentile !== null;
 }
 
-export function determineDominantDirection(tendencies: DirectionTendencyMap): DirectionKey {
+export function determineDominantDirection(
+  tendencies: DirectionTendencyMap,
+  previousDominant?: DirectionKey,
+): DirectionKey {
+  const bestScore = DIRECTION_KEYS.reduce((score, key) => Math.max(score, tendencies[key]), 0);
+
+  if (previousDominant && tendencies[previousDominant] === bestScore) {
+    return previousDominant;
+  }
+
   return DIRECTION_KEYS.reduce((best, key) => (tendencies[key] > tendencies[best] ? key : best), "undecided");
 }
 
@@ -200,7 +217,10 @@ export function ensureProgressionState(run: GameRun): GameRun {
     },
     latestHints: run.progression?.latestHints ?? [],
   };
-  const dominantDirection = determineDominantDirection(baseProgression.tendencies);
+  const dominantDirection = determineDominantDirection(
+    baseProgression.tendencies,
+    run.progression?.dominantDirection,
+  );
   const competitionProjects = [...(run.competitionProjects ?? [])];
   const semesterKey = buildSemesterKey(run.currentYear, run.currentMonth);
   const existingProjects = competitionProjects.filter((project) => project.semesterKey === semesterKey);
@@ -217,6 +237,12 @@ export function ensureProgressionState(run: GameRun): GameRun {
     },
     competitionProjects,
     scholarships: run.scholarships ?? [],
+    internshipRecords: run.internshipRecords ?? [],
+    futureOffers: run.futureOffers ?? [],
+    acceptedOffer: run.acceptedOffer ?? null,
+    timelineNodes: run.timelineNodes ?? [],
+    monthlyLetters: run.monthlyLetters ?? [],
+    endingEvidence: run.endingEvidence ?? [],
   };
 }
 
@@ -237,7 +263,10 @@ export function withTendencyShift(
     progression: {
       ...nextRun.progression!,
       tendencies,
-      dominantDirection: determineDominantDirection(tendencies),
+      dominantDirection: determineDominantDirection(
+        tendencies,
+        nextRun.progression!.dominantDirection,
+      ),
       latestHints: [...new Set([...hints, ...nextRun.progression!.latestHints])].slice(0, 6),
     },
   };
@@ -978,6 +1007,317 @@ function createResumeItem(run: GameRun, title: string, summary: string, category
   };
 }
 
+function addTimelineNode(run: GameRun, node: Omit<TimelineNode, "id"> & { id?: string }): GameRun {
+  const id = node.id ?? `${run.id}-timeline-${node.monthIndex}-${node.kind}-${node.sourceId ?? node.title}`;
+  const existing = run.timelineNodes ?? [];
+
+  if (existing.some((item) => item.id === id)) {
+    return run;
+  }
+
+  return {
+    ...run,
+    timelineNodes: [...existing, { ...node, id }],
+  };
+}
+
+function addEndingEvidence(run: GameRun, evidence: Omit<EndingEvidence, "id"> & { id?: string }): GameRun {
+  const id = evidence.id ?? `${run.id}-evidence-${evidence.monthIndex}-${evidence.kind}-${evidence.sourceId ?? evidence.title}`;
+  const existing = run.endingEvidence ?? [];
+
+  if (existing.some((item) => item.id === id)) {
+    return run;
+  }
+
+  return {
+    ...run,
+    endingEvidence: [...existing, { ...evidence, id }],
+  };
+}
+
+function addMonthlyLetter(run: GameRun, monthIndex: number, facts: string[]): GameRun {
+  const existing = run.monthlyLetters ?? [];
+  const id = `${run.id}-letter-${monthIndex}`;
+
+  if (existing.some((letter) => letter.id === id)) {
+    return run;
+  }
+
+  return {
+    ...run,
+    monthlyLetters: [
+      ...existing,
+      {
+        id,
+        monthIndex,
+        title: `第 ${monthIndex} 月来信`,
+        body: facts.length > 0
+          ? `这个月留下了新的记录：${facts.slice(0, 3).join("、")}。这些内容都来自已经结算的规则事实。`
+          : "这个月没有特别大的正式结果，但每周安排和状态变化已经进入存档。",
+        facts: facts.slice(0, 6),
+        fallback: true,
+      },
+    ],
+  };
+}
+
+function scholarshipAmount(level: ScholarshipRecord["level"]) {
+  switch (level) {
+    case "national":
+    case "high":
+      return 10000;
+    case "city":
+      return 6000;
+    case "school":
+    case "standard":
+      return 4000;
+    case "college":
+      return 2000;
+    default:
+      return 0;
+  }
+}
+
+function scholarshipTitle(level: ScholarshipRecord["level"]) {
+  switch (level) {
+    case "national":
+    case "high":
+      return "国家奖学金";
+    case "city":
+      return "市级奖学金";
+    case "school":
+    case "standard":
+      return "校级奖学金";
+    case "college":
+      return "院级奖学金";
+    default:
+      return "未获得奖学金";
+  }
+}
+
+function addInternshipChoices(run: GameRun, monthIndex: number): GameRun {
+  if ((run.internshipRecords ?? []).some((record) => record.openedMonthIndex === monthIndex && record.stage === "junior_choice")) {
+    return run;
+  }
+
+  const business = run.profile.collegeTrack === "business";
+  const records: InternshipRecord[] = [
+    {
+      id: `${run.id}-internship-${monthIndex}-a`,
+      title: business ? "一线城市互联网商业分析实习" : "一线城市工程产品实习",
+      stage: "junior_choice",
+      companyType: "一线城市成长型企业",
+      roleType: business ? "商业分析 / 产品运营" : "工程项目 / 产品技术",
+      cityTier: "tier_1",
+      growth: 86,
+      pressure: 78,
+      cost: 1200,
+      routeBonus: ["employment"],
+      status: "available",
+      openedMonthIndex: monthIndex,
+      summary: "成长高、压力高、成本高，对就业线加成最明显。",
+    },
+    {
+      id: `${run.id}-internship-${monthIndex}-b`,
+      title: business ? "天津本地咨询 / 市场研究实习" : "天津本地研发助理实习",
+      stage: "junior_choice",
+      companyType: "本地稳定型单位",
+      roleType: business ? "市场研究助理" : "研发助理",
+      cityTier: "tier_2",
+      growth: 64,
+      pressure: 52,
+      cost: 420,
+      routeBonus: ["employment"],
+      status: "available",
+      openedMonthIndex: monthIndex,
+      summary: "成本较低、压力中等，是更稳的实践选择。",
+    },
+    {
+      id: `${run.id}-internship-${monthIndex}-c`,
+      title: "校内老师项目助理",
+      stage: "junior_choice",
+      companyType: "校内项目",
+      roleType: "项目 / 科研助理",
+      cityTier: run.profile.cityTier,
+      growth: 54,
+      pressure: 45,
+      cost: 0,
+      routeBonus: ["recommendation", "postgraduate"],
+      status: "available",
+      openedMonthIndex: monthIndex,
+      summary: "对推免和深造材料有帮助，就业加成相对有限。",
+    },
+  ];
+
+  return addTimelineNode(
+    {
+      ...run,
+      internshipRecords: [...(run.internshipRecords ?? []), ...records],
+    },
+    {
+      monthIndex,
+      kind: "internship_choice",
+      title: "大三实习选择出现",
+      body: "系统生成了多段实习机会，玩家可以根据成长、压力、成本和未来路线取舍。",
+      facts: records.map((record) => record.title),
+    },
+  );
+}
+
+function offerTierForRun(run: GameRun): FutureOffer["tier"] {
+  return run.profile.schoolTier;
+}
+
+function addFutureOffer(run: GameRun, offer: FutureOffer): GameRun {
+  const offers = run.futureOffers ?? [];
+
+  if (offers.some((item) => item.id === offer.id || (item.type === offer.type && item.title === offer.title))) {
+    return run;
+  }
+
+  const nextRun = addTimelineNode(
+    {
+      ...run,
+      futureOffers: [...offers, offer],
+    },
+    {
+      monthIndex: offer.monthIndex,
+      kind: offer.type === "postgraduate_exam" ? "postgraduate_result" : "offer",
+      title: offer.title,
+      body: offer.reasons[0] ?? "一个未来选择已经正式进入存档。",
+      sourceId: offer.id,
+      facts: [offer.type, offer.tier, offer.quality, ...offer.reasons].slice(0, 5),
+    },
+  );
+
+  return addEndingEvidence(nextRun, {
+    monthIndex: offer.monthIndex,
+    kind: "offer",
+    title: offer.title,
+    body: offer.reasons.join(" ") || "这份 offer 来自规则层已经形成的学业、履历和路线倾向。",
+    sourceId: offer.id,
+  });
+}
+
+function generateRecommendationOffer(run: GameRun, monthIndex: number): GameRun {
+  if ((run.futureOffers ?? []).some((offer) => offer.type === "recommendation")) {
+    return run;
+  }
+
+  const qualification = evaluateRecommendationQualification(run);
+  const tier = offerTierForRun(run);
+
+  if (qualification !== "eligible" && qualification !== "borderline") {
+    return {
+      ...run,
+      progression: {
+        ...run.progression!,
+        recommendationQualification: qualification,
+        recommendationAppliedAtMonth: monthIndex,
+      },
+    };
+  }
+
+  return addFutureOffer(
+    {
+      ...run,
+      progression: {
+        ...run.progression!,
+        recommendationQualification: qualification,
+        recommendationAppliedAtMonth: monthIndex,
+      },
+    },
+    {
+      id: `${run.id}-offer-recommendation-${monthIndex}`,
+      type: "recommendation",
+      title: tier === "nankai_tianda" ? "天津大学推免接收 offer" : "推免接收 offer",
+      tier,
+      quality: qualification === "eligible" ? "excellent" : "good",
+      reasons: [
+        "GPA、排名、奖学金和竞赛项目共同支撑了这次推免结果。",
+        "这不是一次突然出现的结果，而是前期积累稳定后形成的机会。",
+      ],
+      tradeoffs: ["接受后路线更稳定，但会放下部分考研和就业选择。"],
+      accepted: false,
+      rejected: false,
+      monthIndex,
+    },
+  );
+}
+
+function generatePostgraduateOffer(run: GameRun, monthIndex: number): GameRun {
+  if ((run.futureOffers ?? []).some((offer) => offer.type === "postgraduate_exam")) {
+    return run;
+  }
+
+  const profile = deriveAcademicProfile(run);
+  const score = (run.progression?.postgraduateProgress ?? 0) + (profile.gpa ?? 0) * 10 + schoolTierScore(run.profile);
+  const tier: FutureOffer["tier"] = score >= 92 ? "985" : score >= 78 ? "211" : score >= 64 ? "first_tier" : "second_tier";
+  const quality: FutureOffer["quality"] = score >= 78 ? "good" : score >= 64 ? "ordinary" : "fallback";
+
+  return addFutureOffer(run, {
+    id: `${run.id}-offer-postgraduate-${monthIndex}`,
+    type: "postgraduate_exam",
+    title: quality === "fallback" ? "考研调剂机会通知" : "硕士研究生录取通知书",
+    tier,
+    quality,
+    reasons: [
+      quality === "fallback"
+        ? "考研结果没有落到最理想层级，但仍保留了继续深造的转向可能。"
+        : "持续复习、学业基础和阶段项目共同支撑了这次录取结果。",
+    ],
+    tradeoffs: ["继续深造会延后就业，但能把专业路径再往前推一步。"],
+    accepted: false,
+    rejected: false,
+    monthIndex,
+  });
+}
+
+function generateEmploymentOffers(run: GameRun, monthIndex: number): GameRun {
+  if ((run.futureOffers ?? []).some((offer) => offer.type === "employment")) {
+    return run;
+  }
+
+  const internshipCount = (run.internshipRecords ?? []).filter((record) => record.status !== "declined").length +
+    run.resume.filter((item) => item.category === "internship").length;
+  const readiness = run.progression?.employmentReadiness ?? 0;
+  const strongOffer = readiness + internshipCount * 8 + schoolTierScore(run.profile) * 3 >= 70;
+
+  const offers: FutureOffer[] = [
+    {
+      id: `${run.id}-offer-employment-${monthIndex}-growth`,
+      type: "employment",
+      title: run.profile.collegeTrack === "business" ? "一线城市商业分析 / 产品运营岗 Offer" : "一线城市工程项目岗 Offer",
+      tier: offerTierForRun(run),
+      quality: strongOffer ? "excellent" : "good",
+      salaryLevel: strongOffer ? "high" : "medium",
+      reasons: [
+        "前期项目、实习和求职准备让这份就业结果有了落点。",
+        "薪资只作为未来选择展示，不会加到在校现金里。",
+      ],
+      tradeoffs: ["成长快、压力也高，稳定性不如本地岗位。"],
+      accepted: false,
+      rejected: false,
+      monthIndex,
+    },
+    {
+      id: `${run.id}-offer-employment-${monthIndex}-stable`,
+      type: "employment",
+      title: "天津本地稳定型岗位 Offer",
+      tier: "first_tier",
+      quality: "ordinary",
+      salaryLevel: "medium",
+      reasons: ["这份 offer 更稳，和已有履历形成了普通但可靠的落点。"],
+      tradeoffs: ["成长速度较慢，但生活成本和压力更可控。"],
+      accepted: false,
+      rejected: false,
+      monthIndex,
+    },
+  ];
+
+  return offers.reduce((nextRun, offer) => addFutureOffer(nextRun, offer), run);
+}
+
 function competitionScore(run: GameRun, project: CompetitionProject): number {
   const academic = deriveAcademicProfile(run).recommendationScore;
   const effort = project.investedDays * 8;
@@ -1022,7 +1362,7 @@ function formatCompetitionAward(award: CompetitionAward): string {
 }
 
 function evaluateScholarshipLevel(run: GameRun, academicYear: number): ScholarshipRecord | null {
-  if (academicYear <= 1) {
+  if (academicYear < 1) {
     return null;
   }
 
@@ -1031,7 +1371,7 @@ function evaluateScholarshipLevel(run: GameRun, academicYear: number): Scholarsh
     return null;
   }
 
-  const semesterStart = (academicYear - 2) * 2;
+  const semesterStart = (academicYear - 1) * 2;
   const yearSemesters = (run.semesters ?? []).slice(semesterStart, semesterStart + 2);
   if (yearSemesters.length === 0) {
     return null;
@@ -1044,25 +1384,17 @@ function evaluateScholarshipLevel(run: GameRun, academicYear: number): Scholarsh
   const schoolBonus = schoolTierScore(run.profile);
   const score = average + competitionBonus * 5 + resumeBonus * 2 + schoolBonus * 1.5 - (hasFailure ? 20 : 0);
 
-  if (score >= 92) {
-    return {
-      id: `${run.id}-scholarship-${academicYear}`,
-      academicYear,
-      level: "high",
-      amount: 5000,
-      title: "高等级奖学金",
-      reason: "上一学年的学业表现、竞赛和履历积累都比较强。",
-    };
-  }
+  const level: ScholarshipRecord["level"] =
+    score >= 96 ? "national" : score >= 88 ? "city" : score >= 80 ? "school" : score >= 70 ? "college" : "none";
 
-  if (score >= 78) {
+  if (level !== "none") {
     return {
       id: `${run.id}-scholarship-${academicYear}`,
       academicYear,
-      level: "standard",
-      amount: 2000,
-      title: "普通奖学金",
-      reason: "上一学年的整体表现比较稳，拿到了基础奖学金。",
+      level,
+      amount: scholarshipAmount(level),
+      title: scholarshipTitle(level),
+      reason: "上一学年的学业表现、竞赛和履历积累都比较强。",
     };
   }
 
@@ -1105,8 +1437,10 @@ export function settleLongTermProgression(run: GameRun, input: {
   const resumeAdditions: ResumeItem[] = [];
   const notableFacts: string[] = [];
   let scholarshipAwarded: ScholarshipRecord | undefined;
+  const monthIndex = monthIndexFromYearMonth(input.playedYear, input.playedMonth);
+  const factsForLetter: string[] = [];
 
-  if (input.playedMonth % 6 === 0) {
+  if ([4, 10].includes(input.playedMonth)) {
     const semesterKey = `${input.playedYear}-${input.playedMonth <= 6 ? "spring" : "fall"}`;
     const updatedProjects = nextRun.competitionProjects!.map((project) => {
       if (project.semesterKey !== semesterKey || (project.status !== "open" && project.status !== "active")) {
@@ -1125,6 +1459,7 @@ export function settleLongTermProgression(run: GameRun, input: {
 
       const awardLabel = formatCompetitionAward(award);
       notableFacts.push(`competition:${project.title}:${award.level}-${award.rank}`);
+      factsForLetter.push(`${project.title} ${awardLabel}`);
       resumeAdditions.push(
         createResumeItem(
           nextRun,
@@ -1146,13 +1481,34 @@ export function settleLongTermProgression(run: GameRun, input: {
       competitionProjects: updatedProjects,
       resume: [...nextRun.resume, ...resumeAdditions],
     };
+
+    for (const item of resumeAdditions.filter((entry) => entry.category === "competition")) {
+      nextRun = addTimelineNode(nextRun, {
+        monthIndex,
+        kind: "competition_award",
+        title: item.title,
+        body: item.summary,
+        sourceId: item.id,
+        facts: item.tags,
+      });
+      nextRun = addEndingEvidence(nextRun, {
+        monthIndex,
+        kind: "competition",
+        title: item.title,
+        body: item.summary,
+        sourceId: item.id,
+      });
+    }
   }
 
   if (input.playedMonth === 12) {
-    const scholarship = evaluateScholarshipLevel(nextRun, nextRun.currentYear);
+    const academicYear = input.playedYear;
+    const scholarship = evaluateScholarshipLevel(nextRun, academicYear);
     if (scholarship) {
       scholarshipAwarded = scholarship;
       notableFacts.push(`scholarship:${scholarship.level}:${scholarship.academicYear}`);
+      notableFacts.push(`milestone:scholarship-review:${academicYear * 12 + 1}`);
+      factsForLetter.push(`${scholarship.title} ${scholarship.amount} 元`);
       nextRun = {
         ...nextRun,
         stats: {
@@ -1176,7 +1532,78 @@ export function settleLongTermProgression(run: GameRun, input: {
           resume: [...nextRun.resume, scholarshipResume],
         };
         resumeAdditions.push(scholarshipResume);
+        nextRun = addTimelineNode(nextRun, {
+          monthIndex: academicYear * 12 + 1,
+          kind: "scholarship",
+          title: scholarship.title,
+          body: scholarship.reason,
+          sourceId: scholarship.id,
+          facts: [`${scholarship.amount} 元`, `第 ${academicYear} 学年`],
+        });
+        nextRun = addEndingEvidence(nextRun, {
+          monthIndex: academicYear * 12 + 1,
+          kind: "scholarship",
+          title: scholarship.title,
+          body: scholarship.reason,
+          sourceId: scholarship.id,
+        });
       }
+    }
+  }
+
+  if (monthIndex === 28) {
+    nextRun = addInternshipChoices(nextRun, monthIndex);
+    nextRun = {
+      ...nextRun,
+      progression: {
+        ...nextRun.progression!,
+        postgraduateChoiceOpenedAtMonth: 28,
+        latestHints: [
+          "第 28 月结束后，考研准备行动已经作为后期路径正式打开。",
+          ...nextRun.progression!.latestHints,
+        ].slice(0, 6),
+      },
+    };
+    notableFacts.push("milestone:postgraduate-open:28");
+    factsForLetter.push("考研准备行动开启");
+    nextRun = addTimelineNode(nextRun, {
+      monthIndex,
+      kind: "postgraduate_open",
+      title: "考研准备行动开启",
+      body: "这不是锁死路线，而是把考研作为大三后的真实备选路径放到桌面上。",
+      facts: ["第 28 月", "后期路径"],
+    });
+  }
+
+  if (monthIndex === 34) {
+    nextRun = generateRecommendationOffer(nextRun, monthIndex);
+    notableFacts.push("milestone:recommendation-apply:34");
+    factsForLetter.push("推免申请节点");
+    nextRun = addTimelineNode(nextRun, {
+      monthIndex,
+      kind: "recommendation_apply",
+      title: "推免申请节点",
+      body: "系统根据 GPA、排名、奖学金、竞赛和经历判断推免竞争力，并生成可选择的正式结果。",
+      facts: [nextRun.progression?.recommendationQualification ?? "pending"],
+    });
+  }
+
+  if (monthIndex === 36) {
+    nextRun = {
+      ...generatePostgraduateOffer(nextRun, monthIndex),
+      progression: {
+        ...nextRun.progression!,
+        postgraduateResultMonth: 36,
+      },
+    };
+    notableFacts.push("milestone:postgraduate-result:36");
+    factsForLetter.push("考研结果生成");
+  }
+
+  if (monthIndex >= 37 && monthIndex <= 46) {
+    nextRun = generateEmploymentOffers(nextRun, monthIndex);
+    if ((nextRun.futureOffers ?? []).some((offer) => offer.type === "employment")) {
+      notableFacts.push(`milestone:employment-offer:${monthIndex}`);
     }
   }
 
@@ -1202,6 +1629,8 @@ export function settleLongTermProgression(run: GameRun, input: {
     notableFacts.push(`recommendation:${qualification}`);
   }
 
+  nextRun = addMonthlyLetter(nextRun, monthIndex, [...notableFacts, ...factsForLetter]);
+
   return {
     run: nextRun,
     resumeAdditions,
@@ -1210,8 +1639,113 @@ export function settleLongTermProgression(run: GameRun, input: {
   };
 }
 
+export function acceptFutureOfferDecision(
+  run: GameRun,
+  offerId: string,
+  decision: "accept" | "reject",
+): GameRun {
+  const ensuredRun = ensureProgressionState(run);
+  const selectedOffer = (ensuredRun.futureOffers ?? []).find((offer) => offer.id === offerId);
+
+  if (!selectedOffer) {
+    return ensuredRun;
+  }
+
+  const futureOffers = (ensuredRun.futureOffers ?? []).map((offer) => {
+    if (offer.id === offerId) {
+      return {
+        ...offer,
+        accepted: decision === "accept",
+        rejected: decision === "reject",
+      };
+    }
+
+    if (decision === "accept" && offer.type === selectedOffer.type) {
+      return {
+        ...offer,
+        accepted: false,
+        rejected: true,
+      };
+    }
+
+    return offer;
+  });
+  const decidedOffer = futureOffers.find((offer) => offer.id === offerId)!;
+  let nextRun: GameRun = {
+    ...ensuredRun,
+    futureOffers,
+    acceptedOffer: decision === "accept" ? decidedOffer : ensuredRun.acceptedOffer ?? null,
+  };
+
+  if (decision === "accept") {
+    const category: ResumeItem["category"] = selectedOffer.type === "employment" ? "job_progress" : "special_experience";
+    const resumeItem = createResumeItem(
+      nextRun,
+      selectedOffer.title,
+      selectedOffer.reasons.join(" ") || "这份未来 offer 已经被正式接受，并写入最终路线。",
+      category,
+      [selectedOffer.type, selectedOffer.tier, selectedOffer.quality],
+    );
+    nextRun = {
+      ...nextRun,
+      resume: nextRun.resume.some((item) => item.id === resumeItem.id)
+        ? nextRun.resume
+        : [...nextRun.resume, resumeItem],
+      progression: {
+        ...nextRun.progression!,
+        dominantDirection:
+          selectedOffer.type === "recommendation"
+            ? "recommendation"
+            : selectedOffer.type === "postgraduate_exam"
+              ? "postgraduate"
+              : "employment",
+        recommendationQualification:
+          selectedOffer.type === "recommendation" ? "accepted" : nextRun.progression!.recommendationQualification,
+      },
+    };
+    nextRun = addTimelineNode(nextRun, {
+      monthIndex: selectedOffer.monthIndex,
+      kind: "final_choice",
+      title: `接受：${selectedOffer.title}`,
+      body: "这次选择已经成为最终路线的一部分，并进入结局证据链。",
+      sourceId: selectedOffer.id,
+      facts: [selectedOffer.type, selectedOffer.tier, selectedOffer.quality],
+    });
+    nextRun = addEndingEvidence(nextRun, {
+      monthIndex: selectedOffer.monthIndex,
+      kind: "offer",
+      title: `已接受：${selectedOffer.title}`,
+      body: selectedOffer.reasons.join(" ") || "这份 offer 已经正式被接受。",
+      sourceId: selectedOffer.id,
+    });
+  }
+
+  if (decision === "reject") {
+    nextRun = addTimelineNode(nextRun, {
+      monthIndex: selectedOffer.monthIndex,
+      kind: "offer",
+      title: `暂时放下：${selectedOffer.title}`,
+      body: "这份机会被放下了，但路线还没有被封死，后续仍然可以转向。",
+      sourceId: selectedOffer.id,
+      facts: [selectedOffer.type, "rejected"],
+    });
+  }
+
+  return nextRun;
+}
+
 export function inferGraduationPath(run: GameRun): GraduationPath {
   const ensuredRun = ensureProgressionState(run);
+
+  if (ensuredRun.acceptedOffer?.type === "recommendation") {
+    return "recommendation";
+  }
+  if (ensuredRun.acceptedOffer?.type === "postgraduate_exam") {
+    return "postgraduate_exam";
+  }
+  if (ensuredRun.acceptedOffer?.type === "employment") {
+    return "employment";
+  }
 
   if (ensuredRun.progression?.recommendationQualification === "eligible" && ensuredRun.progression.dominantDirection === "recommendation") {
     return "recommendation";
@@ -1234,6 +1768,9 @@ export function inferGraduationPathResult(run: GameRun, path: GraduationPath): G
 
   switch (path) {
     case "recommendation":
+      if (run.acceptedOffer?.type === "recommendation" || run.progression?.recommendationQualification === "accepted") {
+        return "success";
+      }
       if (run.progression?.recommendationQualification === "eligible") {
         return "success";
       }
@@ -1241,8 +1778,14 @@ export function inferGraduationPathResult(run: GameRun, path: GraduationPath): G
     case "public_exam":
       return (run.progression?.publicExam.progress ?? 0) >= 75 ? "success" : (run.progression?.publicExam.progress ?? 0) >= 45 ? "ordinary" : "failure";
     case "postgraduate_exam":
+      if (run.acceptedOffer?.type === "postgraduate_exam") {
+        return run.acceptedOffer.quality === "fallback" ? "ordinary" : "success";
+      }
       return (run.progression?.postgraduateProgress ?? 0) + (profile.gpa ?? 0) * 10 >= 78 ? "success" : (run.progression?.postgraduateProgress ?? 0) >= 38 ? "ordinary" : "failure";
     case "employment":
+      if (run.acceptedOffer?.type === "employment") {
+        return run.acceptedOffer.quality === "excellent" || run.acceptedOffer.quality === "good" ? "success" : "ordinary";
+      }
       return (run.progression?.employmentReadiness ?? 0) + schoolTierScore(run.profile) * 4 >= 65 ? "success" : (run.progression?.employmentReadiness ?? 0) >= 28 ? "ordinary" : "failure";
     default:
       return "pivot";

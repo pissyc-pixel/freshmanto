@@ -34,6 +34,11 @@ export default async function StartPage() {
             <span>新生建档</span>
           </Link>
 
+          <Link href="/demo-saves" className="fm-button-secondary">
+            <FmIcon name="file" className="h-6 w-6" />
+            <span>载入演示存档</span>
+          </Link>
+
           <ContinueSaveButton />
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">

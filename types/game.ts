@@ -90,11 +90,17 @@ export type CompetitionAwardLevel = "school" | "provincial" | "national";
 
 export type CompetitionAwardRank = "first" | "second" | "third";
 
-export type ScholarshipLevel = "none" | "standard" | "high";
+export type ScholarshipLevel = "none" | "college" | "school" | "city" | "national" | "standard" | "high";
 
 export type GraduationPath = "employment" | "recommendation" | "postgraduate_exam" | "public_exam" | "undecided";
 
 export type GraduationPathResult = "success" | "ordinary" | "failure" | "pivot";
+
+export type FutureOfferType = "recommendation" | "postgraduate_exam" | "employment";
+
+export type FutureOfferTier = SchoolTier;
+
+export type FutureOfferQuality = "excellent" | "good" | "ordinary" | "fallback";
 
 export type EventTriggerCondition =
   | "always"
@@ -380,6 +386,93 @@ export type ScholarshipRecord = {
   reason: string;
 };
 
+export type InternshipRecord = {
+  id: string;
+  title: string;
+  stage: "career_awareness" | "first_internship" | "junior_choice" | "senior_practice";
+  companyType: string;
+  roleType: string;
+  cityTier: CityTier;
+  growth: number;
+  pressure: number;
+  cost: number;
+  routeBonus: DirectionKey[];
+  status: "available" | "accepted" | "completed" | "declined";
+  openedMonthIndex: number;
+  completedMonthIndex?: number;
+  summary: string;
+};
+
+export type FutureOffer = {
+  id: string;
+  type: FutureOfferType;
+  title: string;
+  tier: FutureOfferTier;
+  quality: FutureOfferQuality;
+  reasons: string[];
+  tradeoffs: string[];
+  accepted: boolean;
+  rejected: boolean;
+  monthIndex: number;
+  salaryLevel?: "low" | "medium" | "high";
+  sourceResumeIds?: string[];
+};
+
+export type TimelineNodeKind =
+  | "competition_entry"
+  | "competition_award"
+  | "scholarship"
+  | "internship"
+  | "internship_choice"
+  | "postgraduate_open"
+  | "recommendation_apply"
+  | "postgraduate_result"
+  | "offer"
+  | "final_choice"
+  | "ending"
+  | "warning"
+  | "monthly";
+
+export type TimelineNode = {
+  id: string;
+  monthIndex: number;
+  kind: TimelineNodeKind;
+  title: string;
+  body: string;
+  sourceId?: string;
+  facts: string[];
+};
+
+export type MonthlyLetter = {
+  id: string;
+  monthIndex: number;
+  title: string;
+  body: string;
+  facts: string[];
+  fallback: boolean;
+};
+
+export type EndingEvidenceKind =
+  | "academic"
+  | "scholarship"
+  | "competition"
+  | "internship"
+  | "offer"
+  | "route"
+  | "money"
+  | "mood"
+  | "stress"
+  | "ending";
+
+export type EndingEvidence = {
+  id: string;
+  kind: EndingEvidenceKind;
+  title: string;
+  body: string;
+  monthIndex: number;
+  sourceId?: string;
+};
+
 export type CareerRouteState = {
   tendencies: DirectionTendencyMap;
   dominantDirection: DirectionKey;
@@ -390,6 +483,9 @@ export type CareerRouteState = {
   recommendationQualification: RecommendationQualification;
   recommendationEvaluatedAtYear?: number;
   recommendationEvaluatedAtMonth?: number;
+  postgraduateChoiceOpenedAtMonth?: number;
+  recommendationAppliedAtMonth?: number;
+  postgraduateResultMonth?: number;
   latestHints: string[];
 };
 
@@ -479,6 +575,12 @@ export type StructuredMonthlySummary = {
   progression?: CareerRouteState;
   competitionProjects?: CompetitionProject[];
   scholarshipAwarded?: ScholarshipRecord;
+  internshipRecords?: InternshipRecord[];
+  futureOffers?: FutureOffer[];
+  acceptedOffer?: FutureOffer | null;
+  timelineNodes?: TimelineNode[];
+  monthlyLetters?: MonthlyLetter[];
+  endingEvidence?: EndingEvidence[];
 };
 
 export type SemesterSettlement = {
@@ -521,6 +623,12 @@ export type GameRun = {
   progression?: CareerRouteState;
   competitionProjects?: CompetitionProject[];
   scholarships?: ScholarshipRecord[];
+  internshipRecords?: InternshipRecord[];
+  futureOffers?: FutureOffer[];
+  acceptedOffer?: FutureOffer | null;
+  timelineNodes?: TimelineNode[];
+  monthlyLetters?: MonthlyLetter[];
+  endingEvidence?: EndingEvidence[];
 };
 
 export type InitialGameRunOptions = {

@@ -708,11 +708,11 @@ describe("semester and ending evaluation", () => {
 
     const expired = settleLongTermProgression(underInvestedRun, {
       playedYear: 1,
-      playedMonth: 6,
+      playedMonth: 4,
     });
     const awarded = settleLongTermProgression(investedRun, {
       playedYear: 1,
-      playedMonth: 6,
+      playedMonth: 4,
     });
 
     expect(expired.run.competitionProjects?.[0]?.status).toBe("expired");
@@ -720,7 +720,7 @@ describe("semester and ending evaluation", () => {
     expect(awarded.resumeAdditions.some((item) => item.category === "competition")).toBe(true);
   });
 
-  it("awards scholarships only from the second academic year onward", () => {
+  it("awards first-year scholarships at the documented year review node", () => {
     const baseRun = ensureProgressionState(
       createInitialGameRun({
         id: "scholarship-award-run",
@@ -743,7 +743,9 @@ describe("semester and ending evaluation", () => {
     });
 
     expect(scholarshipResult.scholarshipAwarded).toBeDefined();
-    expect(["standard", "high", "none"]).toContain(scholarshipResult.scholarshipAwarded?.level ?? "none");
+    expect(["college", "school", "city", "national", "standard", "high", "none"]).toContain(
+      scholarshipResult.scholarshipAwarded?.level ?? "none",
+    );
     expect(scholarshipResult.run.scholarships?.length).toBeGreaterThan(0);
   });
 

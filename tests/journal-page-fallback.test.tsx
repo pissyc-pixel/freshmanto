@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createInitialGameRun } from "@/core/game-engine";
+import type { StructuredMonthlySummary } from "@/types/game";
 
 const mockedBundleState = {
   bundle: null as Awaited<ReturnType<typeof import("@/lib/demo/server")["getServerJournalBundle"]>> | null,
@@ -128,7 +129,7 @@ function createBundleWithoutAiJournal() {
             latestHints: [],
           },
           competitionProjects: [],
-        },
+        } as StructuredMonthlySummary,
       },
     ],
     aiReports: [],

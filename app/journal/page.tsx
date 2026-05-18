@@ -13,6 +13,7 @@ import { buildMonthlyJournalRulesFallback } from "@/lib/ai/reports";
 import { resolveActiveRunId } from "@/lib/demo/active-run";
 import { buildGrowthJournalEntry, buildMonthlyDiaryDigest } from "@/lib/demo/monthly-digest";
 import { formatMonthLabel } from "@/lib/demo/options";
+import { normalizeSaveState } from "@/lib/demo/save-state";
 import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
 import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
 import { getServerJournalBundle } from "@/lib/demo/server";
@@ -66,8 +67,9 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
     cookieRunId: await readActiveRunIdFromCookies(),
   });
   const bundle = runId ? await getServerJournalBundle(runId) : null;
+  const hydratedRun = bundle ? normalizeSaveState(bundle.run) : null;
 
-  if (!runId || !bundle) {
+  if (!runId || !bundle || !hydratedRun) {
     return (
       <FmShellLayout
         active="journal"
@@ -136,6 +138,30 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
             details: [] as string[],
           }),
     }));
+  const persistedLetters = (hydratedRun.monthlyLetters ?? []).slice().sort((left, right) => right.monthIndex - left.monthIndex);
+  const latestPersistedLetter = persistedLetters[0] ?? null;
+  const persistedTimelineEntries = (hydratedRun.timelineNodes ?? [])
+    .slice()
+    .sort((left, right) => right.monthIndex - left.monthIndex)
+    .map((node) => ({
+      id: node.id,
+      periodLabel: `M${node.monthIndex}`,
+      title: node.title,
+      message: node.body,
+      badge: node.kind,
+      details: node.facts,
+    }));
+  const timelineEntries =
+    persistedTimelineEntries.length > 0
+      ? persistedTimelineEntries
+      : growthEntries.map((entry) => ({
+          id: entry.id,
+          periodLabel: entry.periodLabel,
+          title: entry.title,
+          message: entry.message,
+          badge: entry.badge,
+          details: buildTimelineTags(entry.state.snapshot_json),
+        }));
 
   const latestState = bundle.monthlyStates.at(-1) ?? null;
   const latestReport = latestState
@@ -170,7 +196,7 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
       }
     >
       <div className="fm-grid-2">
-        <ActiveRunSync runId={bundle.run.id} />
+        <ActiveRunSync runId={hydratedRun.id} />
 
         <div className="fm-journal-board">
           <FmMotionSection delay={40}>
@@ -218,6 +244,25 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
                       </div>
                       <div className="fm-paper__fade" aria-hidden="true" />
                       <div className="fm-paper__footer">{latestRulesFallback.endStateLine}</div>
+                    </article>
+                  </div>
+                ) : latestPersistedLetter ? (
+                  <div className="fm-paper-stack fm-paper-stack--fixed">
+                    <article className="fm-paper">
+                      <div className="fm-paper__clip" aria-hidden="true" />
+                      <div className="fm-paper__stats">
+                        <span className="fm-paper__stat tone-cyan">存档事实</span>
+                        <span className="fm-paper__stat tone-mint">M{latestPersistedLetter.monthIndex}</span>
+                      </div>
+                      <div className="fm-paper__date">M{latestPersistedLetter.monthIndex}</div>
+                      <h2 className="fm-paper__title">{latestPersistedLetter.title}</h2>
+                      <div className="fm-paper__copy fm-paper__copy--scroll">
+                        <p>{latestPersistedLetter.body}</p>
+                      </div>
+                      <div className="fm-paper__fade" aria-hidden="true" />
+                      <div className="fm-paper__footer">
+                        {latestPersistedLetter.fallback ? "规则层事实信件" : "月记归档"}
+                      </div>
                     </article>
                   </div>
                 ) : pendingMonths.length > 0 ? (
@@ -304,9 +349,9 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
             />
 
             <div className="mt-6">
-              {growthEntries.length > 0 ? (
+              {timelineEntries.length > 0 ? (
                 <div className="fm-timeline">
-                  {growthEntries.map((entry, index) => (
+                  {timelineEntries.map((entry, index) => (
                     <article
                       key={entry.id}
                       className={`fm-timeline-entry ${index === 0 ? "is-current" : ""}`}
@@ -322,9 +367,9 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
                             {index === 0 ? "当前月" : entry.badge}
                           </FmBadge>
                         </div>
-                        {buildTimelineTags(entry.state.snapshot_json).length > 0 ? (
+                        {entry.details.length > 0 ? (
                           <div className="fm-timeline-tags">
-                            {buildTimelineTags(entry.state.snapshot_json).map((tag) => (
+                            {entry.details.slice(0, 4).map((tag) => (
                               <span key={`${entry.id}-${tag}`} className="fm-timeline-tag">
                                 {tag}
                               </span>

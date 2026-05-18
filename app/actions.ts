@@ -7,10 +7,13 @@ import { buildPlannerDaysView } from "@/app/game/view-model";
 import { ensureDemoSchema } from "@/db/ensure-schema";
 import { generateAiReport } from "@/lib/ai/reports";
 import { ACTIVE_RUN_COOKIE } from "@/lib/demo/active-run";
+import { demoSavePresetIds } from "@/lib/demo/presets";
 import {
   advanceServerDemoTurn,
   confirmServerWeek,
+  createServerDemoPresetRun,
   createServerDemoRun,
+  decideServerFutureOffer,
   planServerWeekdayAction,
   setServerWeekAttendance,
 } from "@/lib/demo/server";
@@ -47,6 +50,8 @@ const newRunSchema = z.object({
   name: z.string().trim().min(2).max(12),
   discipline: z.enum(["arts", "science", "engineering", "business", "medicine"]),
 });
+const demoPresetIdSchema = z.enum(demoSavePresetIds);
+const offerDecisionSchema = z.enum(["accept", "reject"]);
 const plannedActionSnapshotEntrySchema = z.object({
   weekday: weekdaySchema,
   optionId: z.string().min(1),
@@ -129,6 +134,31 @@ export async function startNewRunAction(formData?: FormData) {
   });
   await persistActiveRun(result.run.id);
   redirect(`/admission?runId=${result.run.id}`);
+}
+
+export async function loadDemoSaveAction(formData: FormData) {
+  const presetId = demoPresetIdSchema.safeParse(readString(formData, "presetId"));
+
+  if (!presetId.success) {
+    redirect("/demo-saves");
+  }
+
+  const result = await createServerDemoPresetRun(presetId.data);
+  await persistActiveRun(result.run.id);
+  redirect(`/game?runId=${result.run.id}`);
+}
+
+export async function decideFutureOfferAction(formData: FormData) {
+  const runId = z.string().min(1).parse(readString(formData, "runId"));
+  const offerId = z.string().min(1).parse(readString(formData, "offerId"));
+  const decision = offerDecisionSchema.parse(readString(formData, "decision"));
+
+  await persistActiveRun(runId);
+  await decideServerFutureOffer(runId, {
+    offerId,
+    decision,
+  });
+  redirect(`/resume?runId=${runId}`);
 }
 
 export async function planWeekdayActionAction(input: {

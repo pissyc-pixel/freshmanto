@@ -1,4 +1,5 @@
 import { ActiveRunSync } from "@/components/active-run-sync";
+import { FormalDocumentPreview } from "@/components/formal-artifacts";
 import { FmBadge } from "@/components/fm-ui/FmBadge";
 import { FmCard } from "@/components/fm-ui/FmCard";
 import { FmEmptyState } from "@/components/fm-ui/FmEmptyState";
@@ -18,6 +19,7 @@ import {
   ensureProgressionState,
 } from "@/core/resolvers/progression";
 import { resolveActiveRunId } from "@/lib/demo/active-run";
+import { buildEndingFormalArtifact } from "@/lib/demo/formal-artifacts";
 import {
   formatCityTier,
   formatCollegeTrack,
@@ -27,6 +29,7 @@ import {
 } from "@/lib/demo/options";
 import { sanitizePlayerFacingText } from "@/lib/player-facing-text";
 import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
+import { normalizeSaveState } from "@/lib/demo/save-state";
 import { getServerEndingPreview } from "@/lib/demo/server";
 import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
 import type { GameRun } from "@/types/game";
@@ -86,6 +89,12 @@ function coerceRunForEnding(run: Partial<GameRun>): GameRun {
     progression: run.progression,
     competitionProjects: run.competitionProjects ?? [],
     scholarships: run.scholarships ?? [],
+    internshipRecords: run.internshipRecords ?? [],
+    futureOffers: run.futureOffers ?? [],
+    acceptedOffer: run.acceptedOffer ?? null,
+    timelineNodes: run.timelineNodes ?? [],
+    monthlyLetters: run.monthlyLetters ?? [],
+    endingEvidence: run.endingEvidence ?? [],
   };
 }
 
@@ -373,7 +382,7 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
     );
   }
 
-  const run = ensureProgressionState(coerceRunForEnding(bundle.run));
+  const run = ensureProgressionState(normalizeSaveState(coerceRunForEnding(bundle.run)));
   const completed = run.status === "completed";
   const academicProfile = deriveAcademicProfile(run);
   const directionPerception = buildDirectionPerception(run);
@@ -422,6 +431,9 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
     failedSemesterCount,
     riskFlagCount,
   });
+  const savedEndingEvidence = (run.endingEvidence ?? [])
+    .slice()
+    .sort((left, right) => left.monthIndex - right.monthIndex);
   const letterBody = bundle.savedEndingReport?.output_markdown
     ? sanitizePlayerFacingText(bundle.savedEndingReport.output_markdown)
     : buildFallbackLetter({
@@ -436,6 +448,7 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
   const positionLabel = completed
     ? formatMonthLabel(bundle.endingSummary.finalYear, 12)
     : formatMonthLabel(Math.min(run.currentYear, 4), Math.min(run.currentMonth, 12));
+  const endingFormalArtifact = completed ? buildEndingFormalArtifact(run, bundle.endingSummary) : null;
 
   return (
     <FmShellLayout
@@ -583,6 +596,24 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
               </FmCard>
             </FmMotionSection>
 
+            {endingFormalArtifact ? (
+              <FmMotionSection delay={370}>
+                <FmPanel>
+                  <FmSectionHead
+                    title="正式结果文件"
+                    copy="这是根据最终结局事实生成的正式录取 / offer 文件，不补写未发生的学校、单位或录用细节。"
+                    aside={<FmBadge tone="ending">{endingFormalArtifact.badgeLabel}</FmBadge>}
+                  />
+                  <div className="mt-6">
+                    <FormalDocumentPreview
+                      artifact={endingFormalArtifact}
+                      recipientName={run.profile.name ?? "同学"}
+                    />
+                  </div>
+                </FmPanel>
+              </FmMotionSection>
+            ) : null}
+
             <FmMotionSection delay={420}>
               <FmCard variant="normal">
                 <FmSectionHead title="为什么会走到这个结局？" copy="证据链只引用真实数据：投入、学业、履历、状态、金钱和方向变化。" />
@@ -597,6 +628,26 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
                 </div>
               </FmCard>
             </FmMotionSection>
+
+            {savedEndingEvidence.length > 0 ? (
+              <FmMotionSection delay={470}>
+                <FmCard variant="completed">
+                  <FmSectionHead
+                    title="存档证据链"
+                    copy="这些条目来自 run state 已经写入的证据链，不从前端临时编造。"
+                  />
+                  <div className="mt-6 fm-evidence-list">
+                    {savedEndingEvidence.map((item) => (
+                      <div key={item.id} className="fm-evidence-row">
+                        <div className="fm-evidence-row__title">{item.title}</div>
+                        <div className="fm-evidence-row__copy">{item.body}</div>
+                        <FmBadge tone="resume">M{item.monthIndex}</FmBadge>
+                      </div>
+                    ))}
+                  </div>
+                </FmCard>
+              </FmMotionSection>
+            ) : null}
 
             <FmMotionSection delay={520}>
               <section className="fm-ending-letter">

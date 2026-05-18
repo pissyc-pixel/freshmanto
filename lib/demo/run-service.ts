@@ -10,8 +10,9 @@ import {
   selectWeekAttendanceStrategy,
   settleSemester,
 } from "@/core/game-engine";
-import { deriveAcademicProfile, settleLongTermProgression } from "@/core/resolvers/progression";
+import { acceptFutureOfferDecision, deriveAcademicProfile, settleLongTermProgression } from "@/core/resolvers/progression";
 import { renderEndingReportFallback, renderMonthlyJournalFallback } from "@/lib/ai/reports";
+import { normalizeSaveState } from "@/lib/demo/save-state";
 import type { AiReportRequest, AiReportResult } from "@/types/ai";
 import type {
   ActionTurnPlan,
@@ -380,6 +381,12 @@ async function persistMonthArtifacts(input: {
     progression: settledRun.progression,
     competitionProjects: settledRun.competitionProjects,
     scholarshipAwarded: longTermSettlement.scholarshipAwarded,
+    internshipRecords: settledRun.internshipRecords,
+    futureOffers: settledRun.futureOffers,
+    acceptedOffer: settledRun.acceptedOffer,
+    timelineNodes: settledRun.timelineNodes,
+    monthlyLetters: settledRun.monthlyLetters,
+    endingEvidence: settledRun.endingEvidence,
   };
 
   await input.repository.saveMonthlyState({
@@ -528,7 +535,7 @@ export async function setDemoWeekAttendance(input: {
     throw new Error(`Run ${input.runId} was not found.`);
   }
 
-  const baseRun = existing.current_state_json;
+  const baseRun = normalizeSaveState(existing.current_state_json);
   const playedYear = baseRun.currentYear;
   const playedMonth = baseRun.currentMonth;
   const playedWeek = baseRun.activeMonth?.currentWeek ?? 1;
@@ -575,7 +582,7 @@ export async function planDemoWeekday(input: {
     throw new Error(`Run ${input.runId} was not found.`);
   }
 
-  const baseRun = existing.current_state_json;
+  const baseRun = normalizeSaveState(existing.current_state_json);
   const playedYear = baseRun.currentYear;
   const playedMonth = baseRun.currentMonth;
   const playedWeek = baseRun.activeMonth?.currentWeek ?? 1;
@@ -628,7 +635,7 @@ export async function confirmDemoWeek(input: {
     throw new Error(`Run ${input.runId} was not found.`);
   }
 
-  const baseRun = applyPlannedActionsSnapshot(existing.current_state_json, input.plannedActionsSnapshot);
+  const baseRun = applyPlannedActionsSnapshot(normalizeSaveState(existing.current_state_json), input.plannedActionsSnapshot);
   const playedYear = baseRun.currentYear;
   const playedMonth = baseRun.currentMonth;
   const playedWeek = baseRun.activeMonth?.currentWeek ?? 1;
@@ -707,7 +714,7 @@ export async function advanceDemoTurn(input: {
     throw new Error(`Run ${input.runId} was not found.`);
   }
 
-  const baseRun = existing.current_state_json;
+  const baseRun = normalizeSaveState(existing.current_state_json);
   const playedYear = baseRun.currentYear;
   const playedMonth = baseRun.currentMonth;
   const playedWeek = baseRun.activeMonth?.currentWeek ?? 1;
@@ -782,7 +789,7 @@ export async function endDemoWeek(input: {
     throw new Error(`Run ${input.runId} was not found.`);
   }
 
-  const baseRun = existing.current_state_json;
+  const baseRun = normalizeSaveState(existing.current_state_json);
   const playedYear = baseRun.currentYear;
   const playedMonth = baseRun.currentMonth;
   const playedWeek = baseRun.activeMonth?.currentWeek ?? 1;
@@ -857,7 +864,7 @@ export async function advanceDemoMonth(input: {
     throw new Error(`Run ${input.runId} was not found.`);
   }
 
-  const baseRun = existing.current_state_json;
+  const baseRun = normalizeSaveState(existing.current_state_json);
   const playedYear = baseRun.currentYear;
   const playedMonth = baseRun.currentMonth;
   const monthlyResult = resolveMonthlyTurn(baseRun, input.plan);
@@ -896,10 +903,49 @@ export async function advanceDemoMonth(input: {
     run: monthArtifacts.nextRun,
     playedYear,
     playedMonth,
-    monthlySummary: monthlyResult.summary,
+    monthlySummary: monthArtifacts.monthlySummary,
     monthlyReport: monthArtifacts.monthlyReport,
     semesterSettlement: monthArtifacts.semesterSettlement,
     endingSummary: monthArtifacts.endingSummary,
     endingReport: monthArtifacts.endingReport,
   };
+}
+
+export async function decideFutureOffer(input: {
+  repository: DemoRepository;
+  runId: string;
+  offerId: string;
+  decision: "accept" | "reject";
+}) {
+  const existing = await input.repository.getRun(input.runId);
+
+  if (!existing) {
+    throw new Error(`Run ${input.runId} was not found.`);
+  }
+
+  const baseRun = normalizeSaveState(existing.current_state_json);
+  const nextRun = acceptFutureOfferDecision(baseRun, input.offerId, input.decision);
+
+  await input.repository.writeEventLogs([
+    {
+      runId: input.runId,
+      year: baseRun.currentYear,
+      month: baseRun.currentMonth,
+      logType: "settlement",
+      message: input.decision === "accept" ? "已接受未来 offer" : "已放下未来 offer",
+      metadata: {
+        offerId: input.offerId,
+        decision: input.decision,
+      },
+    },
+  ]);
+  await input.repository.updateRun(input.runId, {
+    status: nextRun.status,
+    currentYear: nextRun.currentYear,
+    currentMonth: nextRun.currentMonth,
+    profile: nextRun.profile,
+    currentState: nextRun,
+  });
+
+  return { run: nextRun };
 }

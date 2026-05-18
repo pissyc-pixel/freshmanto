@@ -1,4 +1,5 @@
 import { ActiveRunSync } from "@/components/active-run-sync";
+import { FormalArtifactCards, FormalDocumentPreview } from "@/components/formal-artifacts";
 import { FmBadge } from "@/components/fm-ui/FmBadge";
 import { FmEmptyState } from "@/components/fm-ui/FmEmptyState";
 import { FmPartialNotice } from "@/components/fm-ui/FmPartialNotice";
@@ -21,8 +22,10 @@ import {
   summarizeDirectionSignals,
 } from "@/core/resolvers/progression";
 import { resolveActiveRunId } from "@/lib/demo/active-run";
+import { buildResumeFormalArtifacts } from "@/lib/demo/formal-artifacts";
 import { buildGrowthJournalEntry } from "@/lib/demo/monthly-digest";
 import { formatMonthLabel } from "@/lib/demo/options";
+import { normalizeSaveState } from "@/lib/demo/save-state";
 import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
 import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
 import { getServerResumeBundle } from "@/lib/demo/server";
@@ -124,7 +127,7 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
     );
   }
 
-  const hydratedRun = ensureProgressionState(bundle.run);
+  const hydratedRun = ensureProgressionState(normalizeSaveState(bundle.run));
   const academicProfile = deriveAcademicProfile(hydratedRun);
   const directionSignals = summarizeDirectionSignals(hydratedRun);
   const directionPerception = buildDirectionPerception(hydratedRun);
@@ -169,6 +172,11 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
         : { badge: "成长日志", periodLabel: formatMonthLabel(state.year, state.month), title: "数据不完整", message: "这条月度记录的快照数据不完整，无法生成成长日志。", details: [] as string[] }),
     }));
 
+  const runForFormalArtifacts = {
+    ...hydratedRun,
+    resume: resumeItems,
+  };
+
   const coreAbilityTags = buildCoreAbilityTags({
     competitionCount: competitionItems.length,
     internshipCount: internshipItems.length,
@@ -177,6 +185,8 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
     gpa: academicProfile.gpa,
   });
   const projectCount = countProjects(resumeItems);
+  const formalArtifacts = buildResumeFormalArtifacts(runForFormalArtifacts);
+  const leadFormalArtifact = formalArtifacts[0] ?? null;
 
   return (
     <FmShellLayout
@@ -263,6 +273,38 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
               </div>
             </FmPanel>
           </FmMotionSection>
+
+          {formalArtifacts.length > 0 ? (
+            <FmMotionSection delay={130}>
+              <FmPanel>
+                <FmSectionHead
+                  title="正式成果档案"
+                  copy="奖学金、竞赛评奖、实习机会和推免资格这些已经写进存档事实的结果，会先在这里被归档。"
+                  aside={<FmBadge tone="ending">真实结果</FmBadge>}
+                />
+                <div className="mt-6">
+                  <FormalArtifactCards artifacts={formalArtifacts} runId={runId} showOfferActions />
+                </div>
+              </FmPanel>
+            </FmMotionSection>
+          ) : null}
+
+          {leadFormalArtifact ? (
+            <FmMotionSection delay={145}>
+              <FmPanel>
+                <FmSectionHead
+                  title="正式结果预览"
+                  copy="这里把已经发生的成果整理成更正式的证书 / 结果文件，不补写尚未发生的奖励或录取。"
+                />
+                <div className="mt-6">
+                  <FormalDocumentPreview
+                    artifact={leadFormalArtifact}
+                    recipientName={hydratedRun.profile.name ?? "同学"}
+                  />
+                </div>
+              </FmPanel>
+            </FmMotionSection>
+          ) : null}
 
           <FmMotionSection delay={160}>
             <FmPanel>
