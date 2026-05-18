@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import type { DynamicStats } from "@/types/game";
 
-function buildMetricItems(stats: DynamicStats) {
+function buildMetricItems(stats: DynamicStats, weeklyLivingCost = 200) {
   return [
     {
       label: "金钱",
-      tone: stats.money < 0 ? "red" : stats.money < 300 ? "amber" : "teal",
-      warning: stats.money < 0 ? "本周基础开销可能不够" : stats.money < 300 ? "现金有点紧" : undefined,
+      tone: stats.money < weeklyLivingCost ? "red" : stats.money < weeklyLivingCost * 1.2 ? "amber" : "teal",
+      warning: stats.money < weeklyLivingCost ? "本周基础开销可能不够" : stats.money < weeklyLivingCost * 1.2 ? "现金有点紧" : undefined,
     },
     {
       label: "心情",
@@ -36,20 +36,30 @@ function createStats(overrides?: Partial<DynamicStats>): DynamicStats {
 
 describe("metric risk thresholds", () => {
   describe("金钱", () => {
-    it("shows red tone when money is negative", () => {
-      const items = buildMetricItems(createStats({ money: -50 }));
+    it("shows red tone when money is below weekly living cost", () => {
+      const weeklyLivingCost = 250;
+      const items = buildMetricItems(createStats({ money: 200 }), weeklyLivingCost);
       expect(items[0].tone).toBe("red");
       expect(items[0].warning).toBe("本周基础开销可能不够");
     });
 
-    it("shows amber tone when money is below 300", () => {
-      const items = buildMetricItems(createStats({ money: 200 }));
+    it("shows red tone when money is positive but below weekly living cost", () => {
+      const weeklyLivingCost = 300;
+      const items = buildMetricItems(createStats({ money: 150 }), weeklyLivingCost);
+      expect(items[0].tone).toBe("red");
+      expect(items[0].warning).toBe("本周基础开销可能不够");
+    });
+
+    it("shows amber tone when money is below 1.2x weekly living cost", () => {
+      const weeklyLivingCost = 250;
+      const items = buildMetricItems(createStats({ money: 280 }), weeklyLivingCost);
       expect(items[0].tone).toBe("amber");
       expect(items[0].warning).toBe("现金有点紧");
     });
 
-    it("shows teal tone when money is normal", () => {
-      const items = buildMetricItems(createStats({ money: 800 }));
+    it("shows teal tone when money is above 1.2x weekly living cost", () => {
+      const weeklyLivingCost = 250;
+      const items = buildMetricItems(createStats({ money: 800 }), weeklyLivingCost);
       expect(items[0].tone).toBe("teal");
       expect(items[0].warning).toBeUndefined();
     });

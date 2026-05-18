@@ -31,10 +31,11 @@ import {
 import { buildRunHref, resolveActiveRunId } from "@/lib/demo/active-run";
 import { buildGrowthJournalEntry } from "@/lib/demo/monthly-digest";
 import { formatMonthLabel } from "@/lib/demo/options";
+import { getWeeklyLivingExpense } from "@/data/events";
 import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
 import { getServerGameBundle } from "@/lib/demo/server";
 import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
-import type { DynamicStats, TimeBlockKind } from "@/types/game";
+import type { DynamicStats, GameRun, TimeBlockKind } from "@/types/game";
 
 export const dynamic = "force-dynamic";
 
@@ -46,15 +47,16 @@ function clampProgress(value: number, max = 100) {
   return Math.max(0, Math.min(value / max, 1));
 }
 
-function buildMetricItems(stats: DynamicStats) {
+function buildMetricItems(stats: DynamicStats, run?: GameRun) {
+  const weeklyLivingCost = run ? getWeeklyLivingExpense(run) : 200;
   return [
     {
       label: "金钱",
       value: `${stats.money}`,
-      tone: stats.money < 0 ? "red" : stats.money < 300 ? "amber" : "teal",
+      tone: stats.money < weeklyLivingCost ? "red" : stats.money < weeklyLivingCost * 1.2 ? "amber" : "teal",
       icon: "chart" as const,
       progress: clampProgress(stats.money, 2400),
-      warning: stats.money < 0 ? "本周基础开销可能不够" : stats.money < 300 ? "现金有点紧" : undefined,
+      warning: stats.money < weeklyLivingCost ? "本周基础开销可能不够" : stats.money < weeklyLivingCost * 1.2 ? "现金有点紧" : undefined,
     },
     {
       label: "心情",
@@ -215,7 +217,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
     >
       <div className="fm-stack" data-testid="game-page">
         <ActiveRunSync runId={bundle.run.id} />
-        <FmMetricStrip items={buildMetricItems(hydratedRun.stats)} />
+        <FmMetricStrip items={buildMetricItems(hydratedRun.stats, hydratedRun)} />
 
         <div className="fm-grid-2">
           <div className="fm-stack">
