@@ -159,7 +159,7 @@ describe("game page view-model helpers", () => {
     expect(competitionOption?.progressText).toContain("达到 4 次后");
   });
 
-  it("uses trend arrows instead of emoji in action trend descriptions", () => {
+  it("uses plain player-facing trend text instead of emoji or arrows in action descriptions", () => {
     const weeklyCalendar = createWeeklyCalendar(1);
     const currentWeekState: ActiveWeekState = {
       week: 1,
@@ -187,6 +187,6 @@ describe("game page view-model helpers", () => {
     const studyOption = monday?.normalOptions.find((option) => option.action === "study");
     expect(studyOption?.description).toBeDefined();
     expect(studyOption!.description!).toContain("学业");
-    expect(studyOption!.description!).toContain("↗");
+    expect(studyOption!.description!).toContain("压力上升");
   });
 });
