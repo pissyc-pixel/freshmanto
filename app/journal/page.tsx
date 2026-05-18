@@ -10,6 +10,7 @@ import {
 } from "@/components/fm-ui/FmScaffold";
 import { resolveActiveRunId } from "@/lib/demo/active-run";
 import { buildJournalOverview } from "@/lib/journal-overview";
+import { buildMonthlyJournalRulesFallback } from "@/lib/ai/reports";
 import { buildGrowthJournalEntry, buildMonthlyDiaryDigest } from "@/lib/demo/monthly-digest";
 import { formatMonthLabel } from "@/lib/demo/options";
 import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
@@ -96,12 +97,21 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
       ...buildGrowthJournalEntry(state.snapshot_json, state.year, state.month),
     }));
 
-  const latestReport = monthlyReports.at(-1) ?? null;
-  const latestState = latestReport
-    ? bundle.monthlyStates.find((state) => state.year === latestReport.year && state.month === latestReport.month)
+  const latestState = bundle.monthlyStates.at(-1) ?? null;
+  const latestReport = latestState
+    ? monthlyReports.find((report) => report.year === latestState.year && report.month === latestState.month) ?? null
     : null;
   const latestDigest = latestState
     ? buildMonthlyDiaryDigest(latestState.snapshot_json, latestState.year, latestState.month)
+    : null;
+  const latestRulesFallback = latestState
+    ? buildMonthlyJournalRulesFallback({
+        kind: "monthly_journal",
+        runId: bundle.run.id,
+        year: latestState.year,
+        month: latestState.month,
+        summary: latestState.snapshot_json,
+      })
     : null;
 
   return (
@@ -149,6 +159,31 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
                     <div className="fm-paper__footer">
                       方向线索：{latestDigest.directionSignal}
                     </div>
+                  </article>
+                </div>
+              ) : latestRulesFallback && latestDigest ? (
+                <div className="fm-paper-stack">
+                  <article className="fm-paper">
+                    <div className="fm-paper__tape" />
+                    <div className="fm-paper__stats">
+                      <span className="fm-paper__stat tone-teal">学业 {latestDigest.endState.feedback}</span>
+                      <span className="fm-paper__stat tone-amber">资金 {formatMoney(latestDigest.endState.money)}</span>
+                      <span className="fm-paper__stat tone-rose">压力 {latestDigest.endState.stress}</span>
+                    </div>
+                    <div className="fm-paper__date">{latestRulesFallback.monthLabel}</div>
+                    <h2 className="fm-paper__title">月记规则摘要</h2>
+                    <div className="fm-paper__copy">
+                      <p>{latestRulesFallback.intro}</p>
+                      <ul className="mt-3 space-y-2">
+                        {latestRulesFallback.sections.map((section) => (
+                          <li key={section.label}>
+                            <strong>{section.label}</strong>
+                            {`：${section.text}`}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="fm-paper__footer">{latestRulesFallback.endStateLine}</div>
                   </article>
                 </div>
               ) : pendingMonths.length > 0 ? (

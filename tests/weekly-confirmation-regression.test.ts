@@ -7,7 +7,7 @@ import {
   planWeeklyDayAction,
   selectWeekAttendanceStrategy,
 } from "@/core/game-engine";
-import { getWeeklyLivingExpense } from "@/data/events";
+import { getMonthlyLivingExpense } from "@/data/events";
 import type {
   GameRun,
   WeeklyActionOption,
@@ -128,7 +128,7 @@ describe("weekly confirmation regression", () => {
     });
     const wednesdayPlanned = planWeeklyDayAction({
       run: tuesdayPlanned,
-      weekday: "wed",
+      weekday: "sun",
       optionId: "relax",
     });
     const saturdayPlanned = planWeeklyDayAction({
@@ -142,12 +142,12 @@ describe("weekly confirmation regression", () => {
 
     expect(settlement?.dailyResults.find((day) => day.weekday === "mon")?.resolvedAction.action).toBe("study");
     expect(settlement?.dailyResults.find((day) => day.weekday === "tue")?.resolvedAction.action).toBe("social");
-    expect(settlement?.dailyResults.find((day) => day.weekday === "wed")?.resolvedAction.action).toBe("relax");
+    expect(settlement?.dailyResults.find((day) => day.weekday === "sun")?.resolvedAction.action).toBe("relax");
     expect(settlement?.dailyResults.find((day) => day.weekday === "sat")?.resolvedAction.action).toBe("job_prep");
     expect(settlement?.dailyResults.filter((day) => day.resolvedAction.action === "idle")).toHaveLength(3);
     expect(
       settlement?.dailyResults.filter((day) => day.resolvedAction.autoFilled).map((day) => day.weekday),
-    ).toEqual(["thu", "fri", "sun"]);
+    ).toEqual(["wed", "thu", "fri"]);
   });
 
   it("keeps weekly settlements in the month summary and exposes them to the monthly journal input", () => {
@@ -203,13 +203,13 @@ describe("weekly confirmation regression", () => {
         money: 120,
       },
     };
-    const weeklyExpense = getWeeklyLivingExpense(lowCashRun);
-    const shortfall = weeklyExpense - lowCashRun.stats.money;
+    const monthlyExpense = getMonthlyLivingExpense(lowCashRun);
+    const shortfall = monthlyExpense - lowCashRun.stats.money;
     const withAttendance = selectWeekAttendanceStrategy(lowCashRun, "mixed");
     const warningText = (withAttendance.activeMonth?.currentWeekState.planningWarnings ?? []).join(" ");
 
     expect(warningText).toContain(`${lowCashRun.stats.money}`);
-    expect(warningText).toContain(`${weeklyExpense}`);
+    expect(warningText).toContain(`${monthlyExpense}`);
     expect(warningText).toContain(`${shortfall}`);
     expect(warningText).toMatch(/兼职|赚钱|找家里要钱|控制支出|补现金/);
   });

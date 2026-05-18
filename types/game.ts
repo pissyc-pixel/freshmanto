@@ -243,6 +243,16 @@ export type WeeklyActionEffect = {
   };
 };
 
+export type MoneyBreakdown = {
+  monthStartAllowance?: number;
+  baseLivingCost: number;
+  actionCost: number;
+  actionIncome: number;
+  specialCost: number;
+  specialIncome: number;
+  netChange: number;
+};
+
 export type WeeklyActionOption = {
   optionId: string;
   action: ActionType;
@@ -405,6 +415,7 @@ export type ActionTurnSummary = {
   weekTimeAfter?: number;
   releasedClassDays?: Weekday[];
   weekCompleted?: boolean;
+  moneyBreakdown?: MoneyBreakdown;
 };
 
 export type WeeklySettlementSummary = {

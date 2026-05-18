@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   AcademicProfileSnapshot,
   ActionType,
   CareerRouteState,
@@ -138,7 +138,14 @@ function createSeededProject(run: GameRun, slot: number): CompetitionProject {
 }
 
 export function deriveAcademicProfile(run: GameRun): AcademicProfileSnapshot {
-  const hasSettledSemester = run.semesters.length > 0 && run.semesterAverage > 0;
+  const semesters = run.semesters ?? [];
+  const schoolTier = run.profile ? schoolTierScore(run.profile) : 1;
+  const semesterAcademics = run.stats?.semesterAcademics ?? 0;
+  const academicRisk = run.risk?.academicRisk ?? 0;
+  const resumeStrength = run.resume?.length
+    ? resumeScore(run, [["科研", "研究", "实验室"], ["竞赛", "比赛"]])
+    : 0;
+  const hasSettledSemester = semesters.length > 0 && run.semesterAverage > 0;
   const academicBase = hasSettledSemester ? run.semesterAverage : null;
   const gpa = academicBase === null ? null : Number(clamp(academicBase / 20, 1.8, 4.0).toFixed(2));
   const competitionCount = (run.competitionProjects ?? []).filter((project) => project.result).length;
@@ -146,18 +153,18 @@ export function deriveAcademicProfile(run: GameRun): AcademicProfileSnapshot {
   const rank = academicBase === null
     ? null
     : clamp(
-      Math.round(65 - academicBase * 0.4 - schoolTierScore(run.profile) * 1.3 - competitionCount * 1.8 - scholarshipBonus * 2),
+      Math.round(65 - academicBase * 0.4 - schoolTier * 1.3 - competitionCount * 1.8 - scholarshipBonus * 2),
       1,
       95,
     );
   const percentile = rank === null ? null : clamp(100 - rank, 1, 99);
   const recommendationScore = clamp(
     Math.round(
-      (academicBase ?? clamp(60 + run.stats.semesterAcademics - run.risk.academicRisk * 0.7, 45, 92)) * 0.55 +
+      (academicBase ?? clamp(60 + semesterAcademics - academicRisk * 0.7, 45, 92)) * 0.55 +
         competitionCount * 6 +
         scholarshipBonus * 5 +
-        schoolTierScore(run.profile) * 2 +
-        resumeScore(run, [["科研", "研究", "实验室"], ["竞赛", "比赛"]]) * 3,
+        schoolTier * 2 +
+        resumeStrength * 3,
     ),
     0,
     100,
@@ -1025,7 +1032,7 @@ function evaluateScholarshipLevel(run: GameRun, academicYear: number): Scholarsh
   }
 
   const semesterStart = (academicYear - 2) * 2;
-  const yearSemesters = run.semesters.slice(semesterStart, semesterStart + 2);
+  const yearSemesters = (run.semesters ?? []).slice(semesterStart, semesterStart + 2);
   if (yearSemesters.length === 0) {
     return null;
   }

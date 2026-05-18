@@ -131,6 +131,39 @@ function isVacationActionAllowed(action: WeeklyActionOption["action"], run: Game
   return baselineVacationActions.has(action);
 }
 
+function customizeActionOptionForRun(option: WeeklyActionOption, run: GameRun | undefined): WeeklyActionOption {
+  if (!run) {
+    return option;
+  }
+
+  if (run.profile.collegeTrack !== "engineering") {
+    return option;
+  }
+
+  switch (option.action) {
+    case "study":
+      return {
+        ...option,
+        label: "课程复习",
+        description: "围绕课程复习、刷题和补知识点推进学业。",
+      };
+    case "writing_research":
+      return {
+        ...option,
+        label: "技术调研 / 实验记录",
+        description: "做技术调研、实验记录、项目建模或工程训练整理，符合工科推进节奏。",
+      };
+    case "competition_project":
+      return {
+        ...option,
+        label: "电赛 / 竞赛准备",
+        description: "给手里的电赛、项目实践或工程训练继续投入，推进可参赛成果。",
+      };
+    default:
+      return option;
+  }
+}
+
 function resolveWeekdayKind(weekday: Weekday): TimeBlockKind {
   if (weekday === "sat" || weekday === "sun") {
     return "free";
@@ -277,10 +310,10 @@ export function resolveAvailableWeeklyActions(input: {
 
   const eventOption =
     shouldShowSpecialAction && input.event?.specialAction
-      ? [input.event.specialAction]
+      ? [customizeActionOptionForRun(input.event.specialAction, input.run)]
       : [];
 
-  return [...baseOptions, ...eventOption];
+  return [...baseOptions, ...eventOption].map((option) => customizeActionOptionForRun(option, input.run));
 }
 
 export function isWeekReadyToConfirm(weekState: ActiveWeekState): boolean {

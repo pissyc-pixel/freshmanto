@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { ComponentPropsWithoutRef, ReactNode } from "react";
 
 import { buildRunHref } from "@/lib/demo/active-run";
@@ -32,7 +32,7 @@ type SidebarLink = {
 const sidebarLinks: SidebarLink[] = [
   {
     key: "game",
-    label: "本周周历",
+    label: "鏈懆鍛ㄥ巻",
     href: "/game",
     icon: "calendar",
     readiness: "weeklyPlanner",
@@ -40,7 +40,7 @@ const sidebarLinks: SidebarLink[] = [
   },
   {
     key: "journal",
-    label: "成长日志",
+    label: "鎴愰暱鏃ュ織",
     href: "/journal",
     icon: "book",
     readiness: "journal",
@@ -48,7 +48,7 @@ const sidebarLinks: SidebarLink[] = [
   },
   {
     key: "resume",
-    label: "个人履历",
+    label: "涓汉灞ュ巻",
     href: "/resume",
     icon: "file",
     readiness: "resume",
@@ -56,7 +56,7 @@ const sidebarLinks: SidebarLink[] = [
   },
   {
     key: "ending",
-    label: "结局预览",
+    label: "缁撳眬棰勮",
     href: "/ending",
     icon: "chart",
     readiness: "endingPreview",
@@ -307,9 +307,9 @@ export function FmShellLayout({
           </section>
 
           <nav className="fm-sidebar__nav" data-testid="formal-sidebar-nav">
-            <Link href="/" className={`fm-nav-link ${active === "game" ? "" : ""}`.trim()}>
+            <Link href="/" aria-hidden={Boolean(runId)} className={`fm-nav-link ${runId ? "hidden" : ""}`.trim()}>
               <FmIcon name="home" />
-              <span>开局页</span>
+              <span>{runId ? "" : "开局页"}</span>
             </Link>
 
             {sidebarLinks.map((link) => {

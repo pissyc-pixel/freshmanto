@@ -10,7 +10,7 @@ import {
 } from "@/core/resolvers/progression";
 import { findWeeklyEventBoost, resolveWeeklyEvent } from "@/core/resolvers/weekly-events";
 import { findWeeklyActionOption } from "@/data/actions";
-import { getWeeklyAllowance, getWeeklyLivingExpense } from "@/data/events";
+import { getMonthlyLivingExpense, getWeeklyLivingExpense } from "@/data/events";
 import {
   buildPlannerWeekdays,
   createMonthlySchedule,
@@ -35,6 +35,7 @@ import type {
   CourseResolution,
   DynamicStats,
   GameRun,
+  MoneyBreakdown,
   MonthlyActionPlan,
   PlannedAction,
   PlannedWeekdayState,
@@ -141,6 +142,88 @@ function sumRisk(base: RiskState, addition: Partial<RiskState> | undefined): Ris
   };
 }
 
+function createEmptyMoneyBreakdown(): MoneyBreakdown {
+  return {
+    baseLivingCost: 0,
+    actionCost: 0,
+    actionIncome: 0,
+    specialCost: 0,
+    specialIncome: 0,
+    netChange: 0,
+  };
+}
+
+function addMoneyDeltaToBreakdown(
+  breakdown: MoneyBreakdown,
+  value: number,
+  bucket: "base" | "action" | "special",
+) {
+  if (value === 0) {
+    return breakdown;
+  }
+
+  const next = {
+    ...breakdown,
+    netChange: breakdown.netChange + value,
+  };
+
+  if (bucket === "base") {
+    next.baseLivingCost += Math.abs(value);
+    return next;
+  }
+
+  if (bucket === "action") {
+    if (value > 0) {
+      next.actionIncome += value;
+    } else {
+      next.actionCost += Math.abs(value);
+    }
+    return next;
+  }
+
+  if (value > 0) {
+    next.specialIncome += value;
+  } else {
+    next.specialCost += Math.abs(value);
+  }
+
+  return next;
+}
+
+function mergeMoneyBreakdowns(...breakdowns: Array<MoneyBreakdown | undefined>): MoneyBreakdown {
+  return breakdowns.reduce<MoneyBreakdown>((merged, current) => {
+    if (!current) {
+      return merged;
+    }
+
+    return {
+      monthStartAllowance: (merged.monthStartAllowance ?? 0) + (current.monthStartAllowance ?? 0) || undefined,
+      baseLivingCost: merged.baseLivingCost + current.baseLivingCost,
+      actionCost: merged.actionCost + current.actionCost,
+      actionIncome: merged.actionIncome + current.actionIncome,
+      specialCost: merged.specialCost + current.specialCost,
+      specialIncome: merged.specialIncome + current.specialIncome,
+      netChange: merged.netChange + current.netChange,
+    };
+  }, createEmptyMoneyBreakdown());
+}
+
+function effectMoneyDelta(effect: WeeklyActionEffect | undefined) {
+  if (!effect) {
+    return 0;
+  }
+
+  return (effect.money ?? 0) + (effect.stats?.money ?? 0);
+}
+
+function buildEffectMoneyBreakdown(effect: WeeklyActionEffect | undefined, bucket: "base" | "special") {
+  if (!effect) {
+    return createEmptyMoneyBreakdown();
+  }
+
+  return addMoneyDeltaToBreakdown(createEmptyMoneyBreakdown(), effectMoneyDelta(effect), bucket);
+}
+
 function createPlannerFeedback(
   kind: NonNullable<ActiveWeekState["plannerFeedback"]>["kind"],
   title: string,
@@ -175,7 +258,7 @@ function buildWeeklyCashWarnings(run: GameRun, weekState: ActiveWeekState): stri
 
   return warnings;
 }
-
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function buildDetailedWeeklyCashWarnings(run: GameRun, weekState: ActiveWeekState): string[] {
   const weeklyLivingExpense = getWeeklyLivingExpense(run);
   const warnings: string[] = [];
@@ -195,6 +278,62 @@ function buildDetailedWeeklyCashWarnings(run: GameRun, weekState: ActiveWeekStat
 
   if (!hasWeeklyCashPlan(weekState) && run.stats.money <= weeklyLivingExpense + 300) {
     warnings.push("手头现金已经贴近危险线了，这周最好至少留一个补现金的动作，别等到周结算后才发现下周固定开销扛不住。");
+  }
+
+  return warnings;
+}
+
+function estimatePlannedActionNetDelta(run: GameRun, weekState: ActiveWeekState): number {
+  return (weekState.days ?? []).reduce((sum, day) => {
+    if (!day.plannedAction) {
+      return sum;
+    }
+
+    const resolution = resolveActionPlan(run, {
+      attendanceStrategy: weekState.attendanceStrategy,
+      actions: [day.plannedAction],
+    });
+
+    return sum + resolution.moneyBreakdown.netChange;
+  }, 0);
+}
+
+function estimateRemainingMonthlyBaseCost(run: GameRun): number {
+  const activeMonth = run.activeMonth;
+  const monthlyLivingExpense = getMonthlyLivingExpense(run);
+
+  if (!activeMonth) {
+    return monthlyLivingExpense;
+  }
+
+  const totalWeeks = activeMonth.totalWeeks || WEEKS_PER_MONTH;
+  const settledWeeks = activeMonth.completedWeeks?.length ?? 0;
+  const remainingWeeks = Math.max(0, totalWeeks - settledWeeks);
+  return Math.round((monthlyLivingExpense / totalWeeks) * remainingWeeks);
+}
+
+function buildMonthlyCashWarnings(run: GameRun, weekState: ActiveWeekState): string[] {
+  const weeklyLivingExpense = getWeeklyLivingExpense(run);
+  const remainingMonthlyBaseCost = estimateRemainingMonthlyBaseCost(run);
+  const plannedActionNet = estimatePlannedActionNetDelta(run, weekState);
+  const projectedMonthEndCash = run.stats.money - remainingMonthlyBaseCost + plannedActionNet;
+  const warnings: string[] = [];
+  const shortfall = Math.max(0, remainingMonthlyBaseCost - (run.stats.money + plannedActionNet));
+
+  if (run.stats.money < 0) {
+    warnings.push(
+      `当前余额 ${run.stats.money} 元，已经是负数了；算上本月剩余基础开销约 ${remainingMonthlyBaseCost} 元，现金压力只会继续往上走。建议优先安排赚钱、止损，或者尽快向家里求助。`,
+    );
+  }
+
+  if (projectedMonthEndCash < 0) {
+    warnings.push(
+      `按当前余额 ${run.stats.money} 元、已选行动净变化 ${plannedActionNet >= 0 ? `+${plannedActionNet}` : plannedActionNet} 元、以及本月剩余基础开销约 ${remainingMonthlyBaseCost} 元来算，月底大约还会差 ${shortfall} 元。最好现在就补现金，不要等到周结算后才发现撑不住。`,
+    );
+  }
+
+  if (!hasWeeklyCashPlan(weekState) && run.stats.money <= weeklyLivingExpense + 300) {
+    warnings.push("手头现金已经贴近危险线了。这周最好至少留一个补现金动作，避免基础生活成本一扣就直接见底。");
   }
 
   return warnings;
@@ -312,7 +451,7 @@ function buildWeekPlanningState(
     plannerFeedback: input?.plannerFeedback,
     event,
     days: mergedDays,
-    planningWarnings: buildDetailedWeeklyCashWarnings(run, {
+    planningWarnings: buildMonthlyCashWarnings(run, {
       ...baseState,
       attendanceStrategy,
       attendanceLocked: input?.attendanceLocked ?? false,
@@ -335,7 +474,7 @@ function ensurePlanningWeekState(run: GameRun, activeMonth: ActiveMonthState): A
     return {
       ...current,
       days: hydratedDays,
-      planningWarnings: buildDetailedWeeklyCashWarnings(run, {
+      planningWarnings: buildMonthlyCashWarnings(run, {
         ...current,
         days: hydratedDays,
       }),
@@ -357,7 +496,7 @@ function ensurePlanningWeekState(run: GameRun, activeMonth: ActiveMonthState): A
   return {
     ...rebuilt,
     days: hydrateLegacyPlannerDays(rebuilt, activeMonth),
-    planningWarnings: buildDetailedWeeklyCashWarnings(run, {
+    planningWarnings: buildMonthlyCashWarnings(run, {
       ...rebuilt,
       days: hydrateLegacyPlannerDays(rebuilt, activeMonth),
     }),
@@ -368,6 +507,7 @@ function createEmptyActionResolution(): ReturnType<typeof resolveActionPlan> {
   return {
     stats: emptyStatsDelta(),
     moneyDelta: 0,
+    moneyBreakdown: createEmptyMoneyBreakdown(),
     risk: emptyRiskDelta(),
     resolvedActions: [],
     flags: [],
@@ -449,7 +589,7 @@ function ensureActiveMonth(run: GameRun): ActiveMonthState {
     month: ensuredRun.currentMonth,
     currentWeek: 1,
     totalWeeks: WEEKS_PER_MONTH,
-    allowanceApplied: false,
+    allowanceApplied: true,
     cooldownsAtStart: { ...ensuredRun.cooldowns },
     weeklyCalendar,
     currentWeekState: buildWeekPlanningState(ensuredRun, 1, "mixed"),
@@ -619,16 +759,10 @@ function finalizeCurrentWeek(input: {
   endedEarly: boolean;
   attachCourseToLastTurn: boolean;
 }) {
-  const weeklySettlementHandled = input.activeMonth.turns.some(
-    (turn) => turn.week === input.activeMonth.currentWeek && turn.advancesCalendar,
-  );
-  const weeklyBudgetDelta = weeklySettlementHandled
-    ? 0
-    : getWeeklyAllowance(input.run) - getWeeklyLivingExpense(input.run);
   const course = resolveCourseStrategy(input.attendanceStrategy, {
     skippedClassDays: input.activeMonth.currentWeekState.releasedClassDays,
   });
-  const statsAfter = addStats(input.run.stats, createCourseStatsDelta(course, weeklyBudgetDelta));
+  const statsAfter = addStats(input.run.stats, createCourseStatsDelta(course));
   const riskAfter = mergeRisk(input.run.risk, {
     academicRisk: course.academicRiskDelta,
     burnout: Math.max(0, Math.round(course.stressDelta / 4)),
@@ -713,10 +847,14 @@ function finalizeCurrentWeek(input: {
     (turn) => turn.resolvedAction.action === "ask_family" && turn.resolvedAction.accepted,
   );
   const finalizedCooldowns = finalizeCooldowns(settledMonth.cooldownsAtStart, askFamilyUsedThisMonth);
+  const nextMonthAllowance = input.run.profile.monthlyAllowance;
   const monthAdvancedRun: GameRun = {
     ...runAfterWeek,
     ...nextCalendar(input.runBeforeMonth),
-    stats: finalStatsAfter,
+    stats: addStats(finalStatsAfter, {
+      ...emptyStatsDelta(),
+      money: nextMonthAllowance,
+    }),
     risk: finalRiskAfter,
     activeMonth: undefined,
     cooldowns: finalizedCooldowns,
@@ -903,11 +1041,10 @@ function finalizePlannedWeek(input: {
   const releasedClassDays = input.activeMonth.currentWeekState.days
     ?.filter((day) => day.skipClassSelected)
     .map((day) => day.weekday) ?? [];
-  const weeklyAllowance = getWeeklyAllowance(input.run);
+  const weeklyAllowance = input.run.profile.monthlyAllowance;
   const weeklyLivingExpense = getWeeklyLivingExpense(input.run);
-  const weeklyBudgetDelta = weeklyAllowance;
   const course = resolveCourseStrategy(input.attendanceStrategy);
-  const statsAfter = addStats(input.run.stats, createCourseStatsDelta(course, weeklyBudgetDelta));
+  const statsAfter = addStats(input.run.stats, createCourseStatsDelta(course));
   const riskAfter = mergeRisk(input.run.risk, {
     academicRisk: course.academicRiskDelta,
     burnout: Math.max(0, Math.round(course.stressDelta / 4)),
@@ -917,6 +1054,10 @@ function finalizePlannedWeek(input: {
     academicRisk: riskAfter.academicRisk - input.runBeforeMonth.risk.academicRisk,
     burnout: riskAfter.burnout - input.runBeforeMonth.risk.burnout,
   };
+  const weeklyMoneyBreakdown = input.dayTurns.reduce(
+    (merged, turn) => mergeMoneyBreakdowns(merged, turn.moneyBreakdown),
+    createEmptyMoneyBreakdown(),
+  );
   const weeklySettlement: WeeklySettlementSummary = {
     week: input.activeMonth.currentWeek,
     attendanceStrategy: input.attendanceStrategy,
@@ -934,6 +1075,14 @@ function finalizePlannedWeek(input: {
       course.proxyCost > 0 ? `翘课或代价带来的额外课程成本 ${course.proxyCost} 元。` : "",
     ].filter(Boolean),
   };
+  weeklySettlement.budgetLines = [
+    `每日基础生活成本本周合计 -${weeklyMoneyBreakdown.baseLivingCost || weeklyLivingExpense} 元。`,
+    weeklyMoneyBreakdown.actionCost > 0 ? `行动额外花费合计 -${weeklyMoneyBreakdown.actionCost} 元。` : "",
+    weeklyMoneyBreakdown.actionIncome > 0 ? `行动收入合计 +${weeklyMoneyBreakdown.actionIncome} 元。` : "",
+    weeklyMoneyBreakdown.specialCost > 0 ? `特殊事件或附加成本合计 -${weeklyMoneyBreakdown.specialCost} 元。` : "",
+    weeklyMoneyBreakdown.specialIncome > 0 ? `特殊事件收入合计 +${weeklyMoneyBreakdown.specialIncome} 元。` : "",
+    course.proxyCost > 0 ? `翘课或代课带来的额外课程成本 ${course.proxyCost} 元。` : "",
+  ].filter(Boolean);
   weeklySettlement.opportunities = buildWeeklyOpportunities({
     settlement: weeklySettlement,
     resumeAdded: input.resumeAdded,
@@ -1013,10 +1162,14 @@ function finalizePlannedWeek(input: {
     (turn) => turn.resolvedAction.action === "ask_family" && turn.resolvedAction.accepted,
   );
   const finalizedCooldowns = finalizeCooldowns(settledMonth.cooldownsAtStart, askFamilyUsedThisMonth);
+  const nextMonthAllowance = input.run.profile.monthlyAllowance;
   const monthAdvancedRun: GameRun = {
     ...runAfterWeek,
     ...nextCalendar(input.runBeforeMonth),
-    stats: finalStatsAfter,
+    stats: addStats(finalStatsAfter, {
+      ...emptyStatsDelta(),
+      money: nextMonthAllowance,
+    }),
     risk: finalRiskAfter,
     activeMonth: undefined,
     cooldowns: finalizedCooldowns,
@@ -1064,7 +1217,7 @@ export function selectWeekAttendanceStrategy(run: GameRun, attendanceStrategy: C
   nextWeekState = {
     ...nextWeekState,
     readyToConfirm: isWeekReadyToConfirm(nextWeekState),
-    planningWarnings: buildDetailedWeeklyCashWarnings(run, nextWeekState),
+    planningWarnings: buildMonthlyCashWarnings(run, nextWeekState),
   };
 
   return {
@@ -1183,7 +1336,7 @@ export function planWeeklyDayAction(input: {
   nextWeekState = {
     ...nextWeekState,
     readyToConfirm: isWeekReadyToConfirm(nextWeekState),
-    planningWarnings: buildDetailedWeeklyCashWarnings(input.run, nextWeekState),
+    planningWarnings: buildMonthlyCashWarnings(input.run, nextWeekState),
   };
 
   return {
@@ -1324,6 +1477,13 @@ export function confirmPlannedWeek(run: GameRun): {
       projectedRun.risk,
       sumRisk(baseResolution.risk, combinedEffect.risk),
     );
+    const turnMoneyBreakdown = mergeMoneyBreakdowns(
+      baseResolution.moneyBreakdown,
+      buildEffectMoneyBreakdown(livingCostEffect, "base"),
+      buildEffectMoneyBreakdown(eventBoost, "special"),
+      buildEffectMoneyBreakdown(missedEventEffect, "special"),
+      buildEffectMoneyBreakdown(skipClassEffect, "special"),
+    );
     let turnSummary: ActionTurnSummary = applyWeeklyEffectToTurn(
       {
         turn: projectedRun.activeMonth!.turns.length + 1,
@@ -1351,6 +1511,7 @@ export function confirmPlannedWeek(run: GameRun): {
         weekday: day.weekday,
         dayLabel: getWeeklyDayLabel(day.weekday),
         weekCompleted: false,
+        moneyBreakdown: turnMoneyBreakdown,
       },
       combinedEffect,
     );
@@ -1361,6 +1522,10 @@ export function confirmPlannedWeek(run: GameRun): {
         `daily-living-cost:${dailyLivingCosts[dayIndex] ?? 0}`,
         skipClassEffect.notableFact ?? "",
       ]),
+      moneyBreakdown: {
+        ...turnMoneyBreakdown,
+        netChange: turnSummary.moneyDelta,
+      },
     };
     const skippedCompetitionLine =
       weekState.event?.weekday === day.weekday &&
@@ -1373,6 +1538,7 @@ export function confirmPlannedWeek(run: GameRun): {
         notableFact: `weekly-event:competition-skipped:${weekState.event?.linkedProjectTitle ?? "competition-line"}`,
       });
     }
+    const activeCompetitionBefore = projectedRun.competitionProjects?.find((project) => project.status === "active") ?? null;
     const weeklyResume = createResumeItemFromWeeklyEffect(projectedRun, combinedEffect);
     resumeAdded += baseResolution.resumeAdditions.length + weeklyResume.length;
     projectedRun = {
@@ -1404,6 +1570,35 @@ export function confirmPlannedWeek(run: GameRun): {
     }
     if (turnSummary.resolvedAction.accepted) {
       projectedRun = applyAcceptedActionProgression(projectedRun, turnSummary.resolvedAction.action);
+      if (turnSummary.resolvedAction.action === "competition_project") {
+        const activeCompetitionAfter =
+          projectedRun.competitionProjects?.find((project) => project.status === "active") ?? null;
+
+        if (activeCompetitionBefore && activeCompetitionAfter && activeCompetitionBefore.id === activeCompetitionAfter.id) {
+          const remaining = Math.max(0, activeCompetitionAfter.minimumEffortDays - activeCompetitionAfter.investedDays);
+          const progressLine =
+            remaining > 0
+              ? `competition-progress:${activeCompetitionAfter.title}:${activeCompetitionAfter.investedDays}:${activeCompetitionAfter.minimumEffortDays}:${remaining}`
+              : `competition-progress-ready:${activeCompetitionAfter.title}:${activeCompetitionAfter.investedDays}:${activeCompetitionAfter.minimumEffortDays}`;
+          turnSummary = {
+            ...turnSummary,
+            notableFacts: dedupe([...turnSummary.notableFacts, progressLine]),
+          };
+          projectedRun = {
+            ...projectedRun,
+            activeMonth: projectedRun.activeMonth
+              ? {
+                  ...projectedRun.activeMonth,
+                  turns: [
+                    ...projectedRun.activeMonth.turns.slice(0, -1),
+                    turnSummary,
+                  ],
+                  lastResolvedTurn: turnSummary,
+                }
+              : projectedRun.activeMonth,
+          };
+        }
+      }
     }
     dayTurns.push(turnSummary);
   }
@@ -1436,7 +1631,6 @@ export function resolveActionTurn(run: GameRun, plan: ActionTurnPlan): ResolvedT
 
   const timeCost = getActionTimeCost(plan.action.action);
   const weekTimeBefore = activeMonth.currentWeekState.remainingTimeUnits;
-  const allowanceDelta = activeMonth.allowanceApplied ? 0 : ensuredRun.profile.monthlyAllowance;
   const initialActionResolution = resolveActionPlan(ensuredRun, {
     attendanceStrategy: plan.attendanceStrategy,
     actions: [plan.action],
@@ -1474,7 +1668,7 @@ export function resolveActionTurn(run: GameRun, plan: ActionTurnPlan): ResolvedT
   const weekTimeAfter = Math.max(0, weekTimeBefore - effectiveTimeCost + skipClassRelease.reclaimedTimeUnits);
   const statsBefore = ensuredRun.stats;
   const statsDelta: DynamicStats = {
-    money: allowanceDelta + actionResolution.moneyDelta + actionResolution.stats.money,
+    money: actionResolution.moneyDelta + actionResolution.stats.money,
     mood: actionResolution.stats.mood,
     stress: actionResolution.stats.stress,
     fulfillment: actionResolution.stats.fulfillment,
@@ -1488,7 +1682,6 @@ export function resolveActionTurn(run: GameRun, plan: ActionTurnPlan): ResolvedT
     rejectedForTime ? "insufficient-week-time" : "",
   ].filter(Boolean));
   const notableFacts = dedupe([
-    allowanceDelta > 0 ? `allowance:${allowanceDelta}` : "",
     skipClassRelease.newlyReleasedDays.length > 0
       ? `skip_class released ${skipClassRelease.newlyReleasedDays.join(", ")} daytime blocks`
       : "",
@@ -1507,13 +1700,18 @@ export function resolveActionTurn(run: GameRun, plan: ActionTurnPlan): ResolvedT
     moneyDelta: statsDelta.money,
     flags,
     notableFacts,
-    allowanceApplied: allowanceDelta > 0,
+    allowanceApplied: false,
     course: createInstantCourseResolution(plan.attendanceStrategy),
     timeCost: effectiveTimeCost,
     weekTimeBefore,
     weekTimeAfter,
     releasedClassDays: skipClassRelease.releasedClassDays,
     weekCompleted: false,
+    moneyBreakdown: {
+      ...actionResolution.moneyBreakdown,
+      monthStartAllowance: 0,
+      netChange: statsDelta.money,
+    },
   };
   const updatedActiveMonth: ActiveMonthState = {
     ...activeMonth,

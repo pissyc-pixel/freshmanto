@@ -22,6 +22,7 @@ type PlannerDayOptionView = {
   action: ActionType;
   label: string;
   description: string;
+  progressText?: string;
   selected: boolean;
   source: "default" | "weekly_event";
   sourceEventId?: string;
@@ -825,6 +826,9 @@ export function ActionPlanForm({
                             </button>
                           </div>
                           <p>{option.description}</p>
+                          {option.progressText ? (
+                            <p className="mt-2 text-xs leading-5 text-stone-500">{option.progressText}</p>
+                          ) : null}
                         </div>
                       </article>
                     );

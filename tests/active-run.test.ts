@@ -50,4 +50,37 @@ describe("active run helpers", () => {
     expect(markup).toContain("/resume?runId=run-123");
     expect(markup).toContain("/ending?runId=run-123");
   });
+
+  it("hides the start-page sidebar entry after a run already exists", () => {
+    const markup = renderToStaticMarkup(
+      createElement(
+        FmShellLayout,
+        {
+          active: "game",
+          runId: "run-123",
+          title: "本周周历",
+        },
+        createElement("div", null, "content"),
+      ),
+    );
+
+    expect(markup).not.toContain("开局页");
+    expect(markup).toContain("/game?runId=run-123");
+    expect(markup).toContain("/journal?runId=run-123");
+  });
+
+  it("keeps the start-page sidebar entry visible before the player has a run", () => {
+    const markup = renderToStaticMarkup(
+      createElement(
+        FmShellLayout,
+        {
+          active: "game",
+          title: "本周周历",
+        },
+        createElement("div", null, "content"),
+      ),
+    );
+
+    expect(markup).toContain("开局页");
+  });
 });
