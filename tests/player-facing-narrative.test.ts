@@ -464,15 +464,14 @@ describe("player-facing narrative helpers", () => {
     const report = renderMonthlyJournalFallback(monthlyInput);
 
     expect(report.usedFallback).toBe(true);
-    expect(report.markdown).toContain("# 第 2 学年 第 3 月");
-    expect(report.markdown).toContain("这个月的月记暂时没写出来，但本月规则摘要仍然保留。");
-    expect(report.markdown).toContain("- 学业变化：");
-    expect(report.markdown).toContain("- 压力 / 心情变化：");
-    expect(report.markdown).toContain("- 金钱变化：");
-    expect(report.markdown).toContain("- 重要事件：");
-    expect(report.markdown).toContain("- 方向变化：");
+    expect(report.markdown).toContain("# 第2学年");
+    expect(report.markdown).toContain("## ");
+    expect(report.markdown).not.toContain("学业变化");
+    expect(report.markdown).not.toContain("压力 / 心情变化");
     expect(report.markdown).not.toContain("statsDelta");
     expect(report.markdown).not.toContain("eventIds");
+    expect(report.markdown).not.toContain("↑");
+    expect(report.markdown).not.toContain("↓");
   });
 
   it("keeps monthly digest and fallback stable for legacy partial summaries", () => {

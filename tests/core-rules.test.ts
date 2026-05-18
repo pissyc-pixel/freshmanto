@@ -1305,4 +1305,43 @@ describe("semester and ending evaluation", () => {
     expect(engineeringResearch?.label).not.toBe("鍐欎綔 / 璋冪爺");
     expect(`${engineeringResearch?.label} ${engineeringResearch?.description}`).toMatch(/技术调研|实验记录|项目|建模/);
   });
+
+  it("gates writing_research behind competition project or research context", () => {
+    const baseRun = createInitialGameRun({
+      id: "writing-research-gate-run",
+      discipline: "engineering",
+      randomValues: [0.31, 0.28, 0.4, 0.55, 0.73, 0.51, 0.22, 0.44],
+    });
+    const withAttendance = selectWeekAttendanceStrategy(baseRun, "mixed");
+
+    // Fresh run should have open competition projects, so writing_research should be available
+    const plannerDays = buildPlannerDaysView(withAttendance.activeMonth!.currentWeekState, withAttendance);
+    const saturday = plannerDays.find((day) => day.weekday === "sat");
+    const writingResearch = saturday?.normalOptions.find((option) => option.action === "writing_research");
+
+    // With open projects from ensureProgressionState, writing_research should be available
+    expect(writingResearch).toBeDefined();
+  });
+
+  it("hides writing_research when no competition projects or research resume items exist", () => {
+    const baseRun = createInitialGameRun({
+      id: "writing-research-hidden-run",
+      discipline: "engineering",
+      randomValues: [0.31, 0.28, 0.4, 0.55, 0.73, 0.51, 0.22, 0.44],
+    });
+    const withAttendance = selectWeekAttendanceStrategy(baseRun, "mixed");
+
+    // Remove all competition projects and resume items to simulate no research context
+    const runWithoutProjects = {
+      ...withAttendance,
+      competitionProjects: [],
+      resume: [],
+    };
+
+    const plannerDays = buildPlannerDaysView(runWithoutProjects.activeMonth!.currentWeekState, runWithoutProjects);
+    const saturday = plannerDays.find((day) => day.weekday === "sat");
+    const writingResearch = saturday?.normalOptions.find((option) => option.action === "writing_research");
+
+    expect(writingResearch).toBeUndefined();
+  });
 });

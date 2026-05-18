@@ -24,6 +24,7 @@ export type MonthlyDiaryDigest = {
   emotionalArc: string;
   academicArc: string;
   moneyArc: string;
+  moneyStory: string;
   directionSignal: string;
   futureSignals: string[];
   resumeHighlights: string[];
@@ -62,7 +63,20 @@ function emptyStats() {
   };
 }
 
-function normalizeMonthlySummary(summary: StructuredMonthlySummary): StructuredMonthlySummary {
+function ensureDynamicStats(stats: Partial<Record<keyof ReturnType<typeof emptyStats>, number>> | undefined | null): ReturnType<typeof emptyStats> {
+  const base = emptyStats();
+  if (!stats) return base;
+  return {
+    money: stats.money ?? 0,
+    mood: stats.mood ?? 0,
+    stress: stats.stress ?? 0,
+    fulfillment: stats.fulfillment ?? 0,
+    social: stats.social ?? 0,
+    semesterAcademics: stats.semesterAcademics ?? 0,
+  };
+}
+
+export function normalizeMonthlySummary(summary: StructuredMonthlySummary): StructuredMonthlySummary {
   return {
     ...summary,
     actions: summary.actions ?? [],
@@ -72,9 +86,9 @@ function normalizeMonthlySummary(summary: StructuredMonthlySummary): StructuredM
     resolvedActions: summary.resolvedActions ?? [],
     flags: summary.flags ?? [],
     weeklySettlements: summary.weeklySettlements ?? [],
-    statsBefore: summary.statsBefore ?? emptyStats(),
-    statsAfter: summary.statsAfter ?? summary.statsBefore ?? emptyStats(),
-    statsDelta: summary.statsDelta ?? emptyStats(),
+    statsBefore: ensureDynamicStats(summary.statsBefore),
+    statsAfter: ensureDynamicStats(summary.statsAfter ?? summary.statsBefore),
+    statsDelta: ensureDynamicStats(summary.statsDelta),
     academicFeedback: summary.academicFeedback ?? "stable",
     cooldowns: summary.cooldowns ?? { askFamilyMonths: 0 },
     course: summary.course ?? {
@@ -304,6 +318,11 @@ export function buildMonthlyDiaryDigest(
     emotionalArc: summarizeEmotionalArc(safeSummary),
     academicArc: summarizeAcademicArc(safeSummary),
     moneyArc: summarizeMoneyArc(safeSummary),
+    moneyStory: safeSummary.statsDelta.money <= -600
+      ? `这个月花掉了 ${Math.abs(safeSummary.statsDelta.money)} 元，手头明显紧了。`
+      : safeSummary.statsDelta.money >= 300
+        ? `这个月进账比花销多，手头缓过来了一点。`
+        : `钱的进出基本持平，没有特别大的波动。`,
     directionSignal,
     futureSignals: buildFutureSignals(safeSummary),
     resumeHighlights: safeSummary.resumeAdditions.map((item) => item.title).slice(0, 3),

@@ -97,6 +97,16 @@ function isOptionUnlocked(run: GameRun | undefined, option: WeeklyActionOption):
     return (run.competitionProjects ?? []).some((project) => project.status === "active");
   }
 
+  if (option.action === "writing_research") {
+    const hasActiveProject = (run.competitionProjects ?? []).some(
+      (project) => project.status === "active" || project.status === "open",
+    );
+    const hasResearchContext = run.resume.some(
+      (item) => ["research", "project", "competition"].includes(item.category),
+    );
+    return hasActiveProject || hasResearchContext;
+  }
+
   return true;
 }
 
@@ -107,7 +117,6 @@ function isVacationActionAllowed(action: WeeklyActionOption["action"], run: Game
 
   const baselineVacationActions = new Set<WeeklyActionOption["action"]>([
     "study",
-    "writing_research",
     "job_prep",
     "competition_project",
     "part_time",
@@ -126,6 +135,15 @@ function isVacationActionAllowed(action: WeeklyActionOption["action"], run: Game
 
   if (action === "public_exam_prep") {
     return run.currentYear > 3 || (run.currentYear === 3 && run.currentMonth >= 7);
+  }
+
+  if (action === "writing_research") {
+    const hasActiveProject = (run.competitionProjects ?? []).some(
+      (project) => project.status === "active" || project.status === "open",
+    );
+    return hasActiveProject || run.resume.some(
+      (item) => ["research", "project", "competition"].includes(item.category),
+    );
   }
 
   return baselineVacationActions.has(action);

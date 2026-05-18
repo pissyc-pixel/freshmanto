@@ -4,7 +4,6 @@ import { createAiClient } from "@/lib/ai/client";
 import { aiConfig, getAiReportTimeoutMs, isAiConfigured } from "@/lib/ai/config";
 import { buildGrowthJournalEntry, buildMonthlyDiaryDigest } from "@/lib/demo/monthly-digest";
 import {
-  formatAttendanceStrategy,
   formatEndingNotableFact,
   formatGraduationOutcome,
   formatMonthLabel,
@@ -16,7 +15,6 @@ import type {
   EndingReportPromptInput,
   MonthlyJournalPromptInput,
 } from "@/types/ai";
-import type { DynamicStats } from "@/types/game";
 
 function getPromptPayload(input: AiReportRequest): AiPromptPayload {
   return input.kind === "monthly_journal"
@@ -32,30 +30,6 @@ function formatMonthlyHeading(year: number, month: number) {
   return `第 ${year} 学年 第 ${month} 月`;
 }
 
-function formatSignedValue(value: number) {
-  return value > 0 ? `+${value}` : `${value}`;
-}
-
-function buildStatDeltaLine(statsDelta: DynamicStats) {
-  return [
-    `钱 ${formatSignedValue(statsDelta.money)}`,
-    `心情 ${formatSignedValue(statsDelta.mood)}`,
-    `压力 ${formatSignedValue(statsDelta.stress)}`,
-    `学业 ${formatSignedValue(statsDelta.semesterAcademics)}`,
-  ].join("，");
-}
-
-function emptyStatsDelta(): DynamicStats {
-  return {
-    money: 0,
-    mood: 0,
-    stress: 0,
-    fulfillment: 0,
-    social: 0,
-    semesterAcademics: 0,
-  };
-}
-
 function renderOutcomeSentence(input: EndingReportPromptInput): string {
   switch (input.summary.outcome) {
     case "graduate":
@@ -63,7 +37,7 @@ function renderOutcomeSentence(input: EndingReportPromptInput): string {
     case "delayed":
       return "我没能按原计划毕业，最后走到了延毕这一步。";
     case "cannot_graduate":
-      return "大学这段路最后没停在“正常毕业”上，这件事我得认。";
+      return `大学这段路最后没停在"正常毕业"上，这件事我得认。`;
     case "drop_out":
       return "这段大学路最后没有走到毕业，而是停在了肄业。";
     default:
@@ -79,52 +53,38 @@ export function buildMonthlyJournalRulesFallback(input: MonthlyJournalPromptInpu
   const { summary, year, month } = input;
   const digest = buildMonthlyDiaryDigest(summary, year, month);
   const growthLog = buildGrowthJournalEntry(summary, year, month);
-  const importantEvents =
-    digest.keyMoments.length > 0
-      ? digest.keyMoments.slice(0, 3).join("；")
-      : "这个月没有额外的大事件，更多是日常安排一点点把状态推到了现在。";
+
+  const paragraph1 = `这个月主要围着${digest.mainActions.join("、") || "把节奏稳住"}在转。${digest.academicArc}`;
+  const paragraph2 = `${digest.emotionalArc} ${digest.moneyStory}`;
+  const paragraph3 = digest.keyMoments.length > 0
+    ? `回头看，${digest.keyMoments.slice(0, 2).join("；")}。`
+    : "这个月没有特别大的转折，但日子确实一点点走到了现在。";
+  const directionLine = `${digest.directionSignal}${digest.futureSignals[0] ? ` ${digest.futureSignals[0]}` : ""}`;
 
   return {
     monthLabel: formatMonthLabel(year, month),
     heading: formatMonthlyHeading(year, month),
-    intro: "这个月的月记暂时没写出来，但本月规则摘要仍然保留。",
-    sections: [
-      { label: "学业变化", text: digest.academicArc },
-      { label: "压力 / 心情变化", text: digest.emotionalArc },
-      { label: "金钱变化", text: digest.moneyArc },
-      { label: "重要事件", text: importantEvents },
-      {
-        label: "方向变化",
-        text: [digest.directionSignal, ...digest.futureSignals.slice(0, 2)].join(" "),
-      },
-    ],
-    endStateLine: `月底状态：余额 ${digest.endState.money}，心情 ${digest.endState.mood}，压力 ${digest.endState.stress}，学业反馈“${digest.endState.feedback}”。`,
-    growthTitle: growthLog.title,
+    title: growthLog.title,
+    diary: [paragraph1, paragraph2, paragraph3, directionLine].join("\n\n"),
+    endStateLine: `月底状态：余额 ${digest.endState.money}，心情 ${digest.endState.mood}，压力 ${digest.endState.stress}，学业反馈"${digest.endState.feedback}"。`,
   };
 }
 
 export function renderMonthlyJournalFallback(input: MonthlyJournalPromptInput): AiReportResult {
-  const { summary, year, month } = input;
-  const digest = buildMonthlyDiaryDigest(summary, year, month);
   const rulesFallback = buildMonthlyJournalRulesFallback(input);
-  const statsDelta = summary.statsDelta ?? emptyStatsDelta();
-  const attendanceStrategy = summary.attendanceStrategy ?? "mixed";
 
   return {
     kind: "monthly_journal",
     usedFallback: true,
     markdown: [
-      `# ${rulesFallback.heading}`,
+      `# ${rulesFallback.monthLabel}`,
       "",
-      rulesFallback.intro,
+      `## ${rulesFallback.title}`,
       "",
-      ...rulesFallback.sections.map((section) => `- ${section.label}：${section.text}`),
+      rulesFallback.diary,
       "",
-      `课程态度：${formatAttendanceStrategy(attendanceStrategy)}。`,
-      `主要行动：${digest.mainActions.join("、") || "这个月更多是在调状态和补节奏。"}。`,
+      `---`,
       rulesFallback.endStateLine,
-      `和月初比起来，${buildStatDeltaLine(statsDelta)}。`,
-      `这条月度记录没有新增规则结果，只保留已经发生的事实。${rulesFallback.growthTitle}。`,
     ].join("\n"),
   };
 }
@@ -144,7 +104,7 @@ export function renderEndingReportFallback(input: EndingReportPromptInput): AiRe
       "# 毕业回望",
       "",
       renderOutcomeSentence(input),
-      `如果把这四年的结果压成一句话，我最后拿到的是“${formatGraduationOutcome(summary.outcome)}”。长期学业表现大概停在 ${summary.longTermAcademicAverage}，写到这里时我已经走到了第 ${summary.finalYear} 学年。`,
+      `如果把这四年的结果压成一句话，我最后拿到的是"${formatGraduationOutcome(summary.outcome)}"。长期学业表现大概停在 ${summary.longTermAcademicAverage}，写到这里时我已经走到了第 ${summary.finalYear} 学年。`,
       highlights,
       endingFacts.length > 0
         ? renderMarkdownFactBlock(

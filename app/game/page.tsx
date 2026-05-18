@@ -51,23 +51,26 @@ function buildMetricItems(stats: DynamicStats) {
     {
       label: "金钱",
       value: `${stats.money}`,
-      tone: stats.money < 300 ? "amber" : "teal",
+      tone: stats.money < 0 ? "red" : stats.money < 300 ? "amber" : "teal",
       icon: "chart" as const,
       progress: clampProgress(stats.money, 2400),
+      warning: stats.money < 0 ? "本周基础开销可能不够" : stats.money < 300 ? "现金有点紧" : undefined,
     },
     {
       label: "心情",
       value: `${stats.mood}`,
-      tone: "mint",
+      tone: stats.mood <= 35 ? "rose" : stats.mood <= 50 ? "amber" : "mint",
       icon: "moon" as const,
       progress: clampProgress(stats.mood),
+      warning: stats.mood <= 35 ? "心情已经很低" : stats.mood <= 50 ? "心情偏低" : undefined,
     },
     {
       label: "压力",
       value: `${stats.stress}`,
-      tone: stats.stress >= 70 ? "rose" : "blue",
+      tone: stats.stress >= 75 ? "rose" : stats.stress >= 60 ? "amber" : "blue",
       icon: "alert" as const,
       progress: clampProgress(stats.stress),
+      warning: stats.stress >= 75 ? "压力过高" : stats.stress >= 60 ? "压力偏高" : undefined,
     },
     {
       label: "学业",
@@ -172,7 +175,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
   const plannerLines = buildPlannerFeedbackLines(currentWeekState);
   const weeklySettlement = buildWeeklySettlementView(activeMonth?.latestWeekSettlement);
   const latestMonthlyState = bundle.monthlyStates.at(-1);
-  const latestGrowthLog = latestMonthlyState
+  const latestGrowthLog = latestMonthlyState?.snapshot_json
     ? buildGrowthJournalEntry(latestMonthlyState.snapshot_json, latestMonthlyState.year, latestMonthlyState.month)
     : null;
   const latestSystemLogs = bundle.logs.slice(-6).reverse().map((log) => ({

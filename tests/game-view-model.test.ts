@@ -158,4 +158,33 @@ describe("game page view-model helpers", () => {
     expect(competitionOption?.progressText).toContain("2 / 4");
     expect(competitionOption?.progressText).toContain("达到 4 次后");
   });
+
+  it("uses emoji icons instead of arrow characters in action trend descriptions", () => {
+    const weeklyCalendar = createWeeklyCalendar(1);
+    const currentWeekState: ActiveWeekState = {
+      week: 1,
+      totalTimeUnits: 13,
+      remainingTimeUnits: 11,
+      releasedClassDays: ["mon", "wed"],
+      attendanceStrategy: "mixed",
+      attendanceLocked: true,
+      days: buildPlannerWeekdays({
+        week: weeklyCalendar[0]!,
+        releasedClassDays: ["mon", "wed"],
+      }),
+    };
+
+    const plannerDays = buildPlannerDaysView(currentWeekState);
+    const monday = plannerDays.find((day) => day.weekday === "mon");
+    const descriptions = monday?.normalOptions.map((option) => option.description ?? "") ?? [];
+
+    for (const desc of descriptions) {
+      expect(desc).not.toContain("↑");
+      expect(desc).not.toContain("↓");
+    }
+
+    const studyOption = monday?.normalOptions.find((option) => option.action === "study");
+    expect(studyOption?.description).toBeDefined();
+    expect(studyOption!.description!).toContain("学业");
+  });
 });
