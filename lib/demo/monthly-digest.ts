@@ -43,13 +43,14 @@ function uniqueStrings(items: Array<string | undefined | null>): string[] {
 }
 
 function formatDirectionLabel(direction: DirectionKey) {
-  return {
+  const labels: Record<DirectionKey, string> = {
     employment: "就业",
     postgraduate: "考研",
     public_exam: "考公",
     recommendation: "推免",
     undecided: "未定",
-  }[direction];
+  };
+  return labels[direction] ?? "未定";
 }
 
 function emptyStats() {

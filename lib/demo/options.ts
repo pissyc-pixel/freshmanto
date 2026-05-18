@@ -492,7 +492,7 @@ export function formatAttendanceStrategy(value: CourseAttendanceStrategy): strin
 }
 
 export function formatSemesterFeedback(value: SemesterFeedback): string {
-  return feedbackLabels[value];
+  return feedbackLabels[value] ?? "稳定";
 }
 
 export function formatGraduationOutcome(value: GraduationOutcome): string {

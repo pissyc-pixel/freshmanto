@@ -92,6 +92,27 @@ export default async function SettlementPage({ searchParams }: SettlementPagePro
       item.month === monthlyState.month,
   );
   const summary = monthlyState.snapshot_json;
+  if (!summary || typeof summary !== "object") {
+    return (
+      <AppShell
+        runId={runId}
+        eyebrow="月结算"
+        title={`${formatMonthLabel(monthlyState.year, monthlyState.month)} 已结算`}
+        description="这条月度记录的快照数据不完整，无法生成完整结算页。"
+        actions={
+          <Link
+            href={buildRunHref(bundle.run.status === "completed" ? "/ending" : "/game", runId)}
+            className="rounded-full border border-amber-900/15 bg-white/60 px-5 py-3 font-semibold text-stone-800 transition hover:bg-white/90"
+          >
+            {bundle.run.status === "completed" ? "查看正式结局" : "继续下个月"}
+          </Link>
+        }
+      >
+        <ActiveRunSync runId={bundle.run.id} />
+        <p className="text-stone-500">快照数据缺失，无法显示本月结算详情。</p>
+      </AppShell>
+    );
+  }
   const growthLog = buildGrowthJournalEntry(summary, monthlyState.year, monthlyState.month);
   const digest = buildMonthlyDiaryDigest(summary, monthlyState.year, monthlyState.month);
   const scholarshipExplanation = buildScholarshipExplanationFromSummary(summary);
