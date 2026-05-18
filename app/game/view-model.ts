@@ -78,7 +78,7 @@ function buildActionTrendText(action: WeeklySettlementSummary["dailyResults"][nu
     case "ask_family":
       return "↗金钱 ↗压力";
     default:
-      return "状态微调";
+      return "→状态";
   }
 }
 

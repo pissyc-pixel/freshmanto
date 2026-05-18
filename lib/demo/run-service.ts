@@ -154,9 +154,19 @@ async function generateReportWithFallback(
     // The rules and monthly snapshot are already deterministic; report writing must degrade locally.
   }
 
-  return input.kind === "monthly_journal"
-    ? renderMonthlyJournalFallback(input)
-    : renderEndingReportFallback(input);
+  try {
+    return input.kind === "monthly_journal"
+      ? renderMonthlyJournalFallback(input)
+      : renderEndingReportFallback(input);
+  } catch {
+    return {
+      kind: input.kind,
+      usedFallback: true,
+      markdown: input.kind === "monthly_journal"
+        ? `# 月度小结\n\n本月总结暂时无法生成，但结算数据已保存。`
+        : `# 毕业回望\n\n结局回望暂时无法生成，但结算数据已保存。`,
+    };
+  }
 }
 
 function createRunLog(run: GameRun) {

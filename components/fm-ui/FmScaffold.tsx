@@ -14,6 +14,7 @@ type IconName =
   | "compass"
   | "file"
   | "home"
+  | "minus"
   | "moon"
   | "spark"
   | "trending-down"
@@ -190,6 +191,12 @@ export function FmIcon({
         <svg className={className} {...common}>
           <path d="m3 7 6 6 4-4 8 8" />
           <path d="M17 17h4v-4" />
+        </svg>
+      );
+    case "minus":
+      return (
+        <svg className={className} {...common}>
+          <path d="M5 12h14" />
         </svg>
       );
     default:
