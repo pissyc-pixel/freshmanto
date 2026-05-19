@@ -1229,9 +1229,9 @@ describe("semester and ending evaluation", () => {
     const socialSettlement = buildWeeklySettlementView(confirmPlannedWeek(plannedSocial).run.activeMonth?.latestWeekSettlement);
     const socialLine = socialSettlement?.dayLines.find((line) => line.actionLabel.includes("社交"));
 
-    expect(socialLine?.summary).toContain("基础生活开销");
-    expect(socialLine?.summary).toContain("额外花费");
-    expect(socialLine?.summary).toContain("当天共减少");
+    expect(socialLine?.summary).toMatch(/同学|外面待了一会儿|心里不那么堵|饭/);
+    expect(socialLine?.summary).not.toContain("基础生活开销");
+    expect(socialLine?.summary).not.toContain("当天共减少");
 
     const partTimeRun = selectWeekAttendanceStrategy(
       createInitialGameRun({
@@ -1248,9 +1248,9 @@ describe("semester and ending evaluation", () => {
     const partTimeSettlement = buildWeeklySettlementView(confirmPlannedWeek(plannedPartTime).run.activeMonth?.latestWeekSettlement);
     const partTimeLine = partTimeSettlement?.dayLines.find((line) => line.actionLabel.includes("兼职"));
 
-    expect(partTimeLine?.summary).toContain("基础生活开销");
-    expect(partTimeLine?.summary).toContain("兼职收入");
-    expect(partTimeLine?.summary).toContain("当天净变化");
+    expect(partTimeLine?.summary).toMatch(/钱|收入|手头|赚钱/);
+    expect(partTimeLine?.summary).not.toContain("基础生活开销");
+    expect(partTimeLine?.summary).not.toContain("当天净变化");
   });
 
   it("shows rest-day only on full-day schedules and never on busy or half-day class days", () => {

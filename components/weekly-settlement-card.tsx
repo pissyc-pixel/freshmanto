@@ -46,7 +46,7 @@ export function WeeklySettlementCard(props: WeeklySettlementCardProps) {
       <h3 className="mt-4 text-2xl font-semibold text-stone-900">{props.title}</h3>
       {props.eventTitle ? (
         <p className="mt-2 text-sm leading-6 text-amber-700">
-          本周事件：{props.eventTitle}。{props.eventSummary}
+          这周还夹着一件事：{props.eventTitle}。{props.eventSummary}
         </p>
       ) : null}
 
@@ -64,12 +64,6 @@ export function WeeklySettlementCard(props: WeeklySettlementCardProps) {
                   {line.actionLabel}
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2 text-xs font-semibold text-stone-700">
-                <span className="rounded-full bg-stone-100 px-3 py-1">钱 {formatSignedValue(line.statsDelta.money)}</span>
-                <span className="rounded-full bg-stone-100 px-3 py-1">心情 {formatSignedValue(line.statsDelta.mood)}</span>
-                <span className="rounded-full bg-stone-100 px-3 py-1">压力 {formatSignedValue(line.statsDelta.stress)}</span>
-                <span className="rounded-full bg-stone-100 px-3 py-1">学业 {formatSignedValue(line.statsDelta.semesterAcademics)}</span>
-              </div>
             </div>
             <p className="mt-3 text-sm leading-6 text-stone-700">{line.summary}</p>
           </div>
@@ -77,7 +71,7 @@ export function WeeklySettlementCard(props: WeeklySettlementCardProps) {
       </div>
 
       <div className="mt-6 rounded-2xl border border-dashed border-[var(--border)] bg-white/85 p-4">
-        <p className="text-sm font-semibold text-stone-900">这周留下的变化</p>
+        <p className="text-sm font-semibold text-stone-900">这一周留下了一点变化</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {props.totalLines.map((item) => (
             <div key={item.label} className="rounded-2xl bg-stone-50 px-4 py-3">
@@ -86,21 +80,11 @@ export function WeeklySettlementCard(props: WeeklySettlementCardProps) {
             </div>
           ))}
         </div>
-        {props.budgetLines.length > 0 ? (
-          <div className="mt-6 rounded-2xl border border-[var(--border)] bg-white/90 p-4 text-sm leading-6 text-stone-700">
-            <p className="font-semibold text-stone-900">本周收支拆解</p>
-            <ul className="mt-2 space-y-2">
-              {props.budgetLines.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
       </div>
 
       {props.riskLines.length > 0 ? (
         <div className="mt-6 rounded-2xl bg-stone-100/90 p-4 text-sm leading-6 text-stone-700">
-          <p className="font-semibold text-stone-900">这周冒出来的事</p>
+          <p className="font-semibold text-stone-900">这周还惦记着的事</p>
           <ul className="mt-2 space-y-2">
             {props.riskLines.map((line) => (
               <li key={line}>{line}</li>

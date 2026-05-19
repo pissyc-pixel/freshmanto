@@ -22,9 +22,9 @@ describe("real pages use freshmanto ui shells safely", () => {
       }),
     );
 
-    expect(markup).toContain("这里会收集每个月的 AI 月记");
+    expect(markup).toContain("这里会收集每个月留下来的月记和痕迹");
     expect(markup).toContain("先回到首页创建一局");
-    expect(markup).toContain("不会凭空生成");
+    expect(markup).toContain("不会凭空出现");
   });
 
   it("renders the resume empty state without fabricating resume evidence", async () => {

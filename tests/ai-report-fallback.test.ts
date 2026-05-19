@@ -101,8 +101,8 @@ describe("AI report fallback", () => {
     expect(Date.now() - startedAt).toBeLessThan(80);
     expect(report.kind).toBe("monthly_journal");
     expect(report.usedFallback).toBe(true);
-    expect(report.markdown).toContain("第1学年");
-    expect(report.markdown).toContain("第1月");
+    expect(report.markdown).toContain("我");
+    expect(report.markdown).not.toContain("#");
   });
   it("falls back to chat completions when the compatible endpoint does not support responses.create", async () => {
     vi.stubEnv("OPENAI_MODEL", "mimo-compatible-model");

@@ -71,8 +71,9 @@ describe("monthly journal prompt safeguards", () => {
     const promptText = prompt.messages.map((message) => message.content).join("\n");
 
     expect(promptText).toContain("第一人称");
-    expect(promptText).toContain("基于");
+    expect(promptText).toContain("私人日记");
+    expect(promptText).toContain("深夜");
     expect(promptText).toMatch(/不得编造|不要编造|只能源于/);
-    expect(promptText).toMatch(/不要写成系统播报|避免总结报告腔/);
+    expect(promptText).toMatch(/不要写成总结报告|不要写成系统旁白|不要出现 markdown 标题/);
   });
 });
