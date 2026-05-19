@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createInitialGameRun } from "@/core/game-engine";
+import { createInitialGameRun } from "@/core/generators/opening";
 import type { StructuredMonthlySummary } from "@/types/game";
 
 const mockedBundleState = {
@@ -40,6 +40,18 @@ function createBundleWithoutAiJournal() {
     discipline: "engineering",
     randomValues: [0.2, 0.4, 0.6, 0.8, 0.1, 0.3, 0.5, 0.7],
   });
+
+  run.timelineNodes = [
+    {
+      id: "timeline-1",
+      monthIndex: 65136,
+      kind: "monthly",
+      title: "market-ops.first-entry",
+      body: "sourceId artifactId category delta fallback",
+      sourceId: "timeline-source",
+      facts: ["前 21 - 79%", "nankai_tianda"],
+    },
+  ];
 
   return {
     run,
@@ -158,7 +170,7 @@ describe("journal page fallback", () => {
 
     expect(markup).toContain("fm-paper__title");
     expect(markup).toContain("fm-paper__copy");
-    expect(markup).toContain("点击打开本月来信");
+    expect(markup).toContain("打开本月来信");
     expect(markup).not.toContain("project");
     expect(markup).not.toContain("internship");
     expect(markup).not.toContain("scholarship");
@@ -173,6 +185,8 @@ describe("journal page fallback", () => {
     expect(markup).not.toContain("心情 58");
     expect(markup).not.toContain("压力 42");
     expect(markup).not.toContain("moneyDelta");
+    expect(markup).not.toContain("65136");
+    expect(markup).not.toContain("前 21 - 79%");
   });
 
   it("falls back to a friendly empty state when journal bundle loading throws", async () => {

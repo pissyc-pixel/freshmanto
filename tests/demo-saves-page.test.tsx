@@ -1,7 +1,13 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 describe("demo saves page", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.resetModules();
+    vi.clearAllMocks();
+  });
+
   it("renders the core demo save list with load actions", async () => {
     const pageModule = await import("@/app/demo-saves/page");
     const markup = renderToStaticMarkup(await pageModule.default({ searchParams: Promise.resolve({}) }));
@@ -23,5 +29,19 @@ describe("demo saves page", () => {
     );
 
     expect(markup).toContain('role="alert"');
+  });
+
+  it("renders the page shell even when search params never resolve", async () => {
+    vi.useFakeTimers();
+    const pageModule = await import("@/app/demo-saves/page");
+    const markupPromise = pageModule.default({
+      searchParams: new Promise<Record<string, string | string[] | undefined>>(() => undefined),
+    });
+
+    await vi.advanceTimersByTimeAsync(250);
+
+    const markup = renderToStaticMarkup(await markupPromise);
+    expect(markup).toContain("Demo Save Center");
+    expect(markup).toContain("presetId");
   });
 });

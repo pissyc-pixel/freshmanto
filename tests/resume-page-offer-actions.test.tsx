@@ -45,7 +45,7 @@ function createOfferRun(): GameRun {
       {
         id: "offer-action-run-offer-employment-37-growth",
         type: "employment",
-        title: "一线城市商业分析 / 产品运营岗 Offer",
+        title: "一线城市商业分析 / 产品运营岗录用通知",
         tier: "nankai_tianda",
         quality: "excellent",
         salaryLevel: "high",
@@ -60,7 +60,7 @@ function createOfferRun(): GameRun {
 }
 
 describe("resume page future offer decisions", () => {
-  it("renders formal offer actions for pending future offers", async () => {
+  it("renders player-facing offer actions for pending future offers", async () => {
     const run = createOfferRun();
     mockedBundleState.bundle = {
       run,
@@ -85,9 +85,10 @@ describe("resume page future offer decisions", () => {
       }),
     );
 
-    expect(markup).toContain("Offer Letter");
-    expect(markup).toContain("选择这个 offer");
-    expect(markup).toContain("继续看看别的选择");
+    expect(markup).toContain("就业录用通知");
+    expect(markup).toContain("收进履历");
+    expect(markup).toContain("留作纪念");
+    expect(markup).not.toContain("Offer Letter");
     expect(markup).toContain("offer-action-run-offer-employment-37-growth");
   });
 });

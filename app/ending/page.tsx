@@ -27,7 +27,7 @@ import {
   formatMonthLabel,
   formatSchoolTier,
 } from "@/lib/demo/options";
-import { sanitizePlayerFacingText } from "@/lib/player-facing-text";
+import { formatPlayerFacingMonthIndex, sanitizePlayerFacingText } from "@/lib/player-facing-text";
 import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
 import { normalizeSaveState } from "@/lib/demo/save-state";
 import { getServerEndingPreview } from "@/lib/demo/server";
@@ -486,7 +486,7 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
           <>
             <FmMotionSection delay={0}>
               <section className="fm-ending-cover">
-                <div className="fm-ending-cover__eyebrow">Future Preview</div>
+                <div className="fm-ending-cover__eyebrow">未来预览</div>
                 <h1 className="fm-ending-cover__title">未来还没有写完</h1>
                 <p className="fm-ending-cover__subtitle">
                   现在只能看到一些正在形成的趋势，真正的结局会由后面的选择决定。
@@ -549,7 +549,7 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
           <>
             <FmMotionSection delay={0}>
               <section className="fm-ending-cover">
-                <div className="fm-ending-cover__eyebrow">Final Report</div>
+                <div className="fm-ending-cover__eyebrow">最终归档</div>
                 <h1 className="fm-ending-cover__title">四年之后</h1>
                 <p className="fm-ending-cover__subtitle">你把这四年过成了这样。</p>
                 <p className="fm-ending-cover__subtitle">当前学年位置：{positionLabel}</p>
@@ -641,7 +641,7 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
                       <div key={item.id} className="fm-evidence-row">
                         <div className="fm-evidence-row__title">{item.title}</div>
                         <div className="fm-evidence-row__copy">{item.body}</div>
-                        <FmBadge tone="resume">M{item.monthIndex}</FmBadge>
+                        <FmBadge tone="resume">{formatPlayerFacingMonthIndex(item.monthIndex)}</FmBadge>
                       </div>
                     ))}
                   </div>

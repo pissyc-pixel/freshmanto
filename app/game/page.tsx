@@ -16,7 +16,7 @@ import { FmMotionSection } from "@/components/fm-ui/FmMotionSection";
 import { LogFeed } from "@/components/log-feed";
 import { ScrollIntoView } from "@/components/scroll-into-view";
 import { WeeklySettlementCard } from "@/components/weekly-settlement-card";
-import { WeeklySettlementModal } from "@/components/weekly-settlement-modal";
+import { WeeklySettlementModalHost } from "@/components/weekly-settlement-modal-host";
 import { WeeklyKickoffModal, type WeeklyKickoffNotice } from "@/components/weekly-kickoff-modal";
 import {
   FmInlineStat,
@@ -197,7 +197,7 @@ function buildFinalDemoMilestone(run: GameRun) {
     ? {
         monthIndex: nextMonth,
         title: `下一个关键节点：${milestones[nextMonth]!.title}`,
-        body: `当前不会提前判结果；可以提前知道 M${nextMonth} 有规则节点，方便安排本月行动。`,
+        body: `当前不会提前判结果；可以提前知道第 ${nextMonth} 月有规则节点，方便安排本月行动。`,
         tone: milestones[nextMonth]!.tone,
       }
     : null;
@@ -443,10 +443,9 @@ export default async function GamePage({ searchParams }: GamePageProps) {
           week={currentWeek}
           notices={weeklyKickoffNotices}
         />
-        <WeeklySettlementModal
-          open={focusParam === "weekly-settlement"}
+        <WeeklySettlementModalHost
+          focusParam={focusParam}
           settlement={weeklySettlement}
-          closeHref={buildRunHref("/game", bundle.run.id)}
         />
         <FmMotionSection delay={40}>
           <FmMetricStrip items={buildMetricItems(hydratedRun.stats, hydratedRun)} />
@@ -456,9 +455,16 @@ export default async function GamePage({ searchParams }: GamePageProps) {
           <FmMotionSection delay={65}>
             <FmPanel>
               <FmSectionHead
-                title="Final Demo Milestone"
+                title="本月关键节点"
                 copy="本月提醒只预告规则节点，不提前泄露奖学金、竞赛、offer 或结局结果。"
-                aside={<FmBadge tone={finalDemoMilestone.tone}>M{finalDemoMilestone.monthIndex}</FmBadge>}
+                aside={
+                  <FmBadge tone={finalDemoMilestone.tone}>
+                    {formatMonthLabel(
+                      Math.ceil(finalDemoMilestone.monthIndex / 12),
+                      ((finalDemoMilestone.monthIndex - 1) % 12) + 1,
+                    )}
+                  </FmBadge>
+                }
               />
               <div className="mt-6 fm-stat-card">
                 <div className="fm-stat-card__label">{finalDemoMilestone.title}</div>

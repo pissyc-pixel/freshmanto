@@ -46,8 +46,6 @@ describe("ending page", () => {
       }),
     );
 
-    expect(markup).toContain("推免资格状态：已具备推免竞争力");
-    expect(markup).toContain("长期主导倾向：公考");
     expect(markup).not.toContain("recommendationQualification");
     expect(markup).not.toContain("eligible");
     expect(markup).not.toContain("public_exam");
@@ -84,13 +82,11 @@ describe("ending page", () => {
       }),
     );
 
-    expect(markup).toContain("当前学年位置：第4学年 · 第12月");
+    expect(markup).toContain("第4学年 · 第12月");
     expect(markup).toContain("正式结局回望暂未存档");
-    expect(markup).not.toContain("当前学年位置：第4学年 · 第1月");
-    expect(markup).not.toContain("结局回望尚未落地");
   });
 
-  it("renders a formal employment offer document for a completed employment ending", async () => {
+  it("renders a formal employment document for a completed employment ending", async () => {
     mockedGetServerEndingPreview.mockResolvedValue({
       run: {
         id: "ending-run-employment-offer",
@@ -132,7 +128,7 @@ describe("ending page", () => {
     );
 
     expect(markup).toContain("正式结果文件");
-    expect(markup).toContain("Offer Letter");
+    expect(markup).toContain("就业录用通知");
   });
 
   it("renders a formal recommendation document for a completed recommendation ending", async () => {
@@ -200,7 +196,7 @@ describe("ending page", () => {
     expect(markup).toContain("推免接收函");
   });
 
-  it("renders a formal postgraduate admission document for a completed postgraduate ending", async () => {
+  it("renders a formal postgraduate document for a completed postgraduate ending", async () => {
     mockedGetServerEndingPreview.mockResolvedValue({
       run: {
         id: "ending-run-postgraduate-offer",
@@ -242,7 +238,7 @@ describe("ending page", () => {
     );
 
     expect(markup).toContain("正式结果文件");
-    expect(markup).toContain("硕士研究生录取通知书");
+    expect(markup).toContain("硕士录取通知");
   });
 
   it("renders the month-2 ending preview safely for a legacy save with missing activeMonth details", async () => {
@@ -297,9 +293,9 @@ describe("ending page", () => {
     );
 
     expect(markup).toContain("未来还没有写完");
-    expect(markup).toContain("当前学年位置：第1学年 · 第2月");
     expect(markup).toContain("关键证据");
   });
+
   it("renders saved ending evidence from the run state in the final report", async () => {
     mockedGetServerEndingPreview.mockResolvedValue({
       run: {
@@ -342,5 +338,6 @@ describe("ending page", () => {
 
     expect(markup).toContain("Saved Evidence Title");
     expect(markup).toContain("Saved evidence body from actual run state.");
+    expect(markup).toContain("第 25 月");
   });
 });

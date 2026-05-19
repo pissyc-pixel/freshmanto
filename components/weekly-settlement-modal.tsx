@@ -1,20 +1,12 @@
 "use client";
 
 import type { ComponentProps } from "react";
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 
 import { WeeklySettlementCard } from "@/components/weekly-settlement-card";
 
 type WeeklySettlementView = ComponentProps<typeof WeeklySettlementCard>;
-
-function replaceUrlWithoutReload(nextHref: string) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.history.replaceState(window.history.state, "", nextHref);
-}
 
 export function stripWeeklySettlementFocus(href: string) {
   const [pathname, query = ""] = href.split("?");
@@ -32,33 +24,33 @@ export function stripWeeklySettlementFocus(href: string) {
 export function WeeklySettlementModal({
   open,
   settlement,
-  closeHref,
+  onClose,
 }: {
   open: boolean;
   settlement: WeeklySettlementView | null;
-  closeHref: string;
+  onClose: () => void;
 }) {
   const mounted = useSyncExternalStore(
     () => () => undefined,
     () => true,
     () => false,
   );
-  const nextHref = useMemo(() => stripWeeklySettlementFocus(closeHref), [closeHref]);
 
   useEffect(() => {
     if (!open) {
       return;
     }
 
-    const onKeyDown = (event: KeyboardEvent) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        replaceUrlWithoutReload(nextHref);
+        event.preventDefault();
+        onClose();
       }
     };
 
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [nextHref, open]);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, onClose]);
 
   if (!mounted || !open || !settlement) {
     return null;
@@ -67,15 +59,27 @@ export function WeeklySettlementModal({
   return createPortal(
     <div
       className="fm-weekly-settlement-backdrop"
+      data-testid="weekly-settlement-overlay"
       role="dialog"
       aria-modal="true"
-      aria-label="Weekly Settlement"
+      aria-label="周行动日志"
+      onClick={onClose}
     >
-      <section className="fm-weekly-settlement-modal">
+      <section
+        className="fm-weekly-settlement-modal"
+        data-testid="weekly-settlement-panel"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="fm-weekly-settlement-modal__head">
-          <div className="fm-ending-cover__eyebrow">Weekly Settlement</div>
-          <button type="button" className="fm-dialog__close" onClick={() => replaceUrlWithoutReload(nextHref)}>
-            Close
+          <div className="fm-ending-cover__eyebrow">本周结算</div>
+          <button
+            type="button"
+            className="fm-dialog__close"
+            data-testid="weekly-settlement-close"
+            onClick={onClose}
+            aria-label="关闭周行动日志弹窗"
+          >
+            关闭
           </button>
         </div>
         <WeeklySettlementCard {...settlement} />

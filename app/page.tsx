@@ -4,9 +4,15 @@ import { ContinueSaveButton } from "@/components/continue-save-button";
 import { FmAppRoot, FmBrandMark, FmIcon } from "@/components/fm-ui/FmScaffold";
 import { buildRunHref } from "@/lib/demo/active-run";
 import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
+import { resolveWithTimeout } from "@/lib/server/resolve-with-timeout";
+
+const START_PAGE_TIMEOUT_MS = 150;
 
 export default async function StartPage() {
-  const activeRunId = await readActiveRunIdFromCookies();
+  const activeRunId = await resolveWithTimeout(readActiveRunIdFromCookies(), {
+    timeoutMs: START_PAGE_TIMEOUT_MS,
+    fallback: undefined,
+  });
 
   return (
     <FmAppRoot centered data-testid="start-page">

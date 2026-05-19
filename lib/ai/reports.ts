@@ -55,13 +55,17 @@ const JOURNAL_FORBIDDEN_PATTERNS = [
   /心情\s*\d+/,
   /压力\s*\d+/,
   /学业\s*[+-]?\d+/,
-  /moneyDelta|statsDelta|eventIds|runId|sourceId|artifactId|category|delta/gi,
-  /\b(project|internship|scholarship|monthly|fallback)\b/gi,
+  /moneyDelta|statsDelta|eventIds|runId|sourceId|artifactId|category|delta|academic|stress|mood/gi,
+  /\b(project|internship|scholarship|monthly|fallback|employment|nankai_tianda)\b/gi,
   /整体而言|这个月主要|综上|总体来说|月度状态|本月数据如下/g,
 ];
 
 function hasUnsafeJournalMarkers(text: string) {
   return JOURNAL_FORBIDDEN_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+function shouldFallbackToSafeJournal(text: string) {
+  return hasUnsafeJournalMarkers(text);
 }
 
 function monthDetail(month: number) {
@@ -142,7 +146,7 @@ export function renderMonthlyJournalFallback(input: MonthlyJournalPromptInput): 
   return {
     kind: "monthly_journal",
     usedFallback: true,
-    markdown: hasUnsafeJournalMarkers(markdown)
+    markdown: shouldFallbackToSafeJournal(markdown)
       ? [
           `# ${rulesFallback.monthLabel}`,
           "",
@@ -385,7 +389,7 @@ export async function generateAiReport(input: AiReportRequest): Promise<AiReport
 
     const safeMarkdown =
       input.kind === "monthly_journal"
-        ? hasUnsafeJournalMarkers(markdown)
+        ? shouldFallbackToSafeJournal(markdown)
           ? renderMonthlyJournalFallback(input).markdown
           : sanitizePlayerFacingText(markdown)
         : sanitizePlayerFacingText(markdown);

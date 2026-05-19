@@ -41,20 +41,20 @@ type TimelineEntry = {
   details: string[];
 };
 
-function formatQualitativeMoney(value: number) {
+export function formatQualitativeMoney(value: number) {
   if (value <= 250) return "有点紧";
   if (value <= 700) return "得省着点花";
   return "还算能稳住";
 }
 
-function formatQualitativeStress(value: number) {
+export function formatQualitativeStress(value: number) {
   if (value >= 75) return "压得很满";
   if (value >= 60) return "一直绷着";
   if (value >= 40) return "有点累";
   return "还撑得住";
 }
 
-function formatQualitativeMood(value: number) {
+export function formatQualitativeMood(value: number) {
   if (value >= 70) return "稍微亮一点";
   if (value >= 50) return "平着往前走";
   if (value >= 35) return "有点闷";
@@ -284,17 +284,18 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
                 {latestReport && latestDigest ? (
                   <div className="fm-paper-stack fm-paper-stack--fixed">
                     <details className="fm-letter-shell">
-                      <summary className="fm-letter-shell__summary">点击打开本月来信</summary>
+                      <summary className="fm-letter-shell__summary">
+                        <span className="fm-letter-shell__summary-closed">打开本月来信</span>
+                        <span className="fm-letter-shell__summary-open">收起本月来信</span>
+                      </summary>
                       <article className="fm-paper">
                         <div className="fm-paper__clip" aria-hidden="true" />
                         <div className="fm-paper__stats">
-                          <span className="fm-paper__stat tone-teal">课业 {latestDigest.endState.feedback}</span>
-                          <span className="fm-paper__stat tone-amber">手头 {formatQualitativeMoney(latestDigest.endState.money)}</span>
-                          <span className="fm-paper__stat tone-rose">压力 {formatQualitativeStress(latestDigest.endState.stress)}</span>
-                          <span className="fm-paper__stat tone-cyan">心情 {formatQualitativeMood(latestDigest.endState.mood)}</span>
+                          <span className="fm-paper__stat tone-teal">{formatMonthLabel(latestReport.year, latestReport.month ?? 1)}</span>
+                          <span className="fm-paper__stat tone-mint">写给这个月的自己</span>
                         </div>
                         <div className="fm-paper__date">{formatMonthLabel(latestReport.year, latestReport.month ?? 1)}</div>
-                        <h2 className="fm-paper__title">本月记</h2>
+                        <h2 className="fm-paper__title">本月来信</h2>
                         <div className="fm-paper__copy fm-paper__copy--scroll">
                           {sanitizePlayerFacingText(latestReport.output_markdown)}
                         </div>
@@ -308,14 +309,15 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
                 ) : latestRulesFallback && latestDigest ? (
                   <div className="fm-paper-stack fm-paper-stack--fixed">
                     <details className="fm-letter-shell">
-                      <summary className="fm-letter-shell__summary">点击打开本月来信</summary>
+                      <summary className="fm-letter-shell__summary">
+                        <span className="fm-letter-shell__summary-closed">打开本月来信</span>
+                        <span className="fm-letter-shell__summary-open">收起本月来信</span>
+                      </summary>
                       <article className="fm-paper">
                         <div className="fm-paper__clip" aria-hidden="true" />
                         <div className="fm-paper__stats">
-                          <span className="fm-paper__stat tone-teal">课业 {latestDigest.endState.feedback}</span>
-                          <span className="fm-paper__stat tone-amber">手头 {formatQualitativeMoney(latestDigest.endState.money)}</span>
-                          <span className="fm-paper__stat tone-rose">压力 {formatQualitativeStress(latestDigest.endState.stress)}</span>
-                          <span className="fm-paper__stat tone-cyan">心情 {formatQualitativeMood(latestDigest.endState.mood)}</span>
+                          <span className="fm-paper__stat tone-teal">{latestRulesFallback.monthLabel}</span>
+                          <span className="fm-paper__stat tone-mint">写给这个月的自己</span>
                         </div>
                         <div className="fm-paper__date">{latestRulesFallback.monthLabel}</div>
                         <h2 className="fm-paper__title">{sanitizePlayerFacingText(latestRulesFallback.title)}</h2>
@@ -334,7 +336,10 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
                 ) : latestPersistedLetter ? (
                   <div className="fm-paper-stack fm-paper-stack--fixed">
                     <details className="fm-letter-shell">
-                      <summary className="fm-letter-shell__summary">点击打开本月来信</summary>
+                      <summary className="fm-letter-shell__summary">
+                        <span className="fm-letter-shell__summary-closed">打开本月来信</span>
+                        <span className="fm-letter-shell__summary-open">收起本月来信</span>
+                      </summary>
                       <article className="fm-paper">
                         <div className="fm-paper__clip" aria-hidden="true" />
                         <div className="fm-paper__stats">

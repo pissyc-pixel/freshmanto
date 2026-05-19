@@ -2,15 +2,21 @@ import Link from "next/link";
 
 import { loadDemoSaveAction } from "@/app/actions";
 import { FmAppRoot, FmBrandMark, FmIcon } from "@/components/fm-ui/FmScaffold";
-import { demoSavePresets } from "@/lib/demo/presets";
+import { demoSavePresets } from "@/lib/demo/preset-catalog";
 import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
+import { resolveWithTimeout } from "@/lib/server/resolve-with-timeout";
 
 type DemoSavesPageProps = {
   searchParams: DemoPageSearchParams;
 };
 
+const DEMO_SAVES_TIMEOUT_MS = 150;
+
 export default async function DemoSavesPage({ searchParams }: DemoSavesPageProps) {
-  const params = await searchParams;
+  const params = await resolveWithTimeout(searchParams, {
+    timeoutMs: DEMO_SAVES_TIMEOUT_MS,
+    fallback: {},
+  });
   const error = readSearchParam(params.error);
 
   return (

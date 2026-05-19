@@ -30,6 +30,17 @@ function readSeenState(runId: string, monthIndex: number, week: number) {
   }
 }
 
+function noticeBadge(kind: WeeklyKickoffNotice["kind"]) {
+  switch (kind) {
+    case "event":
+      return { tone: "event" as const, label: "周初事件" };
+    case "money":
+      return { tone: "money" as const, label: "手头提醒" };
+    default:
+      return { tone: "warning" as const, label: "状态提醒" };
+  }
+}
+
 export function WeeklyKickoffModal({
   runId,
   monthIndex,
@@ -86,41 +97,53 @@ export function WeeklyKickoffModal({
   }
 
   return createPortal(
-    <div className="fm-kickoff-backdrop" role="dialog" aria-modal="true" aria-label="本周开始前">
-      <section className="fm-kickoff-modal">
+    <div
+      className="fm-kickoff-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="本周开始前"
+      onClick={(event) => {
+        if (event.currentTarget === event.target) {
+          close();
+        }
+      }}
+    >
+      <section className="fm-kickoff-modal" onClick={(event) => event.stopPropagation()}>
         <div className="fm-kickoff-modal__head">
           <div>
-            <div className="fm-ending-cover__eyebrow">Week Start</div>
+            <div className="fm-ending-cover__eyebrow">本周提醒</div>
             <h2>本周开始前</h2>
           </div>
-          <button type="button" className="fm-dialog__close" onClick={close}>
-            我知道了
+          <button type="button" className="fm-dialog__close" onClick={close} aria-label="关闭本周开始前弹窗">
+            关闭
           </button>
         </div>
         <div className="fm-stack">
-          {notices.map((notice) => (
-            <article key={notice.id} className="fm-kickoff-card">
-              <div className="fm-kickoff-card__head">
-                <FmBadge tone={notice.kind === "event" ? "event" : notice.kind === "money" ? "money" : "warning"}>
-                  {notice.kind === "event" ? "周初事件" : notice.kind === "money" ? "经济提醒" : "状态提醒"}
-                </FmBadge>
-                <h3>{notice.title}</h3>
-              </div>
-              <p>
-                <strong>发生了什么：</strong>
-                {notice.whatHappened}
-              </p>
-              <div className="fm-kickoff-card__changes">
-                {notice.changes.map((change) => (
-                  <span key={`${notice.id}-${change}`}>{change}</span>
-                ))}
-              </div>
-              <p>
-                <strong>本周要留意：</strong>
-                {notice.reminder}
-              </p>
-            </article>
-          ))}
+          {notices.map((notice) => {
+            const badge = noticeBadge(notice.kind);
+
+            return (
+              <article key={notice.id} className="fm-kickoff-card">
+                <div className="fm-kickoff-card__head">
+                  <FmBadge tone={badge.tone}>{badge.label}</FmBadge>
+                  <h3>{notice.title}</h3>
+                </div>
+                <p>
+                  <strong>发生了什么：</strong>
+                  {notice.whatHappened}
+                </p>
+                <div className="fm-kickoff-card__changes">
+                  {notice.changes.map((change) => (
+                    <span key={`${notice.id}-${change}`}>{change}</span>
+                  ))}
+                </div>
+                <p>
+                  <strong>这周留意：</strong>
+                  {notice.reminder}
+                </p>
+              </article>
+            );
+          })}
         </div>
       </section>
     </div>,

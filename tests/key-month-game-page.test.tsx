@@ -306,11 +306,11 @@ describe("key month game page rendering", () => {
     expect(markup).toContain(expected);
   });
   it.each([
-    { label: "M13", run: createRunForMonth({ id: "game-node-13", year: 2, month: 1 }) },
-    { label: "M28", run: createRunForMonth({ id: "game-node-28", year: 3, month: 4 }) },
-    { label: "M34", run: createRunForMonth({ id: "game-node-34", year: 3, month: 10 }) },
-    { label: "M48", run: createRunForMonth({ id: "game-node-48", year: 4, month: 12 }) },
-  ])("shows documented final-demo milestone prompt $label", async ({ label, run }) => {
+    { label: "第2学年 · 第1月", run: createRunForMonth({ id: "game-node-13", year: 2, month: 1 }) },
+    { label: "第3学年 · 第4月", run: createRunForMonth({ id: "game-node-28", year: 3, month: 4 }) },
+    { label: "第3学年 · 第10月", run: createRunForMonth({ id: "game-node-34", year: 3, month: 10 }) },
+    { label: "第4学年 · 第12月", run: createRunForMonth({ id: "game-node-48", year: 4, month: 12 }) },
+  ])("shows player-facing milestone timing $label", async ({ label, run }) => {
     mockedBundleState.bundle = {
       run,
       runRecord: {
@@ -335,6 +335,6 @@ describe("key month game page rendering", () => {
     );
 
     expect(markup).toContain(label);
-    expect(markup).toContain("Final Demo Milestone");
+    expect(markup).toContain("本月关键节点");
   });
 });

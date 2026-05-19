@@ -45,7 +45,7 @@ function formatAcademicValue(value: number | null) {
   return value === null ? "暂无 GPA" : value.toFixed(2);
 }
 
-function formatRankPercentile(rank: number | null, percentile: number | null) {
+export function formatRankPercentile(rank: number | null, percentile: number | null) {
   if (rank === null || percentile === null) {
     return "暂无排名 / 百分比";
   }
@@ -229,7 +229,13 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
                 <article className="fm-resume-kpi">
                   <div className="fm-resume-kpi__label">排名 / 百分比</div>
                   <div className="fm-resume-kpi__value">
-                    {formatRankPercentile(academicProfile.rank, academicProfile.percentile)}
+                    {academicProfile.percentile === null
+                      ? academicProfile.rank === null
+                        ? "当前排名暂未结算"
+                        : `当前排名第 ${academicProfile.rank} 名`
+                      : academicProfile.percentile <= 5
+                        ? `专业前 ${academicProfile.percentile}%`
+                        : `排名约前 ${academicProfile.percentile}%`}
                   </div>
                   <div className="fm-resume-kpi__note">这是学业竞争力最直观的一层证据。</div>
                 </article>

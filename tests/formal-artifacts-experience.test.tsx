@@ -4,27 +4,47 @@ import { describe, expect, it } from "vitest";
 import { FormalArtifactCards, FormalDocumentPreview } from "@/components/formal-artifacts";
 import type { FormalArtifact } from "@/lib/demo/formal-artifacts";
 
-const artifact: FormalArtifact = {
+const scholarshipArtifact: FormalArtifact = {
   id: "formal-stage-artifact",
   kind: "scholarship",
-  title: "Scholarship Certificate",
-  subtitle: "Year 1",
-  summary: "Recognized for sustained academic progress.",
-  issuer: "Freshmanto Records",
-  serialNumber: "SCH-001",
-  sealLabel: "Official",
-  badgeLabel: "Scholarship",
+  title: "奖学金证书",
+  subtitle: "上一学年的稳定积累被正式看见",
+  summary: "这份结果来自已经发生过的学业表现和阶段积累。",
+  issuer: "学生资助与发展中心",
+  serialNumber: "SCH-13-0001",
+  sealLabel: "正式发放",
+  badgeLabel: "奖学金归档",
   badgeTone: "academic",
-  facts: ["6000"],
-  periodLabel: "M13",
+  facts: ["第 13 月", "结果层级：较高"],
+  periodLabel: "第 13 月",
   monthIndex: 13,
 };
 
+const employmentArtifact: FormalArtifact = {
+  id: "employment-artifact",
+  kind: "employment",
+  title: "就业录用通知",
+  subtitle: "本地消费品公司市场运营助理",
+  summary: "这份机会已经进入正式档案，不再显示内部层级 key。",
+  issuer: "校园招聘结果归档中心",
+  serialNumber: "OFR-37-0001",
+  sealLabel: "待查看",
+  badgeLabel: "就业结果",
+  badgeTone: "ending",
+  facts: ["目标层级：南开 / 天大层级", "结果感受：较好", "薪资感受：较高"],
+  periodLabel: "第 37 月",
+  monthIndex: 37,
+  offerId: "offer-1",
+  offerType: "employment",
+  accepted: false,
+  rejected: false,
+};
+
 describe("formal result experience", () => {
-  it("shows the full emotional sequence on formal result cards and documents", () => {
-    const cardMarkup = renderToStaticMarkup(<FormalArtifactCards artifacts={[artifact]} />);
+  it("shows the emotional sequence as content instead of cramped action buttons", () => {
+    const cardMarkup = renderToStaticMarkup(<FormalArtifactCards artifacts={[scholarshipArtifact]} />);
     const documentMarkup = renderToStaticMarkup(
-      <FormalDocumentPreview artifact={artifact} recipientName="Player" />,
+      <FormalDocumentPreview artifact={scholarshipArtifact} recipientName="同学" />,
     );
 
     for (const stage of ["等待", "揭晓", "被认可", "回看付出", "留下纪念"]) {
@@ -33,16 +53,31 @@ describe("formal result experience", () => {
     }
   });
 
+  it("renders wide, player-facing artifact cards without internal fields or English offer labels", () => {
+    const markup = renderToStaticMarkup(
+      <FormalArtifactCards artifacts={[employmentArtifact]} runId="demo-run" showOfferActions />,
+    );
+
+    expect(markup).toContain("就业录用通知");
+    expect(markup).toContain("本地消费品公司市场运营助理");
+    expect(markup).toContain("收进履历");
+    expect(markup).toContain("留作纪念");
+    expect(markup).not.toContain("Offer Letter");
+    expect(markup).not.toContain("market-ops");
+    expect(markup).not.toContain("quality");
+    expect(markup).not.toContain("salaryLevel");
+  });
+
   it("dedupes duplicate artifacts before rendering cards", () => {
     const duplicateMarkup = renderToStaticMarkup(
       <FormalArtifactCards
         artifacts={[
-          artifact,
-          { ...artifact, subtitle: "Duplicate", summary: "Duplicate artifact row." },
+          scholarshipArtifact,
+          { ...scholarshipArtifact, subtitle: "重复项", summary: "不应该再渲染第二次。" },
         ]}
       />,
     );
 
-    expect(duplicateMarkup.match(/Scholarship Certificate/g)?.length ?? 0).toBe(1);
+    expect(duplicateMarkup.match(/奖学金证书/g)?.length ?? 0).toBe(1);
   });
 });
