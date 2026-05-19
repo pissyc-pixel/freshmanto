@@ -136,7 +136,7 @@ function createRepository(store: InMemoryStore) {
         year: input.year,
         month: input.month ?? null,
         report_type: input.reportType,
-        input_summary_json: input.inputSummary as unknown as Json,
+        input_summary_json: input.inputSummary,
         output_markdown: input.outputMarkdown,
         model: input.model ?? null,
         created_at: new Date().toISOString(),
@@ -149,8 +149,10 @@ function createRepository(store: InMemoryStore) {
       year: number;
       month: number;
       title: string;
-      category: string;
-      detail?: string;
+      category: ResumeItemRecord["category"];
+      summary: string;
+      sourceItemId?: string | null;
+      metadata?: Record<string, Json>;
     }>) {
       const records = inputs.map((input, index) => ({
         id: `${input.runId}-resume-${input.year}-${input.month}-${index}`,
@@ -159,9 +161,11 @@ function createRepository(store: InMemoryStore) {
         month: input.month,
         title: input.title,
         category: input.category,
-        detail: input.detail ?? null,
+        summary: input.summary,
+        source_item_id: input.sourceItemId ?? null,
+        metadata_json: input.metadata ?? {},
         created_at: new Date().toISOString(),
-      }));
+      })) satisfies ResumeItemRecord[];
       store.resumeItems.push(...records);
       return records;
     },
@@ -323,5 +327,76 @@ describe("12-month smoke test", () => {
     }
 
     expect(store.monthlyStates).toHaveLength(12);
+  });
+});
+
+describe("48-month smoke test", () => {
+  it("advances through 48 months and verifies final-demo route milestones", async () => {
+    const store = createStore();
+    const run = createInitialGameRun({
+      id: "run-48-months",
+      randomValues: [0.2, 0.6, 0.4, 0.5, 0.3, 0.1, 0.7, 0.2],
+    });
+    store.run = {
+      id: run.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      status: "active",
+      current_year: run.currentYear,
+      current_month: run.currentMonth,
+      profile_json: run.profile,
+      current_state_json: run,
+    };
+
+    let latestResult:
+      | Awaited<ReturnType<typeof advanceDemoMonth>>
+      | undefined;
+    const factsByMonth = new Map<number, string[]>();
+
+    for (let month = 1; month <= 48; month += 1) {
+      latestResult = await advanceDemoMonth({
+        repository: createRepository(store),
+        runId: run.id,
+        plan: {
+          attendanceStrategy: month % 3 === 0 ? "serious" : "mixed",
+          actions: [
+            { action: "study", time: "day" },
+            { action: month % 2 === 0 ? "job_prep" : "student_activity", time: "night" },
+            { action: month >= 28 ? "writing_research" : "social", time: "night" },
+          ],
+        },
+        generateReport: fakeAiReport,
+      });
+
+      const expectedCompleted = month === 48;
+      expect(latestResult.run.status === "completed").toBe(expectedCompleted);
+      expect(store.monthlyStates.length).toBe(month);
+      expect(store.aiReports.filter((record) => record.report_type === "monthly_journal")).toHaveLength(month);
+      expect(store.monthlyStates.at(-1)?.snapshot_json).toBeDefined();
+      expect(
+        buildGrowthJournalEntry(
+          store.monthlyStates.at(-1)!.snapshot_json as unknown as StructuredMonthlySummary,
+          store.monthlyStates.at(-1)!.year,
+          store.monthlyStates.at(-1)!.month,
+        ).title,
+      ).toBeTruthy();
+      factsByMonth.set(month, latestResult.monthlySummary.notableFacts);
+    }
+
+    expect(latestResult?.run.status).toBe("completed");
+    expect(latestResult?.endingSummary?.finalYear).toBe(4);
+    expect(store.aiReports.some((record) => record.report_type === "ending_report")).toBe(true);
+
+    for (const month of [4, 10, 16, 22, 28, 34, 40, 46]) {
+      expect(factsByMonth.get(month)?.some((fact) => fact.startsWith("competition:"))).toBe(true);
+    }
+    expect(factsByMonth.get(12)).toContain("milestone:scholarship-review:13");
+    expect(factsByMonth.get(24)).toContain("milestone:scholarship-review:25");
+    expect(factsByMonth.get(36)).toContain("milestone:scholarship-review:37");
+    expect(factsByMonth.get(28)).toContain("milestone:postgraduate-open:28");
+    expect(factsByMonth.get(34)).toContain("milestone:recommendation-apply:34");
+    expect(factsByMonth.get(36)).toContain("milestone:postgraduate-result:36");
+    expect([...factsByMonth.entries()].some(([month, facts]) => month >= 37 && month <= 46 && facts.some((fact) => fact.startsWith("milestone:employment-offer:")))).toBe(true);
+    expect(latestResult?.run.timelineNodes?.some((node) => node.kind === "ending" || node.kind === "offer")).toBe(true);
   });
 });

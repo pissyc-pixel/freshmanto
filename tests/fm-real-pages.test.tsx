@@ -8,7 +8,9 @@ describe("real pages use freshmanto ui shells safely", () => {
 
     expect(markup).toContain("Freshmanto");
     expect(markup).toContain("/new-game");
+    expect(markup).toContain("/demo-saves");
     expect(markup).toContain("新生建档");
+    expect(markup).toContain("载入演示存档");
     expect(markup).toContain("大学生活模拟器");
   });
 

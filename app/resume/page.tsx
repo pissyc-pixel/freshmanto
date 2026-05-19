@@ -1,4 +1,5 @@
 import { ActiveRunSync } from "@/components/active-run-sync";
+import { FormalArtifactCards, FormalDocumentPreview } from "@/components/formal-artifacts";
 import { FmBadge } from "@/components/fm-ui/FmBadge";
 import { FmEmptyState } from "@/components/fm-ui/FmEmptyState";
 import { FmPartialNotice } from "@/components/fm-ui/FmPartialNotice";
@@ -21,11 +22,18 @@ import {
   summarizeDirectionSignals,
 } from "@/core/resolvers/progression";
 import { resolveActiveRunId } from "@/lib/demo/active-run";
+import { buildResumeFormalArtifacts } from "@/lib/demo/formal-artifacts";
 import { buildGrowthJournalEntry } from "@/lib/demo/monthly-digest";
 import { formatMonthLabel } from "@/lib/demo/options";
+import { normalizeSaveState } from "@/lib/demo/save-state";
 import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
 import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
 import { getServerResumeBundle } from "@/lib/demo/server";
+import {
+  formatPlayerFacingMonthIndex,
+  sanitizePlayerFacingText,
+  sanitizePlayerFacingTextList,
+} from "@/lib/player-facing-text";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +45,7 @@ function formatAcademicValue(value: number | null) {
   return value === null ? "暂无 GPA" : value.toFixed(2);
 }
 
-function formatRankPercentile(rank: number | null, percentile: number | null) {
+export function formatRankPercentile(rank: number | null, percentile: number | null) {
   if (rank === null || percentile === null) {
     return "暂无排名 / 百分比";
   }
@@ -124,7 +132,7 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
     );
   }
 
-  const hydratedRun = ensureProgressionState(bundle.run);
+  const hydratedRun = ensureProgressionState(normalizeSaveState(bundle.run));
   const academicProfile = deriveAcademicProfile(hydratedRun);
   const directionSignals = summarizeDirectionSignals(hydratedRun);
   const directionPerception = buildDirectionPerception(hydratedRun);
@@ -135,11 +143,13 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
   const resumeItems = bundle.resumeItems.map((item) => ({
     id: item.id,
     category: item.category,
-    title: item.title,
-    summary: item.summary,
+    title: sanitizePlayerFacingText(item.title),
+    summary: sanitizePlayerFacingText(item.summary),
     month: item.month,
     tags: Array.isArray(item.metadata_json?.tags)
-      ? item.metadata_json.tags.filter((tag): tag is string => typeof tag === "string")
+      ? sanitizePlayerFacingTextList(
+          item.metadata_json.tags.filter((tag): tag is string => typeof tag === "string"),
+        )
       : [],
   }));
 
@@ -169,6 +179,11 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
         : { badge: "成长日志", periodLabel: formatMonthLabel(state.year, state.month), title: "数据不完整", message: "这条月度记录的快照数据不完整，无法生成成长日志。", details: [] as string[] }),
     }));
 
+  const runForFormalArtifacts = {
+    ...hydratedRun,
+    resume: resumeItems,
+  };
+
   const coreAbilityTags = buildCoreAbilityTags({
     competitionCount: competitionItems.length,
     internshipCount: internshipItems.length,
@@ -177,6 +192,8 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
     gpa: academicProfile.gpa,
   });
   const projectCount = countProjects(resumeItems);
+  const formalArtifacts = buildResumeFormalArtifacts(runForFormalArtifacts);
+  const leadFormalArtifact = formalArtifacts[0] ?? null;
 
   return (
     <FmShellLayout
@@ -194,7 +211,7 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
       }
     >
       <div className="fm-grid-2">
-        <ActiveRunSync runId={bundle.run.id} />
+        <ActiveRunSync runId={bundle.run.id} snapshot={hydratedRun} />
 
         <div className="fm-stack">
           <FmMotionSection delay={40}>
@@ -212,7 +229,13 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
                 <article className="fm-resume-kpi">
                   <div className="fm-resume-kpi__label">排名 / 百分比</div>
                   <div className="fm-resume-kpi__value">
-                    {formatRankPercentile(academicProfile.rank, academicProfile.percentile)}
+                    {academicProfile.percentile === null
+                      ? academicProfile.rank === null
+                        ? "当前排名暂未结算"
+                        : `当前排名第 ${academicProfile.rank} 名`
+                      : academicProfile.percentile <= 5
+                        ? `专业前 ${academicProfile.percentile}%`
+                        : `排名约前 ${academicProfile.percentile}%`}
                   </div>
                   <div className="fm-resume-kpi__note">这是学业竞争力最直观的一层证据。</div>
                 </article>
@@ -264,6 +287,38 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
             </FmPanel>
           </FmMotionSection>
 
+          {formalArtifacts.length > 0 ? (
+            <FmMotionSection delay={130}>
+              <FmPanel>
+                <FmSectionHead
+                  title="正式成果档案"
+                  copy="奖学金、竞赛评奖、实习机会和推免资格这些已经写进存档事实的结果，会先在这里被归档。"
+                  aside={<FmBadge tone="ending">真实结果</FmBadge>}
+                />
+                <div className="mt-6">
+                  <FormalArtifactCards artifacts={formalArtifacts} runId={runId} showOfferActions />
+                </div>
+              </FmPanel>
+            </FmMotionSection>
+          ) : null}
+
+          {leadFormalArtifact ? (
+            <FmMotionSection delay={145}>
+              <FmPanel>
+                <FmSectionHead
+                  title="正式结果预览"
+                  copy="这里把已经发生的成果整理成更正式的证书 / 结果文件，不补写尚未发生的奖励或录取。"
+                />
+                <div className="mt-6">
+                  <FormalDocumentPreview
+                    artifact={leadFormalArtifact}
+                    recipientName={hydratedRun.profile.name ?? "同学"}
+                  />
+                </div>
+              </FmPanel>
+            </FmMotionSection>
+          ) : null}
+
           <FmMotionSection delay={160}>
             <FmPanel>
               <FmSectionHead
@@ -291,7 +346,7 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
                             </div>
                           ) : null}
                         </div>
-                        <div className="fm-resume-line__date">M{item.month}</div>
+                        <div className="fm-resume-line__date">{formatPlayerFacingMonthIndex(item.month)}</div>
                       </article>
                     ))}
                   </div>
@@ -421,9 +476,9 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
                               <div className="fm-journal-card__month">{log.periodLabel}</div>
                               <h3 className="fm-journal-card__title">{log.title}</h3>
                             </div>
-                            <FmBadge tone="neutral">{log.badge}</FmBadge>
+                            <FmBadge tone="neutral">{sanitizePlayerFacingText(log.badge)}</FmBadge>
                           </div>
-                          <p className="fm-journal-card__copy">{log.message}</p>
+                          <p className="fm-journal-card__copy">{sanitizePlayerFacingText(log.message)}</p>
                         </div>
                       </article>
                     ))}

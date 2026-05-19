@@ -1569,7 +1569,11 @@ export function confirmPlannedWeek(run: GameRun): {
       projectedRun = closeCompetitionProject(projectedRun, weekState.event.linkedProjectId);
     }
     if (turnSummary.resolvedAction.accepted) {
-      projectedRun = applyAcceptedActionProgression(projectedRun, turnSummary.resolvedAction.action);
+      projectedRun = applyAcceptedActionProgression(
+        projectedRun,
+        turnSummary.resolvedAction.action,
+        turnSummary.resolvedAction.optionId,
+      );
       if (turnSummary.resolvedAction.action === "competition_project") {
         const activeCompetitionAfter =
           projectedRun.competitionProjects?.find((project) => project.status === "active") ?? null;
@@ -1740,7 +1744,7 @@ export function resolveActionTurn(run: GameRun, plan: ActionTurnPlan): ResolvedT
     activeMonth: updatedActiveMonth,
   };
   if (resolvedAction.accepted) {
-    updatedRun = applyAcceptedActionProgression(updatedRun, resolvedAction.action);
+    updatedRun = applyAcceptedActionProgression(updatedRun, resolvedAction.action, resolvedAction.optionId);
   }
 
   if (weekTimeAfter > 0) {

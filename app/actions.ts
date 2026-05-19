@@ -1,28 +1,15 @@
 "use server";
 
 import { cookies } from "next/headers";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { buildPlannerDaysView } from "@/app/game/view-model";
-import { ensureDemoSchema } from "@/db/ensure-schema";
-import { generateAiReport } from "@/lib/ai/reports";
+
 import { ACTIVE_RUN_COOKIE } from "@/lib/demo/active-run";
-import {
-  advanceServerDemoTurn,
-  confirmServerWeek,
-  createServerDemoRun,
-  planServerWeekdayAction,
-  setServerWeekAttendance,
-} from "@/lib/demo/server";
-import { endDemoWeek } from "@/lib/demo/run-service";
-import { createServerSupabaseRepository } from "@/lib/supabase";
+import { demoSavePresetIds } from "@/lib/demo/preset-catalog";
 import type { ActionTime, ActionType, CollegeTrack, CourseAttendanceStrategy } from "@/types/game";
 
-const attendanceSchema = z.enum([
-  "serious",
-  "mixed",
-  "phone"
-]);
+const attendanceSchema = z.enum(["serious", "mixed", "phone"]);
 
 const actionSchema = z.enum([
   "study",
@@ -38,7 +25,7 @@ const actionSchema = z.enum([
   "student_activity",
   "remedy",
   "ask_family",
-  "skip_class"
+  "skip_class",
 ]);
 
 const timeSchema = z.enum(["day", "night"]);
@@ -47,6 +34,8 @@ const newRunSchema = z.object({
   name: z.string().trim().min(2).max(12),
   discipline: z.enum(["arts", "science", "engineering", "business", "medicine"]),
 });
+const demoPresetIdSchema = z.enum(demoSavePresetIds);
+const offerDecisionSchema = z.enum(["accept", "reject"]);
 const plannedActionSnapshotEntrySchema = z.object({
   weekday: weekdaySchema,
   optionId: z.string().min(1),
@@ -109,6 +98,31 @@ function parsePlannedActionsSnapshot(formData: FormData) {
   }
 }
 
+async function loadDemoServerModule() {
+  return import("@/lib/demo/server");
+}
+
+async function loadPlannerViewModule() {
+  return import("@/app/game/view-model");
+}
+
+async function loadEndWeekDependencies() {
+  const [{ ensureDemoSchema }, { createServerSupabaseRepository }, { generateAiReport }, { endDemoWeek }] =
+    await Promise.all([
+      import("@/db/ensure-schema"),
+      import("@/lib/supabase"),
+      import("@/lib/ai/reports"),
+      import("@/lib/demo/run-service"),
+    ]);
+
+  return {
+    ensureDemoSchema,
+    createServerSupabaseRepository,
+    generateAiReport,
+    endDemoWeek,
+  };
+}
+
 export async function startNewRunAction(formData?: FormData) {
   if (!formData) {
     redirect("/new-game");
@@ -123,12 +137,48 @@ export async function startNewRunAction(formData?: FormData) {
     redirect("/new-game");
   }
 
+  const { createServerDemoRun } = await loadDemoServerModule();
   const result = await createServerDemoRun({
     name: parsed.data.name,
     discipline: parsed.data.discipline as CollegeTrack,
   });
+
   await persistActiveRun(result.run.id);
   redirect(`/admission?runId=${result.run.id}`);
+}
+
+export async function loadDemoSaveAction(formData: FormData) {
+  const presetId = demoPresetIdSchema.safeParse(readString(formData, "presetId"));
+
+  if (!presetId.success) {
+    redirect("/demo-saves");
+  }
+
+  try {
+    const { createServerDemoPresetRun } = await loadDemoServerModule();
+    const result = await createServerDemoPresetRun(presetId.data);
+    await persistActiveRun(result.run.id);
+    redirect(`/game?runId=${result.run.id}`);
+  } catch (error) {
+    if (isRedirectError(error) || (error instanceof Error && error.message.startsWith("REDIRECT:"))) {
+      throw error;
+    }
+    redirect("/demo-saves?error=load-failed");
+  }
+}
+
+export async function decideFutureOfferAction(formData: FormData) {
+  const runId = z.string().min(1).parse(readString(formData, "runId"));
+  const offerId = z.string().min(1).parse(readString(formData, "offerId"));
+  const decision = offerDecisionSchema.parse(readString(formData, "decision"));
+
+  await persistActiveRun(runId);
+  const { decideServerFutureOffer } = await loadDemoServerModule();
+  await decideServerFutureOffer(runId, {
+    offerId,
+    decision,
+  });
+  redirect(`/resume?runId=${runId}`);
 }
 
 export async function planWeekdayActionAction(input: {
@@ -144,11 +194,17 @@ export async function planWeekdayActionAction(input: {
 
   await persistActiveRun(runId);
 
+  const [{ planServerWeekdayAction }, { buildPlannerDaysView }] = await Promise.all([
+    loadDemoServerModule(),
+    loadPlannerViewModule(),
+  ]);
+
   const result = await planServerWeekdayAction(runId, {
     weekday,
     optionId,
     skipClass,
   });
+
   const currentWeekState = result.run.activeMonth?.currentWeekState;
   const savedDay = currentWeekState
     ? buildPlannerDaysView(currentWeekState, result.run).find((day) => day.weekday === weekday) ?? null
@@ -161,11 +217,10 @@ export async function submitActionTurnAction(formData: FormData) {
   const runId = z.string().min(1).parse(readString(formData, "runId"));
   await persistActiveRun(runId);
   const intent = readString(formData, "intent") || "act";
-  const attendanceStrategy = attendanceSchema.parse(
-    readString(formData, "attendanceStrategy"),
-  ) as CourseAttendanceStrategy;
+  const attendanceStrategy = attendanceSchema.parse(readString(formData, "attendanceStrategy")) as CourseAttendanceStrategy;
 
   if (intent === "set_attendance") {
+    const { setServerWeekAttendance } = await loadDemoServerModule();
     await setServerWeekAttendance(runId, attendanceStrategy);
     redirect(`/game?runId=${runId}`);
   }
@@ -175,6 +230,7 @@ export async function submitActionTurnAction(formData: FormData) {
     const optionId = z.string().min(1).parse(readString(formData, "optionId"));
     const skipClass = readString(formData, "skipClass") === "true";
 
+    const { planServerWeekdayAction } = await loadDemoServerModule();
     await planServerWeekdayAction(runId, {
       weekday,
       optionId,
@@ -185,6 +241,7 @@ export async function submitActionTurnAction(formData: FormData) {
 
   if (intent === "confirm_week") {
     const plannedActionsSnapshot = parsePlannedActionsSnapshot(formData);
+    const { confirmServerWeek } = await loadDemoServerModule();
     const result = await confirmServerWeek(runId, plannedActionsSnapshot);
 
     if (result.monthCompleted) {
@@ -195,6 +252,8 @@ export async function submitActionTurnAction(formData: FormData) {
   }
 
   if (intent === "end_week") {
+    const { ensureDemoSchema, createServerSupabaseRepository, generateAiReport, endDemoWeek } =
+      await loadEndWeekDependencies();
     await ensureDemoSchema();
 
     const result = await endDemoWeek({
@@ -212,6 +271,7 @@ export async function submitActionTurnAction(formData: FormData) {
   }
 
   const action = parseActionTurn(formData);
+  const { advanceServerDemoTurn } = await loadDemoServerModule();
   const result = await advanceServerDemoTurn(runId, {
     attendanceStrategy,
     action,

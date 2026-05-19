@@ -2,12 +2,13 @@ import { buildEndingReportPrompt } from "@/core/prompts/ending-report";
 import { buildMonthlyJournalPrompt } from "@/core/prompts/monthly-journal";
 import { createAiClient } from "@/lib/ai/client";
 import { aiConfig, getAiReportTimeoutMs, isAiConfigured } from "@/lib/ai/config";
-import { buildGrowthJournalEntry, buildMonthlyDiaryDigest } from "@/lib/demo/monthly-digest";
+import { buildMonthlyDiaryDigest } from "@/lib/demo/monthly-digest";
 import {
   formatEndingNotableFact,
   formatGraduationOutcome,
   formatMonthLabel,
 } from "@/lib/demo/options";
+import { sanitizePlayerFacingText } from "@/lib/player-facing-text";
 import type {
   AiPromptPayload,
   AiReportRequest,
@@ -49,43 +50,113 @@ function renderMarkdownFactBlock(lead: string, facts: string[]) {
   return [lead, ...facts.map((fact) => `- ${fact}`)].join("\n");
 }
 
+const JOURNAL_FORBIDDEN_PATTERNS = [
+  /余额\s*\d+/,
+  /心情\s*\d+/,
+  /压力\s*\d+/,
+  /学业\s*[+-]?\d+/,
+  /moneyDelta|statsDelta|eventIds|runId|sourceId|artifactId|category|delta|academic|stress|mood/gi,
+  /\b(project|internship|scholarship|monthly|fallback|employment|nankai_tianda)\b/gi,
+  /整体而言|这个月主要|综上|总体来说|月度状态|本月数据如下/g,
+];
+
+function hasUnsafeJournalMarkers(text: string) {
+  return JOURNAL_FORBIDDEN_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+function shouldFallbackToSafeJournal(text: string) {
+  return hasUnsafeJournalMarkers(text);
+}
+
+function monthDetail(month: number) {
+  const details = ["宿舍灯关了一半", "手机备忘录停在最后一行", "食堂的汤有点凉", "书桌边还压着一页草稿纸"];
+  return details[(Math.max(month, 1) - 1) % details.length]!;
+}
+
+function feelingAboutMoney(value: number) {
+  if (value <= 250) {
+    return "月底翻到余额的时候，心里还是会先紧一下。";
+  }
+  if (value <= 700) {
+    return "手头不算宽松，花钱前还是会先停一下。";
+  }
+  return "手头还算能转开，但也远没到敢随便花的时候。";
+}
+
+function feelingAboutStress(value: number) {
+  if (value >= 75) {
+    return "这阵子脑子一直绷着，躺下去也没有真的松掉。";
+  }
+  if (value >= 60) {
+    return "整个月都像是拎着一根线，没断，但也不太敢松。";
+  }
+  return "压力没有彻底退下去，只是终于没再往上顶。";
+}
+
+function feelingAboutAcademics(feedback: string) {
+  if (feedback === "excellent") {
+    return "课业这边终于有点稳住的样子，不用每次都靠临时补回来。";
+  }
+  if (feedback === "stable") {
+    return "课业这边至少没有再往下掉，慢慢能接住自己。";
+  }
+  return "课业还是会让我反复回头补，可总不能一直装没看见。";
+}
+
+function buildJournalTitle(input: MonthlyJournalPromptInput) {
+  return `${formatMonthLabel(input.year, input.month)}的月记`;
+}
+
 export function buildMonthlyJournalRulesFallback(input: MonthlyJournalPromptInput) {
   const { summary, year, month } = input;
   const digest = buildMonthlyDiaryDigest(summary, year, month);
-  const growthLog = buildGrowthJournalEntry(summary, year, month);
-
-  const paragraph1 = `这个月主要围着${digest.mainActions.join("、") || "把节奏稳住"}在转。${digest.academicArc}`;
-  const paragraph2 = `${digest.emotionalArc} ${digest.moneyStory}`;
-  const paragraph3 = digest.keyMoments.length > 0
-    ? `回头看，${digest.keyMoments.slice(0, 2).join("；")}。`
-    : "这个月没有特别大的转折，但日子确实一点点走到了现在。";
-  const directionLine = `${digest.directionSignal}${digest.futureSignals[0] ? ` ${digest.futureSignals[0]}` : ""}`;
+  const detail = monthDetail(month);
+  const actionLine = digest.mainActions.length > 0 ? `这一个月大多时候都在忙${digest.mainActions.slice(0, 2).join("和")}。` : "这一个月像是在先把日子勉强排顺。";
+  const keyMoment = digest.keyMoments[0] ? `真要说最记得住的，还是${digest.keyMoments[0]}。` : "真要说最记得住的，也不是哪件大事，就是那种一直往前顶的小疲惫。";
+  const futureLine = digest.futureSignals[0] ? `我知道后面还会碰到${digest.futureSignals[0]}，只是现在还没想好要怎么讲得更轻一点。` : "我知道后面还有东西在等着我，可我现在也还没把那口气完全顺下来。";
 
   return {
     monthLabel: formatMonthLabel(year, month),
     heading: formatMonthlyHeading(year, month),
-    title: growthLog.title,
-    diary: [paragraph1, paragraph2, paragraph3, directionLine].join("\n\n"),
-    endStateLine: `月底状态：余额 ${digest.endState.money}，心情 ${digest.endState.mood}，压力 ${digest.endState.stress}，学业反馈"${digest.endState.feedback}"。`,
+    title: buildJournalTitle(input),
+    diary: [
+      `晚上把${detail}的时候，我才想起来这个月其实已经过去了。我没那么会总结，只知道自己一直在往前赶，赶到后来连白天和晚上都快叠在一起了。`,
+      `${actionLine}${feelingAboutAcademics(digest.endState.feedback)} ${feelingAboutStress(digest.endState.stress)}`,
+      `${feelingAboutMoney(digest.endState.money)} ${keyMoment}有时候也会觉得自己像是一直没彻底坐下过，但是事情又确实被一点点推到了眼前。`,
+      futureLine,
+    ]
+      .map((paragraph) => sanitizePlayerFacingText(paragraph))
+      .join("\n\n"),
+    endStateLine: sanitizePlayerFacingText("我把这个月记下来，不是因为已经想明白了，只是怕再往后走，会忘了自己是怎么撑到这里的。"),
   };
 }
 
 export function renderMonthlyJournalFallback(input: MonthlyJournalPromptInput): AiReportResult {
   const rulesFallback = buildMonthlyJournalRulesFallback(input);
+  const markdown = [
+    `# ${rulesFallback.monthLabel}`,
+    "",
+    `## ${rulesFallback.title}`,
+    "",
+    rulesFallback.diary,
+    "",
+    rulesFallback.endStateLine,
+  ].join("\n");
 
   return {
     kind: "monthly_journal",
     usedFallback: true,
-    markdown: [
-      `# ${rulesFallback.monthLabel}`,
-      "",
-      `## ${rulesFallback.title}`,
-      "",
-      rulesFallback.diary,
-      "",
-      `---`,
-      rulesFallback.endStateLine,
-    ].join("\n"),
+    markdown: shouldFallbackToSafeJournal(markdown)
+      ? [
+          `# ${rulesFallback.monthLabel}`,
+          "",
+          `## ${rulesFallback.title}`,
+          "",
+          "我把这个月记在手机备忘录里，更多像是怕自己一转身就把这些细小的感受弄丢了。",
+          "",
+          "有些事其实已经在往前走了，只是我还没学会用很轻松的语气把它们说出来。宿舍灯灭下来之后，我才发现自己还在想着下个月会不会好一点。",
+        ].join("\n")
+      : markdown,
   };
 }
 
@@ -316,9 +387,16 @@ export async function generateAiReport(input: AiReportRequest): Promise<AiReport
         : renderEndingReportFallback(input);
     }
 
+    const safeMarkdown =
+      input.kind === "monthly_journal"
+        ? shouldFallbackToSafeJournal(markdown)
+          ? renderMonthlyJournalFallback(input).markdown
+          : sanitizePlayerFacingText(markdown)
+        : sanitizePlayerFacingText(markdown);
+
     return {
       kind: input.kind,
-      markdown,
+      markdown: safeMarkdown,
       model,
       usedFallback: false,
     };

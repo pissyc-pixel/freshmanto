@@ -1,11 +1,14 @@
 import { ensureDemoSchema } from "@/db/ensure-schema";
 import { generateAiReport } from "@/lib/ai/reports";
+import { createDemoPresetRun, type DemoSavePresetId } from "@/lib/demo/presets";
+import { normalizeSaveState } from "@/lib/demo/save-state";
 import { createServerSupabaseRepository } from "@/lib/supabase";
 import {
   advanceDemoMonth,
   advanceDemoTurn,
   confirmDemoWeek,
   createDemoRun,
+  decideFutureOffer,
   type PlannedActionSnapshotEntry,
   planDemoWeekday,
   setDemoWeekAttendance,
@@ -24,6 +27,16 @@ export async function createServerDemoRun(input?: {
     repository,
     name: input?.name,
     discipline: input?.discipline,
+  });
+}
+
+export async function createServerDemoPresetRun(presetId: DemoSavePresetId) {
+  await ensureDemoSchema();
+  const repository = createServerSupabaseRepository();
+
+  return createDemoPresetRun({
+    repository,
+    presetId,
   });
 }
 
@@ -109,7 +122,7 @@ export async function getServerDemoBundle(runId: string) {
   ]);
 
   return {
-    run: runRecord.current_state_json,
+    run: normalizeSaveState(runRecord.current_state_json),
     runRecord,
     monthlyStates,
     logs,
@@ -133,7 +146,7 @@ export async function getServerGameBundle(runId: string) {
   ]);
 
   return {
-    run: runRecord.current_state_json,
+    run: normalizeSaveState(runRecord.current_state_json),
     runRecord,
     monthlyStates: monthlyStates.slice().reverse(),
     logs: logs.slice().reverse(),
@@ -155,7 +168,7 @@ export async function getServerJournalBundle(runId: string) {
   ]);
 
   return {
-    run: runRecord.current_state_json,
+    run: normalizeSaveState(runRecord.current_state_json),
     runRecord,
     monthlyStates,
     aiReports,
@@ -177,7 +190,7 @@ export async function getServerResumeBundle(runId: string) {
   ]);
 
   return {
-    run: runRecord.current_state_json,
+    run: normalizeSaveState(runRecord.current_state_json),
     runRecord,
     monthlyStates,
     resumeItems,
@@ -189,7 +202,25 @@ export async function getServerDemoRun(runId: string) {
   const repository = createServerSupabaseRepository();
   const runRecord = await repository.getRun(runId);
 
-  return runRecord?.current_state_json ?? null;
+  return runRecord ? normalizeSaveState(runRecord.current_state_json) : null;
+}
+
+export async function decideServerFutureOffer(
+  runId: string,
+  input: {
+    offerId: string;
+    decision: "accept" | "reject";
+  },
+) {
+  await ensureDemoSchema();
+  const repository = createServerSupabaseRepository();
+
+  return decideFutureOffer({
+    repository,
+    runId,
+    offerId: input.offerId,
+    decision: input.decision,
+  });
 }
 
 export async function getServerEndingPreview(runId: string) {

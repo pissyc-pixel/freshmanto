@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useState, useSyncExternalStore } from "react";
 
 import { ACTIVE_RUN_STORAGE_KEY } from "@/lib/demo/active-run";
+import { clearBrowserSave } from "@/lib/demo/browser-save";
 import { FmIcon } from "@/components/fm-ui/FmScaffold";
 
 export function ContinueSaveButton() {
@@ -26,12 +27,12 @@ export function ContinueSaveButton() {
 
   const clearSave = useCallback(() => {
     try {
-      window.localStorage.removeItem(ACTIVE_RUN_STORAGE_KEY);
+      clearBrowserSave(window.localStorage, savedRunId);
     } catch {
       // ignore
     }
     setRevision((n) => n + 1);
-  }, []);
+  }, [savedRunId]);
 
   if (!savedRunId && revision === 0) {
     return null;

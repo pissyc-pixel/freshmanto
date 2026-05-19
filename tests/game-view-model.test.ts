@@ -159,6 +159,38 @@ describe("game page view-model helpers", () => {
     expect(competitionOption?.progressText).toContain("达到 4 次后");
   });
 
+  it("renders one dedicated planner action per active competition project", () => {
+    const baseRun = createInitialGameRun({
+      id: "competition-specific-options-run",
+      discipline: "engineering",
+      randomValues: [0.22, 0.31, 0.48, 0.57, 0.61, 0.19, 0.26, 0.4],
+    });
+    const activeProjectRun = selectWeekAttendanceStrategy(
+      {
+        ...baseRun,
+        competitionProjects: baseRun.competitionProjects?.map((project, index) => ({
+          ...project,
+          id: `project-${index + 1}`,
+          status: "active",
+          title: index === 0 ? "电子设计竞赛" : "案例分析商赛",
+          category: index === 0 ? "工程实践" : "案例赛",
+        })),
+      },
+      "mixed",
+    );
+
+    const plannerDays = buildPlannerDaysView(activeProjectRun.activeMonth!.currentWeekState, activeProjectRun);
+    const saturday = plannerDays.find((day) => day.weekday === "sat");
+    const competitionOptions = saturday?.normalOptions.filter((option) => option.action === "competition_project") ?? [];
+
+    expect(competitionOptions.map((option) => option.optionId)).toEqual(
+      expect.arrayContaining(["competition_project:project-1", "competition_project:project-2"]),
+    );
+    expect(competitionOptions.map((option) => option.label)).toEqual(
+      expect.arrayContaining(["【电赛】方案设计", "【商赛】案例分析"]),
+    );
+  });
+
   it("uses plain player-facing trend text instead of emoji or arrows in action descriptions", () => {
     const weeklyCalendar = createWeeklyCalendar(1);
     const currentWeekState: ActiveWeekState = {

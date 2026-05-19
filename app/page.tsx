@@ -4,9 +4,15 @@ import { ContinueSaveButton } from "@/components/continue-save-button";
 import { FmAppRoot, FmBrandMark, FmIcon } from "@/components/fm-ui/FmScaffold";
 import { buildRunHref } from "@/lib/demo/active-run";
 import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
+import { resolveWithTimeout } from "@/lib/server/resolve-with-timeout";
+
+const START_PAGE_TIMEOUT_MS = 150;
 
 export default async function StartPage() {
-  const activeRunId = await readActiveRunIdFromCookies();
+  const activeRunId = await resolveWithTimeout(readActiveRunIdFromCookies(), {
+    timeoutMs: START_PAGE_TIMEOUT_MS,
+    fallback: undefined,
+  });
 
   return (
     <FmAppRoot centered data-testid="start-page">
@@ -32,6 +38,11 @@ export default async function StartPage() {
           <Link href="/new-game" className="fm-button-primary" data-testid="start-new-run-link">
             <FmIcon name="chevron-right" className="h-7 w-7" />
             <span>新生建档</span>
+          </Link>
+
+          <Link href="/demo-saves" className="fm-button-secondary">
+            <FmIcon name="file" className="h-6 w-6" />
+            <span>载入演示存档</span>
           </Link>
 
           <ContinueSaveButton />

@@ -1,10 +1,12 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createInitialGameRun } from "@/core/game-engine";
+import { createInitialGameRun } from "@/core/generators/opening";
+import type { StructuredMonthlySummary } from "@/types/game";
 
 const mockedBundleState = {
   bundle: null as Awaited<ReturnType<typeof import("@/lib/demo/server")["getServerJournalBundle"]>> | null,
+  error: null as Error | null,
 };
 
 vi.mock("@/lib/demo/server-run-context", () => ({
@@ -23,16 +25,33 @@ vi.mock("@/lib/demo/active-run", () => ({
 }));
 
 vi.mock("@/lib/demo/server", () => ({
-  getServerJournalBundle: vi.fn(async () => mockedBundleState.bundle),
+  getServerJournalBundle: vi.fn(async () => {
+    if (mockedBundleState.error) {
+      throw mockedBundleState.error;
+    }
+    return mockedBundleState.bundle;
+  }),
 }));
 
 function createBundleWithoutAiJournal() {
   const run = createInitialGameRun({
     id: "run-journal-page",
-    name: "林舒恒",
+    name: "测试同学",
     discipline: "engineering",
     randomValues: [0.2, 0.4, 0.6, 0.8, 0.1, 0.3, 0.5, 0.7],
   });
+
+  run.timelineNodes = [
+    {
+      id: "timeline-1",
+      monthIndex: 65136,
+      kind: "monthly",
+      title: "market-ops.first-entry",
+      body: "sourceId artifactId category delta fallback",
+      sourceId: "timeline-source",
+      facts: ["前 21 - 79%", "nankai_tianda"],
+    },
+  ];
 
   return {
     run,
@@ -87,7 +106,7 @@ function createBundleWithoutAiJournal() {
           academicFeedback: "stable",
           eventIds: [],
           resumeAdditions: [],
-          notableFacts: ["competition:电子设计训练项目:unfinished"],
+          notableFacts: ["competition:电子设计竞赛项目:unfinished"],
           resolvedActions: [],
           flags: [],
           cooldowns: {
@@ -128,7 +147,7 @@ function createBundleWithoutAiJournal() {
             latestHints: [],
           },
           competitionProjects: [],
-        },
+        } as StructuredMonthlySummary,
       },
     ],
     aiReports: [],
@@ -138,6 +157,7 @@ function createBundleWithoutAiJournal() {
 describe("journal page fallback", () => {
   beforeEach(() => {
     mockedBundleState.bundle = createBundleWithoutAiJournal();
+    mockedBundleState.error = null;
   });
 
   it("renders the monthly rules fallback instead of crashing when the AI journal is missing", async () => {
@@ -150,8 +170,37 @@ describe("journal page fallback", () => {
 
     expect(markup).toContain("fm-paper__title");
     expect(markup).toContain("fm-paper__copy");
-    expect(markup).toContain("月底状态");
-    expect(markup).not.toContain("学业变化");
-    expect(markup).not.toContain("压力 / 心情变化");
+    expect(markup).toContain("打开本月来信");
+    expect(markup).not.toContain("project");
+    expect(markup).not.toContain("internship");
+    expect(markup).not.toContain("scholarship");
+    expect(markup).not.toContain("monthly");
+    expect(markup).not.toContain("fallback");
+    expect(markup).not.toContain("market-ops");
+    expect(markup).not.toContain("sourceId");
+    expect(markup).not.toContain("artifactId");
+    expect(markup).not.toContain("category");
+    expect(markup).not.toContain("delta");
+    expect(markup).not.toContain("余额 980");
+    expect(markup).not.toContain("心情 58");
+    expect(markup).not.toContain("压力 42");
+    expect(markup).not.toContain("moneyDelta");
+    expect(markup).not.toContain("65136");
+    expect(markup).not.toContain("前 21 - 79%");
+  });
+
+  it("falls back to a friendly empty state when journal bundle loading throws", async () => {
+    mockedBundleState.bundle = null;
+    mockedBundleState.error = new Error("journal repository failed");
+
+    const pageModule = await import("@/app/journal/page");
+    const markup = renderToStaticMarkup(
+      await pageModule.default({
+        searchParams: Promise.resolve({ runId: "run-journal-page" }),
+      }),
+    );
+
+    expect(markup).toContain("读不到这封月记");
+    expect(markup).not.toContain("App route failed");
   });
 });

@@ -465,13 +465,24 @@ describe("player-facing narrative helpers", () => {
 
     expect(report.usedFallback).toBe(true);
     expect(report.markdown).toContain("# 第2学年");
-    expect(report.markdown).toContain("## ");
-    expect(report.markdown).not.toContain("学业变化");
-    expect(report.markdown).not.toContain("压力 / 心情变化");
+    expect(report.markdown).toContain("我");
+    expect(report.markdown).not.toContain("整体而言");
+    expect(report.markdown).not.toContain("这个月主要");
+    expect(report.markdown).not.toContain("综上");
+    expect(report.markdown).not.toContain("总体来说");
+    expect(report.markdown).not.toContain("月度状态");
+    expect(report.markdown).not.toContain("本月数据如下");
+    expect(report.markdown).not.toContain("余额 960");
+    expect(report.markdown).not.toContain("心情 68");
+    expect(report.markdown).not.toContain("压力 42");
     expect(report.markdown).not.toContain("statsDelta");
     expect(report.markdown).not.toContain("eventIds");
-    expect(report.markdown).not.toContain("↑");
-    expect(report.markdown).not.toContain("↓");
+    expect(report.markdown).not.toContain("moneyDelta");
+    expect(report.markdown).not.toContain("fallback");
+    expect(report.markdown).not.toContain("monthly");
+    expect(report.markdown).not.toContain("project");
+    expect(report.markdown).not.toContain("internship");
+    expect(report.markdown).not.toContain("scholarship");
   });
 
   it("keeps monthly digest and fallback stable for legacy partial summaries", () => {
@@ -496,6 +507,8 @@ describe("player-facing narrative helpers", () => {
     expect(journal.title.length).toBeGreaterThan(0);
     expect(report.markdown).toContain("#");
     expect(report.usedFallback).toBe(true);
+    expect(report.markdown).toContain("我");
+    expect(report.markdown).not.toContain("本月数据如下");
   });
 
   it("does not fabricate GPA lines in monthly digest or fallback when the semester has not settled yet", () => {
