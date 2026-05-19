@@ -2,8 +2,6 @@ import Link from "next/link";
 
 import {
   buildPlannerDaysView,
-  buildPlannerFeedbackLines,
-  buildPlannerStatusText,
   buildWeeklyScheduleBlocks,
   buildWeeklySettlementView,
   resolveCurrentWeekState,
@@ -362,8 +360,6 @@ export default async function GamePage({ searchParams }: GamePageProps) {
     currentWeekState,
   });
   const plannerDays = buildPlannerDaysView(currentWeekState, hydratedRun);
-  const plannerStatusText = buildPlannerStatusText(currentWeekState);
-  const plannerLines = buildPlannerFeedbackLines(currentWeekState);
   const weeklySettlement = buildWeeklySettlementView(activeMonth?.latestWeekSettlement);
   const latestMonthlyState = bundle.monthlyStates.at(-1);
   const latestGrowthLog = latestMonthlyState?.snapshot_json
@@ -374,7 +370,6 @@ export default async function GamePage({ searchParams }: GamePageProps) {
   const publicExamExplanation = buildPublicExamExplanation(hydratedRun);
   const spotlightArtifacts = buildGameSpotlightArtifacts(hydratedRun);
   const finalDemoMilestone = buildFinalDemoMilestone(hydratedRun);
-  const monthCalendarItems = buildMonthCalendarItems(hydratedRun, currentWeekState);
   const weeklyKickoffNotices = buildWeeklyKickoffNotices(currentWeekState);
   const monthIndex = (hydratedRun.currentYear - 1) * 12 + hydratedRun.currentMonth;
 
@@ -388,7 +383,6 @@ export default async function GamePage({ searchParams }: GamePageProps) {
           ? "假期到了，看看这周想怎么过。"
           : "先看课表，再安排这一周。"
       }
-      sidebarSummary="排课、做选择，看看四年后会走到哪里。"
       headerMeta={
         <>
           <FmInlineStat tone="teal" icon="calendar" label="当前月份" value={formatMonthLabel(bundle.run.currentYear, bundle.run.currentMonth)} />
@@ -423,7 +417,6 @@ export default async function GamePage({ searchParams }: GamePageProps) {
             <FmPanel>
               <FmSectionHead
                 title="本月会发生什么"
-                copy="这个月有些日子值得留意。"
                 aside={
                   <FmBadge tone={finalDemoMilestone.tone}>
                     {formatMonthLabel(
@@ -441,46 +434,19 @@ export default async function GamePage({ searchParams }: GamePageProps) {
           </FmMotionSection>
         ) : null}
 
-        <FmMotionSection delay={80}>
-            <FmPanel>
-            <FmSectionHead
-              title="本月日历"
-              copy="提前看看这个月可能打乱节奏的事。"
-            />
-            <div className="mt-6 fm-month-event-grid">
-              {monthCalendarItems.map((item) => (
-                <article key={`${item.label}-${item.title}`} className="fm-month-event-card">
-                  <FmBadge tone={item.tone}>{item.label}</FmBadge>
-                  <h3>{item.title}</h3>
-                  <p>{item.body}</p>
-                </article>
-              ))}
-            </div>
-          </FmPanel>
-        </FmMotionSection>
-
         <div className="fm-grid-2">
           <div className="fm-stack">
             <FmMotionSection delay={90}>
               <FmPanel>
               <FmSectionHead
                 title={vacationMonth ? "安排这个假期周" : "安排这一周"}
-                copy={
-                  vacationMonth
-                    ? "时间都在自己手里，慢慢把这周排出来。"
-                    : "没安排的日子，会自然滑过去。"
-                }
               />
               <div className="mt-6">
                 <ActionPlanForm
                   runId={bundle.run.id}
                   currentWeek={Math.min(currentWeek, 4)}
-                  currentMood={hydratedRun.stats.mood}
-                  currentStress={hydratedRun.stats.stress}
                   attendanceLocked={Boolean(currentWeekState.attendanceLocked)}
                   defaultAttendanceStrategy={currentWeekState.attendanceStrategy}
-                  plannerStatusText={plannerStatusText}
-                  plannerLines={plannerLines}
                   readyToConfirm={Boolean(currentWeekState.readyToConfirm)}
                   plannerFeedback={currentWeekState.plannerFeedback}
                   days={plannerDays}

@@ -337,4 +337,42 @@ describe("key month game page rendering", () => {
     expect(markup).toContain(label);
     expect(markup).toContain("本月会发生什么");
   });
+
+  it("removes redundant weekly planner helper copy while keeping the functional sections", async () => {
+    const run = createRunForMonth({ id: "game-ui-prune", year: 3, month: 1 });
+    mockedBundleState.bundle = {
+      run,
+      runRecord: {
+        id: run.id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        status: run.status,
+        current_year: run.currentYear,
+        current_month: run.currentMonth,
+        profile_json: run.profile,
+        current_state_json: run,
+      },
+      monthlyStates: [],
+      logs: [],
+    };
+
+    const pageModule = await import("@/app/game/page");
+    const markup = renderToStaticMarkup(
+      await pageModule.default({
+        searchParams: Promise.resolve({ runId: run.id }),
+      }),
+    );
+
+    expect(markup).toContain("Freshmanto");
+    expect(markup).toContain("大学生活模拟器");
+    expect(markup).toContain("本月会发生什么");
+    expect(markup).toContain("安排这一周");
+    expect(markup).toContain("本月周历");
+    expect(markup).not.toContain("从这一周开始，把大学慢慢过出来。");
+    expect(markup).not.toContain("排课、做选择，看看四年后会走到哪里。");
+    expect(markup).not.toContain("这个月有些日子值得留意。");
+    expect(markup).not.toContain("本月日历");
+    expect(markup).not.toContain("提前看看这个月可能打乱节奏的事。");
+    expect(markup).not.toContain("没安排的日子，会自然滑过去。");
+  });
 });

@@ -16,8 +16,6 @@ import { FmBadge } from "@/components/fm-ui/FmBadge";
 import { FmLoadingState } from "@/components/fm-ui/FmLoadingState";
 import { FmIcon } from "@/components/fm-ui/FmScaffold";
 import { LoadingOverlay } from "@/components/loading-overlay";
-import { buildPlannerEventNotice } from "@/lib/planner-option-priority";
-import { buildStatusGuidance } from "@/lib/status-guidance";
 import type { ActionType, CourseAttendanceStrategy, WeeklyDayType } from "@/types/game";
 
 type PlannerDayOptionView = {
@@ -69,12 +67,8 @@ type PendingPlannerSubmission = {
 type ActionPlanFormProps = {
   runId: string;
   currentWeek: number;
-  currentMood: number;
-  currentStress: number;
   attendanceLocked: boolean;
   defaultAttendanceStrategy: CourseAttendanceStrategy;
-  plannerStatusText: string;
-  plannerLines: string[];
   readyToConfirm: boolean;
   plannerFeedback?: PlannerFeedback;
   days: PlannerDayView[];
@@ -347,23 +341,6 @@ function formatActionEffectLabel(effect: ActionEffect) {
   return `${effect.label}下降`;
 }
 
-function buildDayAvailabilityCopy(day: PlannerDayView, skipClassDraft: boolean) {
-  if (day.eventTitle) {
-    return "今天有事插进来，安排要留点余地。";
-  }
-
-  const dayType = skipClassDraft && day.skipClassAvailable ? "full_day" : day.effectiveDayTypeKey;
-
-  switch (dayType) {
-    case "night_only":
-      return "白天有课，晚上还能安排一点事。";
-    case "half_day":
-      return "下午有空，可以认真做一件事。";
-    default:
-      return "今天时间完整，适合推进重要安排。";
-  }
-}
-
 function clonePlannerDay(day: PlannerDayView): PlannerDayView {
   return {
     ...day,
@@ -500,12 +477,8 @@ function GlobalPlannerDialog(props: {
 export function ActionPlanForm({
   runId,
   currentWeek,
-  currentMood,
-  currentStress,
   attendanceLocked,
   defaultAttendanceStrategy,
-  plannerStatusText,
-  plannerLines,
   readyToConfirm,
   plannerFeedback,
   days,
@@ -541,20 +514,6 @@ export function ActionPlanForm({
   const plannerSavePending = queuedSaveCount > 0;
   const readyToConfirmNow = attendanceLocked && !plannerSavePending && (readyToConfirm || plannerDays.length > 0);
   const highlightedWeekday = plannerDays.find((day) => day.justPlanned)?.weekday ?? null;
-  const eventNotice = selectedDay
-    ? buildPlannerEventNotice({
-        eventTitle: selectedDay.eventTitle,
-        eventSummary: selectedDay.eventSummary,
-        eventAttendSummary: selectedDay.eventAttendSummary,
-        eventSkipSummary: selectedDay.eventSkipSummary,
-        options: currentOptions,
-      })
-    : null;
-  const statusGuidance = buildStatusGuidance({
-    mood: currentMood,
-    stress: currentStress,
-  });
-
   async function flushPlannerSaveQueue() {
     if (processingSaveRef.current) {
       return;
@@ -703,22 +662,7 @@ export function ActionPlanForm({
             <FmBadge tone="academic">这一周已经排满</FmBadge>
           )}
         </div>
-        <p className="mt-2">
-          {attendanceLocked
-            ? `这周已经排了 ${7 - missingCount} / 7 天。`
-            : plannerStatusText}
-        </p>
-        {plannerLines.length > 0 ? (
-          <ul className="mt-3 space-y-2 text-sm text-stone-600">
-            {plannerLines.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-        ) : null}
-        <div className="fm-planner-summary__hint">
-          <p className="font-semibold">{statusGuidance.summary}</p>
-          <p className="mt-1">{statusGuidance.strategy}</p>
-        </div>
+        {attendanceLocked ? <p className="mt-2">{`这周已经排了 ${7 - missingCount} / 7 天。`}</p> : null}
       </div>
 
       {activeFeedback ? <FeedbackBanner feedback={activeFeedback} /> : null}
@@ -832,9 +776,6 @@ export function ActionPlanForm({
               {saveState === "error" ? (
                 <p className="fm-day-card__meta">这一下没记住，再点一次试试。</p>
               ) : null}
-              {!attendanceLocked ? (
-                <p className="fm-day-card__meta">先定这周怎么上课。</p>
-              ) : null}
             </div>
           );
         })}
@@ -857,11 +798,9 @@ export function ActionPlanForm({
             className="rounded-full bg-stone-900 px-5 py-3 font-semibold text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-400"
             testId="confirm-week-submit"
           />
-          {attendanceLocked ? (
-            <span className="text-sm text-stone-500">没安排的日子，会自然滑过去。</span>
-          ) : (
+          {!attendanceLocked ? (
             <span className="text-sm text-stone-500">先把这周怎么上课定下来。</span>
-          )}
+          ) : null}
         </div>
         <PendingHint text="这周结束了，稍等一下。" />
         <ConfirmWeekOverlay />
@@ -885,9 +824,6 @@ export function ActionPlanForm({
                   <h2 id="planner-action-dialog-title" className="mt-2 text-2xl font-semibold text-stone-900">
                     给这一天留一个安排
                   </h2>
-                  <p className="mt-2 text-sm leading-6 text-stone-600">
-                    {buildDayAvailabilityCopy(selectedDay, skipClassDraft)}
-                  </p>
                 </div>
                 <button
                   type="button"
@@ -900,19 +836,6 @@ export function ActionPlanForm({
               </div>
 
               <div className="fm-dialog__body">
-                {eventNotice ? (
-                  <div
-                    className={`rounded-2xl border px-4 py-3 text-sm leading-6 ${
-                      eventNotice.tone === "amber"
-                        ? "border-amber-200 bg-amber-50 text-amber-900"
-                        : "border-stone-200 bg-stone-50 text-stone-700"
-                    }`}
-                  >
-                    <p className="font-semibold">{eventNotice.title}</p>
-                    <p className="mt-1">{eventNotice.body}</p>
-                  </div>
-                ) : null}
-
                 {selectedDay.skipClassAvailable ? (
                   <label className="mt-3 flex items-start gap-3 rounded-2xl border border-dashed border-[var(--border)] bg-stone-50/80 px-4 py-3 text-sm leading-6 text-stone-700">
                     <input

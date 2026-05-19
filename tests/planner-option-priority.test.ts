@@ -19,7 +19,7 @@ function createOption(input: Partial<PlannerOptionForPriority> & Pick<PlannerOpt
 }
 
 describe("planner option priority", () => {
-  it("puts event-related actions first and tags them clearly", () => {
+  it("puts event-related actions first without rendering a separate relation badge", () => {
     const event: WeeklyEventInstance = {
       id: "weekly-engineering-sprint",
       title: "工科实验周",
@@ -47,10 +47,10 @@ describe("planner option priority", () => {
     });
 
     expect(sorted[0]?.optionId).toBe("competition_project");
-    expect(sorted[0]?.badges).toContain("今天相关");
+    expect(sorted[0]?.badges).not.toContain("今天相关");
   });
 
-  it("puts cash-risk mitigation actions before ordinary leisure actions", () => {
+  it("puts cash-risk mitigation actions before ordinary leisure actions without a separate priority badge", () => {
     const sorted = annotatePlannerOptions({
       options: [
         createOption({ optionId: "social", action: "social", label: "社交 / 关系" }),
@@ -61,8 +61,8 @@ describe("planner option priority", () => {
     });
 
     expect(sorted.slice(0, 2).map((option) => option.optionId)).toEqual(["part_time", "ask_family"]);
-    expect(sorted[0]?.badges).toContain("手头优先");
-    expect(sorted[1]?.badges).toContain("手头优先");
+    expect(sorted[0]?.badges).not.toContain("手头优先");
+    expect(sorted[1]?.badges).not.toContain("手头优先");
   });
 
   it("keeps explicit selected state understandable instead of relying on border style alone", () => {

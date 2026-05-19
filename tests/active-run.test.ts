@@ -69,7 +69,7 @@ describe("active run helpers", () => {
     expect(markup).toContain("/journal?runId=run-123");
   });
 
-  it("keeps the start-page sidebar entry visible before the player has a run", () => {
+  it("does not render the standalone start-page sidebar entry before the player has a run", () => {
     const markup = renderToStaticMarkup(
       createElement(
         FmShellLayout,
@@ -81,6 +81,8 @@ describe("active run helpers", () => {
       ),
     );
 
-    expect(markup).toContain("开局页");
+    expect(markup).not.toContain("开局页");
+    expect(markup).toContain("/game");
+    expect(markup).toContain("/journal");
   });
 });

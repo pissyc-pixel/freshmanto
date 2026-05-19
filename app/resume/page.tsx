@@ -1,5 +1,5 @@
 import { ActiveRunSync } from "@/components/active-run-sync";
-import { FormalArtifactCards, FormalDocumentPreview } from "@/components/formal-artifacts";
+import { FormalArtifactCards } from "@/components/formal-artifacts";
 import { FmBadge } from "@/components/fm-ui/FmBadge";
 import { FmEmptyState } from "@/components/fm-ui/FmEmptyState";
 import { FmPartialNotice } from "@/components/fm-ui/FmPartialNotice";
@@ -19,12 +19,9 @@ import {
   buildResumeEvidenceSummary,
   deriveAcademicProfile,
   ensureProgressionState,
-  summarizeDirectionSignals,
 } from "@/core/resolvers/progression";
 import { resolveActiveRunId } from "@/lib/demo/active-run";
 import { buildResumeFormalArtifacts } from "@/lib/demo/formal-artifacts";
-import { buildGrowthJournalEntry } from "@/lib/demo/monthly-digest";
-import { formatMonthLabel } from "@/lib/demo/options";
 import { normalizeSaveState } from "@/lib/demo/save-state";
 import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
 import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
@@ -134,7 +131,6 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
 
   const hydratedRun = ensureProgressionState(normalizeSaveState(bundle.run));
   const academicProfile = deriveAcademicProfile(hydratedRun);
-  const directionSignals = summarizeDirectionSignals(hydratedRun);
   const directionPerception = buildDirectionPerception(hydratedRun);
   const recommendationExplanation = buildRecommendationExplanation(hydratedRun);
   const publicExamExplanation = buildPublicExamExplanation(hydratedRun);
@@ -168,17 +164,6 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
       item.tags.some((tag) => hasKeyword(tag.toLowerCase(), ["奖学金", "scholarship"])),
   );
 
-  const playerLogs = bundle.monthlyStates
-    .slice()
-    .reverse()
-    .slice(0, 4)
-    .map((state) => ({
-      id: `${state.id}-growth`,
-      ...(state.snapshot_json
-        ? buildGrowthJournalEntry(state.snapshot_json, state.year, state.month)
-        : { badge: "成长日志", periodLabel: formatMonthLabel(state.year, state.month), title: "数据不完整", message: "这条月度记录的快照数据不完整，无法生成成长日志。", details: [] as string[] }),
-    }));
-
   const runForFormalArtifacts = {
     ...hydratedRun,
     resume: resumeItems,
@@ -193,7 +178,6 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
   });
   const projectCount = countProjects(resumeItems);
   const formalArtifacts = buildResumeFormalArtifacts(runForFormalArtifacts);
-  const leadFormalArtifact = formalArtifacts[0] ?? null;
 
   return (
     <FmShellLayout
@@ -201,7 +185,6 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
       runId={runId}
       title="履历档案"
       subtitle="这里放着这几年慢慢攒下来的东西。"
-      sidebarSummary="GPA、履历、机会线索和阶段记录，都会收在这里。"
       headerMeta={
         <>
           <FmInlineStat tone="teal" icon="chart" label="GPA" value={formatAcademicValue(academicProfile.gpa)} />
@@ -216,15 +199,11 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
         <div className="fm-stack">
           <FmMotionSection delay={40}>
             <FmPanel>
-              <FmSectionHead
-                title="履历档案"
-                copy="这里记录能慢慢写进简历和未来选择里的东西。个人履历会随着项目、成绩、奖学金和实践经历慢慢成形。"
-              />
+              <FmSectionHead title="履历档案" />
               <div className="mt-6 fm-resume-kpis">
                 <article className="fm-resume-kpi">
                   <div className="fm-resume-kpi__label">GPA</div>
                   <div className="fm-resume-kpi__value">{formatAcademicValue(academicProfile.gpa)}</div>
-                  <div className="fm-resume-kpi__note">学业表现会直接影响推免、考研和部分机会线。</div>
                 </article>
                 <article className="fm-resume-kpi">
                   <div className="fm-resume-kpi__label">排名 / 百分比</div>
@@ -237,22 +216,18 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
                         ? `专业前 ${academicProfile.percentile}%`
                         : `排名约前 ${academicProfile.percentile}%`}
                   </div>
-                  <div className="fm-resume-kpi__note">这是学业竞争力最直观的一层证据。</div>
                 </article>
                 <article className="fm-resume-kpi">
                   <div className="fm-resume-kpi__label">奖学金</div>
                   <div className="fm-resume-kpi__value">{scholarshipItems.length}</div>
-                  <div className="fm-resume-kpi__note">阶段性回报会先在这里留下痕迹。</div>
                 </article>
                 <article className="fm-resume-kpi">
                   <div className="fm-resume-kpi__label">比赛 / 项目</div>
                   <div className="fm-resume-kpi__value">{projectCount}</div>
-                  <div className="fm-resume-kpi__note">项目成果会慢慢把这份档案托起来。</div>
                 </article>
                 <article className="fm-resume-kpi">
                   <div className="fm-resume-kpi__label">实习 / 实践</div>
                   <div className="fm-resume-kpi__value">{internshipItems.length}</div>
-                  <div className="fm-resume-kpi__note">越靠近就业，这部分就越关键。</div>
                 </article>
               </div>
               <div className="mt-6">
@@ -277,10 +252,7 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
 
           <FmMotionSection delay={100}>
             <FmPanel>
-              <FmSectionHead
-                title="基础画像 / 入学档案"
-                copy="学校、专业方向、城市层级和初始背景都只来自当前存档字段。这里负责整理，不会替你补写经历。"
-              />
+              <FmSectionHead title="基础画像 / 入学档案" />
               <div className="mt-6">
                 <ProfileSummary profile={hydratedRun.profile} />
               </div>
@@ -297,23 +269,6 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
                 />
                 <div className="mt-6">
                   <FormalArtifactCards artifacts={formalArtifacts} runId={runId} showOfferActions />
-                </div>
-              </FmPanel>
-            </FmMotionSection>
-          ) : null}
-
-          {leadFormalArtifact ? (
-            <FmMotionSection delay={145}>
-              <FmPanel>
-                <FmSectionHead
-                  title="正式结果预览"
-                  copy="这里把已经发生的成果整理成更正式的证书 / 结果文件，不补写尚未发生的奖励或录取。"
-                />
-                <div className="mt-6">
-                  <FormalDocumentPreview
-                    artifact={leadFormalArtifact}
-                    recipientName={hydratedRun.profile.name ?? "同学"}
-                  />
                 </div>
               </FmPanel>
             </FmMotionSection>
@@ -366,7 +321,6 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
             <FmPanel>
               <FmSectionHead
                 title="为什么你正在接近某条路"
-                copy="这里不提前下定论，只把现阶段已经看得见的倾向、支撑证据和缺口整理给你。"
                 aside={<FmBadge tone="ending">{directionPerception.primary.label}</FmBadge>}
               />
 
@@ -452,65 +406,6 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
                   <div className="fm-stat-card__label">机会线索</div>
                   <div className="fm-stat-card__copy">{resumeEvidence.opportunities.join(" ")}</div>
                 </article>
-              </div>
-            </FmPanel>
-          </FmMotionSection>
-
-          <FmMotionSection delay={200}>
-            <FmPanel>
-              <FmSectionHead
-                title="阶段日志"
-                copy="最近几个月的成长记录会在这里给履历做旁证，帮助你把档案和过程对上。"
-              />
-              <div className="mt-6">
-                {playerLogs.length > 0 ? (
-                  <div className="fm-timeline">
-                    {playerLogs.map((log, index) => (
-                      <article key={log.id} className="fm-timeline-entry">
-                        <div className={`fm-timeline-node ${index % 2 === 0 ? "tone-teal" : "tone-mint"}`}>
-                          <FmIcon name="book" className="h-4 w-4" />
-                        </div>
-                        <div className="fm-journal-card">
-                          <div className="fm-journal-card__head">
-                            <div>
-                              <div className="fm-journal-card__month">{log.periodLabel}</div>
-                              <h3 className="fm-journal-card__title">{log.title}</h3>
-                            </div>
-                            <FmBadge tone="neutral">{sanitizePlayerFacingText(log.badge)}</FmBadge>
-                          </div>
-                          <p className="fm-journal-card__copy">{sanitizePlayerFacingText(log.message)}</p>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                ) : (
-                  <FmEmptyState
-                    title="当前还没有月度日志"
-                    body="先把真实流程推进到月末，这里才会出现能给履历作证的阶段记录。"
-                  />
-                )}
-              </div>
-            </FmPanel>
-          </FmMotionSection>
-
-          <FmMotionSection delay={250}>
-            <FmPanel>
-              <FmSectionHead title="方向线索" copy="这些线索只反映当前存档已有的倾向，不预示最终结果。" />
-              <div className="mt-6">
-                {directionSignals.length > 0 ? (
-                  <div className="fm-tag-row">
-                    {directionSignals.map((signal) => (
-                      <span key={signal} className="fm-tag">
-                        {signal}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <FmPartialNotice
-                    title="当前阶段尚未形成明确方向"
-                    body="目前还没有足够的学业与履历证据去支撑更明确的路径判断。"
-                  />
-                )}
               </div>
             </FmPanel>
           </FmMotionSection>

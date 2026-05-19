@@ -68,12 +68,6 @@ function buildBadges(input: {
 }) {
   const badges: string[] = [];
 
-  if (isEventRelatedOption(input.option, input.event)) {
-    badges.push("今天相关");
-  } else if (isCashRiskAction(input.option, input.hasCashRisk)) {
-    badges.push("手头优先");
-  }
-
   if (input.option.selected) {
     badges.push("已选");
   }

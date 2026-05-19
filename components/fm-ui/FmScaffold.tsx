@@ -304,7 +304,7 @@ export function FmShellLayout({
   title,
   subtitle,
   sidebarTitle = "大学生活模拟器",
-  sidebarSubtitle = "从这一周开始，把大学慢慢过出来。",
+  sidebarSubtitle,
   sidebarSummary,
   headerMeta,
   children,
@@ -325,22 +325,15 @@ export function FmShellLayout({
         <aside className="fm-sidebar">
           <div>
             <FmBrandMark />
-            <p className="fm-sidebar__sub">{sidebarSubtitle}</p>
+            {sidebarSubtitle ? <p className="fm-sidebar__sub">{sidebarSubtitle}</p> : null}
           </div>
 
           <section className="fm-profile-card">
             <div className="fm-profile-card__title">{sidebarTitle}</div>
-            <p className="fm-profile-card__sub">
-              {sidebarSummary ?? "排课、做选择，看看四年后会走到哪里。"}
-            </p>
+            {sidebarSummary ? <p className="fm-profile-card__sub">{sidebarSummary}</p> : null}
           </section>
 
           <nav className="fm-sidebar__nav" data-testid="formal-sidebar-nav">
-            <Link href="/" aria-hidden={Boolean(runId)} className={`fm-nav-link ${runId ? "hidden" : ""}`.trim()}>
-              <FmIcon name="home" />
-              <span>{runId ? "" : "开局页"}</span>
-            </Link>
-
             {sidebarLinks.map((link) => {
               const readiness = featureReadiness[link.readiness];
               if (!link.href || !isFeatureRoutedForPlayers(link.readiness)) {

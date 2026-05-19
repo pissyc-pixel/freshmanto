@@ -27,7 +27,7 @@ vi.mock("@/lib/demo/server", () => ({
 }));
 
 describe("game page final-demo experience layers", () => {
-  it("renders the layered month calendar and risk guidance from real run state", async () => {
+  it("keeps milestone and metric surfaces while omitting the duplicated month calendar block", async () => {
     const run = createInitialGameRun({
       id: "game-experience-run",
       name: "Tester",
@@ -67,9 +67,9 @@ describe("game page final-demo experience layers", () => {
       }),
     );
 
-    expect(markup).toContain("fm-month-event-grid");
-    expect(markup).toContain("临时占用");
-    expect(markup).toContain("机会事件");
+    expect(markup).toContain("本月会发生什么");
+    expect(markup).not.toContain("fm-month-event-grid");
+    expect(markup).not.toContain("本月日历");
     expect(markup).toContain("金钱");
     expect(markup).toContain("压力");
   });

@@ -44,11 +44,6 @@ export function WeeklySettlementCard(props: WeeklySettlementCardProps) {
         </span>
       </div>
       <h3 className="mt-4 text-2xl font-semibold text-stone-900">{props.title}</h3>
-      {props.eventTitle ? (
-        <p className="mt-2 text-sm leading-6 text-amber-700">
-          这周还夹着一件事：{props.eventTitle}。{props.eventSummary}
-        </p>
-      ) : null}
 
       <div className="mt-6 space-y-3">
         {props.dayLines.map((line) => (
@@ -82,16 +77,6 @@ export function WeeklySettlementCard(props: WeeklySettlementCardProps) {
         </div>
       </div>
 
-      {props.riskLines.length > 0 ? (
-        <div className="mt-6 rounded-2xl bg-stone-100/90 p-4 text-sm leading-6 text-stone-700">
-          <p className="font-semibold text-stone-900">这周还惦记着的事</p>
-          <ul className="mt-2 space-y-2">
-            {props.riskLines.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
     </article>
   );
 }
