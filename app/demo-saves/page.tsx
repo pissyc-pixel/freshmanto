@@ -3,8 +3,16 @@ import Link from "next/link";
 import { loadDemoSaveAction } from "@/app/actions";
 import { FmAppRoot, FmBrandMark, FmIcon } from "@/components/fm-ui/FmScaffold";
 import { demoSavePresets } from "@/lib/demo/presets";
+import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
 
-export default function DemoSavesPage() {
+type DemoSavesPageProps = {
+  searchParams: DemoPageSearchParams;
+};
+
+export default async function DemoSavesPage({ searchParams }: DemoSavesPageProps) {
+  const params = await searchParams;
+  const error = readSearchParam(params.error);
+
   return (
     <FmAppRoot centered data-testid="demo-saves-page">
       <section className="fm-start-scene">
@@ -19,10 +27,22 @@ export default function DemoSavesPage() {
           </div>
 
           <p className="fm-enroll-eyebrow">Demo Save Center</p>
-          <h1 className="fm-enroll-title">从固定演示存档进入第 25 月第 1 周，直接开始后半程演示。</h1>
+          <h1 className="fm-enroll-title">从核心演示存档直接进入大三上，或直接跳到最后一月查看终局。</h1>
           <p className="fm-enroll-subtitle">
-            这些存档不是静态展示页，而是真实可继续玩的 run state。载入后会保留前置履历、阶段月记和成长痕迹。
+            这些存档不是静态展示页，而是真实可继续玩的 run state。大三上版本从第 25 月第 1 周开始，最后一月版本直接来到第 48 月。
           </p>
+
+          {error === "load-failed" ? (
+            <div
+              className="mt-6 rounded-[24px] border border-[#f0d8c7] bg-[#fff9f4] px-5 py-4 text-left text-[#7b5a35]"
+              role="alert"
+            >
+              <div className="text-base font-semibold">å©•æ—‚ãšç€›æ¨»ã€‚æžè—‰å†æ¾¶è¾«è§¦</div>
+              <div className="mt-2 text-sm leading-7">
+                é™îˆ™äº’é–²å¶†æŸŠé–«å¤‹å«¨æ¶“â‚¬æ¶“î…ç´¨ç»€å“„ç“¨å¦—ï½…å•€ç’‡æ›šç«´å¨†ç›å±½å§©éŠ†ä¿™
+              </div>
+            </div>
+          ) : null}
 
           <div className="mt-8 grid gap-4">
             {demoSavePresets.map((preset) => (
@@ -33,7 +53,7 @@ export default function DemoSavesPage() {
                     <div className="text-sm text-[#5a6b60]">{preset.schoolLabel}</div>
                   </div>
                   <div className="rounded-full bg-[#eef7ef] px-3 py-1 text-sm font-medium text-[#53715c]">
-                    第 25 月第 1 周
+                    {preset.id.endsWith("-final") ? "第 48 月 · 终局前" : "第 25 月第 1 周"}
                   </div>
                 </div>
 

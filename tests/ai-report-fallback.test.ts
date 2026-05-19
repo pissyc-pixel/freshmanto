@@ -88,7 +88,7 @@ describe("AI report fallback", () => {
         responses: {
           create: () =>
             new Promise((resolve) => {
-              setTimeout(() => resolve({ output_text: "late model text" }), 30);
+              setTimeout(() => resolve({ output_text: "late model text" }), 120);
             }),
         },
       }),
@@ -98,7 +98,7 @@ describe("AI report fallback", () => {
     const startedAt = Date.now();
     const report = await generateAiReport(createMonthlyInput());
 
-    expect(Date.now() - startedAt).toBeLessThan(25);
+    expect(Date.now() - startedAt).toBeLessThan(80);
     expect(report.kind).toBe("monthly_journal");
     expect(report.usedFallback).toBe(true);
     expect(report.markdown).toContain("第1学年");

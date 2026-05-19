@@ -53,6 +53,7 @@ export type DemoRepository = {
     profile?: GameRun["profile"];
     currentState?: GameRun;
   }): Promise<unknown>;
+  deleteRun?(runId: string): Promise<unknown>;
   saveMonthlyState(input: {
     runId: string;
     year: number;

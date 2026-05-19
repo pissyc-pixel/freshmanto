@@ -68,12 +68,30 @@ create table if not exists public.resume_items (
   run_id uuid not null references public.runs(id) on delete cascade,
   year integer not null check (year >= 1 and year <= 8),
   month integer not null check (month >= 1 and month <= 12),
-  category text not null check (category in ('internship', 'project', 'campus_activity', 'special_experience', 'job_progress')),
+  category text not null check (category in ('internship', 'project', 'competition', 'scholarship', 'research', 'campus_activity', 'special_experience', 'job_progress')),
   title text not null,
   summary text not null,
   source_item_id text,
   metadata_json jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default timezone('utc', now())
+);
+
+alter table public.resume_items
+drop constraint if exists resume_items_category_check;
+
+alter table public.resume_items
+add constraint resume_items_category_check
+check (
+  category in (
+    'internship',
+    'project',
+    'competition',
+    'scholarship',
+    'research',
+    'campus_activity',
+    'special_experience',
+    'job_progress'
+  )
 );
 
 create index if not exists idx_runs_status on public.runs(status);

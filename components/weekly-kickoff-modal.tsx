@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 
 import { FmBadge } from "@/components/fm-ui/FmBadge";
 
@@ -50,21 +51,41 @@ export function WeeklyKickoffModal({
     () => readSeenState(runId, monthIndex, week),
     () => false,
   );
+  const mounted = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  );
 
-  if (dismissed || alreadySeen || notices.length === 0) {
-    return null;
-  }
-
-  function close() {
+  const close = useCallback(() => {
     try {
       window.localStorage.setItem(buildSeenKey(runId, monthIndex, week), "seen");
     } catch {
       // Ignore storage failures; dismissing the modal still matters more.
     }
     setDismissed(true);
+  }, [monthIndex, runId, week]);
+
+  useEffect(() => {
+    if (!mounted || dismissed || alreadySeen || notices.length === 0) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        close();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [alreadySeen, close, dismissed, mounted, notices.length]);
+
+  if (!mounted || dismissed || alreadySeen || notices.length === 0) {
+    return null;
   }
 
-  return (
+  return createPortal(
     <div className="fm-kickoff-backdrop" role="dialog" aria-modal="true" aria-label="本周开始前">
       <section className="fm-kickoff-modal">
         <div className="fm-kickoff-modal__head">
@@ -102,6 +123,7 @@ export function WeeklyKickoffModal({
           ))}
         </div>
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { z } from "zod";
 import { buildPlannerDaysView } from "@/app/game/view-model";
 import { ensureDemoSchema } from "@/db/ensure-schema";
@@ -143,9 +144,16 @@ export async function loadDemoSaveAction(formData: FormData) {
     redirect("/demo-saves");
   }
 
-  const result = await createServerDemoPresetRun(presetId.data);
-  await persistActiveRun(result.run.id);
-  redirect(`/game?runId=${result.run.id}`);
+  try {
+    const result = await createServerDemoPresetRun(presetId.data);
+    await persistActiveRun(result.run.id);
+    redirect(`/game?runId=${result.run.id}`);
+  } catch (error) {
+    if (isRedirectError(error) || (error instanceof Error && error.message.startsWith("REDIRECT:"))) {
+      throw error;
+    }
+    redirect("/demo-saves?error=load-failed");
+  }
 }
 
 export async function decideFutureOfferAction(formData: FormData) {

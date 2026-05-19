@@ -213,6 +213,14 @@ export function createSupabaseDataRepository(client: DatabaseClient) {
       return ensureSingle(result, "update run");
     },
 
+    async deleteRun(runId: string): Promise<null> {
+      const result = await client.from("runs").delete().eq("id", runId);
+      if (result.error) {
+        throw createRepositoryError("delete run", result.error);
+      }
+      return null;
+    },
+
     async saveMonthlyState(input: SaveMonthlyStateInput): Promise<MonthlyStateRecord> {
       const result = await client
         .from("monthly_states")

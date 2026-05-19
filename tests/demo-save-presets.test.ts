@@ -58,6 +58,16 @@ function createRepository(store: InMemoryStore) {
     async updateRun() {
       return store.run;
     },
+    async deleteRun(runId: string) {
+      if (store.run?.id === runId) {
+        store.run = null;
+      }
+      store.monthlyStates = store.monthlyStates.filter((item) => item.run_id !== runId);
+      store.logs = store.logs.filter((item) => item.run_id !== runId);
+      store.aiReports = store.aiReports.filter((item) => item.run_id !== runId);
+      store.resumeItems = store.resumeItems.filter((item) => item.run_id !== runId);
+      return null;
+    },
     async saveMonthlyState(input: {
       runId: string;
       year: number;
@@ -149,10 +159,14 @@ function createRepository(store: InMemoryStore) {
 
 describe("demo save presets", () => {
   it("lists the two required core demo saves in the catalog", () => {
-    const labels = demoSavePresets.map((preset) => preset.label);
+    const ids = demoSavePresets.map((preset) => preset.id);
 
-    expect(labels).toContain("南开商科｜就业路线｜大三上");
-    expect(labels).toContain("天大工科｜推免路线｜大三上");
+    expect(ids).toEqual([
+      "nankai-business-employment-junior-fall",
+      "nankai-business-employment-final",
+      "tianda-engineering-recommendation-junior-fall",
+      "tianda-engineering-recommendation-final",
+    ]);
   });
 
   it("creates the Nankai business employment preset as a real month-25 run with history", async () => {
@@ -197,6 +211,45 @@ describe("demo save presets", () => {
     expect(store.resumeItems.some((item) => item.title.includes("电子设计竞赛"))).toBe(true);
     expect(store.resumeItems.some((item) => item.title.includes("工程训练综合项目"))).toBe(true);
   });
+
+  it("creates the Nankai employment final preset at month 48 with an employment offer", async () => {
+    const store = createStore();
+
+    const result = await createDemoPresetRun({
+      repository: createRepository(store),
+      presetId: "nankai-business-employment-final",
+      runId: "demo-nankai-final",
+    });
+
+    expect(result.run.currentYear).toBe(4);
+    expect(result.run.currentMonth).toBe(12);
+    expect(result.run.currentSemester).toBe(8);
+    expect(result.run.futureOffers?.some((offer) => offer.type === "employment")).toBe(true);
+    expect(result.run.acceptedOffer?.type).toBe("employment");
+    expect(result.run.timelineNodes?.some((item) => item.kind === "offer")).toBe(true);
+    expect(result.run.endingEvidence?.some((item) => item.kind === "offer")).toBe(true);
+    expect(store.resumeItems.every((item) => item.category !== ("competition" as never) || item.category === "competition")).toBe(true);
+  });
+
+  it("creates the Tianda recommendation final preset at month 48 with a recommendation offer", async () => {
+    const store = createStore();
+
+    const result = await createDemoPresetRun({
+      repository: createRepository(store),
+      presetId: "tianda-engineering-recommendation-final",
+      runId: "demo-tianda-final",
+    });
+
+    expect(result.run.currentYear).toBe(4);
+    expect(result.run.currentMonth).toBe(12);
+    expect(result.run.currentSemester).toBe(8);
+    expect(result.run.futureOffers?.some((offer) => offer.type === "recommendation")).toBe(true);
+    expect(result.run.acceptedOffer?.type).toBe("recommendation");
+    expect(result.run.progression?.postgraduateChoiceOpenedAtMonth).toBe(28);
+    expect(result.run.progression?.recommendationAppliedAtMonth).toBe(34);
+    expect(result.run.timelineNodes?.some((item) => item.kind === "final_choice")).toBe(true);
+    expect(result.run.endingEvidence?.some((item) => item.kind === "offer")).toBe(true);
+  });
   it("persists core demo history as playable run-state evidence, not just external fixtures", async () => {
     const nankaiStore = createStore();
     const tiandaStore = createStore();
@@ -228,5 +281,28 @@ describe("demo save presets", () => {
     expect(tianda.run.endingEvidence?.map((item) => item.kind)).toEqual(
       expect.arrayContaining(["scholarship", "competition", "route"]),
     );
+  });
+
+  it("rolls back the half-created preset run when resume item persistence fails", async () => {
+    const store = createStore();
+    const repository = {
+      ...createRepository(store),
+      async saveResumeItems() {
+        throw new Error("save resume items failed: resume_items_category_check");
+      },
+    };
+
+    await expect(
+      createDemoPresetRun({
+        repository,
+        presetId: "nankai-business-employment-junior-fall",
+        runId: "demo-preset-rollback",
+      }),
+    ).rejects.toThrow("save resume items failed");
+
+    expect(store.run).toBeNull();
+    expect(store.monthlyStates).toHaveLength(0);
+    expect(store.aiReports).toHaveLength(0);
+    expect(store.resumeItems).toHaveLength(0);
   });
 });

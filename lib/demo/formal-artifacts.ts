@@ -92,6 +92,20 @@ function latest<T extends { monthIndex: number }>(items: T[], limit?: number) {
   return typeof limit === "number" ? sorted.slice(0, limit) : sorted;
 }
 
+function dedupeFormalArtifacts(items: FormalArtifact[]) {
+  const unique = new Map<string, FormalArtifact>();
+
+  for (const item of items) {
+    const key = item.id || `${item.kind}-${item.monthIndex}-${item.title}-${item.serialNumber}`;
+
+    if (!unique.has(key)) {
+      unique.set(key, item);
+    }
+  }
+
+  return [...unique.values()];
+}
+
 function normalizeFactList(values: Array<string | null | undefined>) {
   return values.filter((value): value is string => Boolean(value && value.trim().length > 0)).slice(0, 4);
 }
@@ -295,13 +309,13 @@ export function buildResumeFormalArtifacts(run: GameRun) {
   const recommendationArtifact = buildRecommendationArchiveArtifact(run);
 
   return latest(
-    [
+    dedupeFormalArtifacts([
       ...scholarshipArtifacts,
       ...competitionArtifacts,
       ...internshipArtifacts,
       ...offerArtifacts,
       ...(recommendationArtifact ? [recommendationArtifact] : []),
-    ],
+    ]),
     8,
   );
 }

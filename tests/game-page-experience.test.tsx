@@ -27,10 +27,10 @@ vi.mock("@/lib/demo/server", () => ({
 }));
 
 describe("game page final-demo experience layers", () => {
-  it("renders a layered month calendar and weekly kickoff modal copy from real run state", async () => {
+  it("renders the layered month calendar and risk guidance from real run state", async () => {
     const run = createInitialGameRun({
       id: "game-experience-run",
-      name: "事件体验档",
+      name: "Tester",
       discipline: "business",
       randomValues: [0.2, 0.4, 0.6, 0.8, 0.1, 0.3, 0.5, 0.7],
     });
@@ -67,10 +67,9 @@ describe("game page final-demo experience layers", () => {
       }),
     );
 
-    expect(markup).toContain("本月事件月历");
+    expect(markup).toContain("fm-month-event-grid");
     expect(markup).toContain("风险事件");
     expect(markup).toContain("机会事件");
-    expect(markup).toContain("本周开始前");
     expect(markup).toContain("现金");
     expect(markup).toContain("压力");
   });

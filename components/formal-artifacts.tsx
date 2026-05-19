@@ -34,6 +34,22 @@ function EmotionalStageRail() {
   );
 }
 
+function dedupeArtifacts(artifacts: FormalArtifact[]) {
+  const unique = new Map<string, FormalArtifact>();
+
+  for (const artifact of artifacts) {
+    const key =
+      artifact.id ||
+      `${artifact.kind}-${artifact.offerId ?? artifact.serialNumber}-${artifact.monthIndex}-${artifact.title}`;
+
+    if (!unique.has(key)) {
+      unique.set(key, artifact);
+    }
+  }
+
+  return [...unique.values()];
+}
+
 export function FormalArtifactCards({
   artifacts,
   runId,
@@ -43,10 +59,19 @@ export function FormalArtifactCards({
   runId?: string;
   showOfferActions?: boolean;
 }) {
+  const visibleArtifacts = dedupeArtifacts(artifacts);
+
   return (
     <div className="fm-formal-grid">
-      {artifacts.map((artifact) => (
-        <FmCard key={artifact.id} variant={artifact.kind === "employment" || artifact.kind === "recommendation" || artifact.kind === "postgraduate" ? "active" : "normal"} className="fm-formal-card">
+      {visibleArtifacts.map((artifact, index) => (
+        <FmCard
+          key={
+            artifact.id ||
+            `${artifact.kind}-${artifact.offerId ?? artifact.serialNumber ?? runId ?? "artifact"}-${artifact.monthIndex ?? index}-${index}`
+          }
+          variant={artifact.kind === "employment" || artifact.kind === "recommendation" || artifact.kind === "postgraduate" ? "active" : "normal"}
+          className="fm-formal-card"
+        >
           <div className="fm-formal-card__head">
             <div className={`fm-inline-stat__icon tone-${artifact.badgeTone}`}>
               <FmIcon name={iconNameForArtifact(artifact.kind)} />

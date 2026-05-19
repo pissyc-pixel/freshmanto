@@ -50,4 +50,14 @@ describe("loadDemoSaveAction", () => {
     await expect(loadDemoSaveAction(formData)).rejects.toThrow("REDIRECT:/game?runId=demo-run-loaded");
     expect(createServerDemoPresetRunMock).toHaveBeenCalledWith("nankai-business-employment-junior-fall");
   });
+
+  it("redirects back to /demo-saves with a friendly error when preset loading fails", async () => {
+    createServerDemoPresetRunMock.mockRejectedValueOnce(new Error("save resume items failed"));
+    const { loadDemoSaveAction } = await import("@/app/actions");
+    const formData = new FormData();
+    formData.set("presetId", "tianda-engineering-recommendation-junior-fall");
+
+    await expect(loadDemoSaveAction(formData)).rejects.toThrow("REDIRECT:/demo-saves?error=load-failed");
+    expect(persistCookieMock).not.toHaveBeenCalled();
+  });
 });

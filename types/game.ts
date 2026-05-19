@@ -50,15 +50,18 @@ export type WeeklyDayType = "night_only" | "half_day" | "full_day";
 
 export type ActionAvailability = "night" | "half_day" | "full_day";
 
-export type ResumeCategory =
-  | "internship"
-  | "project"
-  | "competition"
-  | "scholarship"
-  | "research"
-  | "campus_activity"
-  | "special_experience"
-  | "job_progress";
+export const RESUME_CATEGORY_VALUES = [
+  "internship",
+  "project",
+  "competition",
+  "scholarship",
+  "research",
+  "campus_activity",
+  "special_experience",
+  "job_progress",
+] as const;
+
+export type ResumeCategory = (typeof RESUME_CATEGORY_VALUES)[number];
 
 export type EventSeverity = "routine" | "important" | "critical";
 

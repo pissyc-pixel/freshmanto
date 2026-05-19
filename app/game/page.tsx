@@ -16,6 +16,7 @@ import { FmMotionSection } from "@/components/fm-ui/FmMotionSection";
 import { LogFeed } from "@/components/log-feed";
 import { ScrollIntoView } from "@/components/scroll-into-view";
 import { WeeklySettlementCard } from "@/components/weekly-settlement-card";
+import { WeeklySettlementModal } from "@/components/weekly-settlement-modal";
 import { WeeklyKickoffModal, type WeeklyKickoffNotice } from "@/components/weekly-kickoff-modal";
 import {
   FmInlineStat,
@@ -441,6 +442,11 @@ export default async function GamePage({ searchParams }: GamePageProps) {
           monthIndex={monthIndex}
           week={currentWeek}
           notices={weeklyKickoffNotices}
+        />
+        <WeeklySettlementModal
+          open={focusParam === "weekly-settlement"}
+          settlement={weeklySettlement}
+          closeHref={buildRunHref("/game", bundle.run.id)}
         />
         <FmMotionSection delay={40}>
           <FmMetricStrip items={buildMetricItems(hydratedRun.stats, hydratedRun)} />

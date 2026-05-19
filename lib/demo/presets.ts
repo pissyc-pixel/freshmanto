@@ -1,11 +1,13 @@
 import { randomUUID } from "node:crypto";
 
-import { createDefaultCareerRouteState } from "@/core/resolvers/progression";
+import { acceptFutureOfferDecision, createDefaultCareerRouteState } from "@/core/resolvers/progression";
 import { renderMonthlyJournalFallback } from "@/lib/ai/reports";
 import { normalizeSaveState } from "@/lib/demo/save-state";
+import { formatPlayerFacingMonthIndex, sanitizePlayerFacingTextList } from "@/lib/player-facing-text";
 import type { DemoRepository } from "@/lib/demo/run-service";
 import type {
   EndingEvidence,
+  FutureOffer,
   GameRun,
   InternshipRecord,
   MonthlyLetter,
@@ -18,9 +20,9 @@ import type {
 
 export type DemoSavePresetId =
   | "nankai-business-employment-junior-fall"
+  | "nankai-business-employment-final"
   | "tianda-engineering-recommendation-junior-fall"
-  | "generic-211-postgraduate-junior-fall"
-  | "second-tier-employment-warning-junior-fall";
+  | "tianda-engineering-recommendation-final";
 
 export type DemoSavePreset = {
   id: DemoSavePresetId;
@@ -33,9 +35,9 @@ export type DemoSavePreset = {
 
 export const demoSavePresetIds = [
   "nankai-business-employment-junior-fall",
+  "nankai-business-employment-final",
   "tianda-engineering-recommendation-junior-fall",
-  "generic-211-postgraduate-junior-fall",
-  "second-tier-employment-warning-junior-fall",
+  "tianda-engineering-recommendation-final",
 ] as const satisfies DemoSavePresetId[];
 
 type SeedResumeRecord = {
@@ -83,6 +85,14 @@ export const demoSavePresets: DemoSavePreset[] = [
     endingTarget: "较好就业 offer",
   },
   {
+    id: "nankai-business-employment-final",
+    label: "南开商科｜就业路线｜最后一月",
+    routeLabel: "终局前快速查看",
+    schoolLabel: "南开大学 · 商科 / 管理类",
+    summary: "直接来到第 48 月，已拥有完整履历与就业 offer，可以快速查看正式就业结局和最终报告。",
+    endingTarget: "正常毕业 + 较好就业 offer",
+  },
+  {
     id: "tianda-engineering-recommendation-junior-fall",
     label: "天大工科｜推免路线｜大三上",
     routeLabel: "推免路线",
@@ -91,20 +101,12 @@ export const demoSavePresets: DemoSavePreset[] = [
     endingTarget: "推免结局",
   },
   {
-    id: "generic-211-postgraduate-junior-fall",
-    label: "普通 211｜考研路线｜大三上",
-    routeLabel: "考研路线",
-    schoolLabel: "普通 211 · 理科",
-    summary: "作为保底演示档，前两年学业稳但履历一般，后面更像在把考研准备慢慢坐实。",
-    endingTarget: "考研成功 / 普通结果",
-  },
-  {
-    id: "second-tier-employment-warning-junior-fall",
-    label: "二本普通档｜毕业风险预警｜大三上",
-    routeLabel: "普通就业路线",
-    schoolLabel: "二本 · 文科",
-    summary: "状态更紧、风险更高的演示档，适合展示预警、止损和普通就业收束。",
-    endingTarget: "普通就业 / 风险预览",
+    id: "tianda-engineering-recommendation-final",
+    label: "天大工科｜推免路线｜最后一月",
+    routeLabel: "终局前快速查看",
+    schoolLabel: "天津大学 · 工科",
+    summary: "直接来到第 48 月，已拥有推免 offer 与完整证据链，可以快速查看推免结局和最终报告。",
+    endingTarget: "正常毕业 + 推免结局",
   },
 ];
 
@@ -189,7 +191,7 @@ function buildPresetTimeline(runId: string, resumeRecords: SeedResumeRecord[]): 
     title: record.title,
     body: record.summary,
     sourceId: `${runId}-${record.year}-${record.month}-${record.title}`,
-    facts: [record.category, ...record.tags],
+    facts: sanitizePlayerFacingTextList(record.tags),
   }));
 }
 
@@ -229,12 +231,12 @@ function buildPresetLetters(runId: string, monthlyStates: SeedMonthlyRecord[]): 
   return monthlyStates.map((state) => ({
     id: `${runId}-letter-${globalMonthIndex(state)}`,
     monthIndex: globalMonthIndex(state),
-    title: `${state.year}-${state.month} 月留存信`,
+    title: `${formatPlayerFacingMonthIndex(globalMonthIndex(state))}来信`,
     body:
       state.summary.notableFacts.length > 0
-        ? `这个月留下来的事实是：${state.summary.notableFacts.join("、")}。这些记录会继续跟着这份演示存档往后走。`
-        : "这个月没有被夸张成戏剧化事件，只是把真实推进过的学习、项目和状态变化留下来。",
-    facts: state.summary.notableFacts,
+        ? `这封信记下来的，是这个月真正留下来的几件事：${sanitizePlayerFacingTextList(state.summary.notableFacts).join("、")}。它们会继续跟着这份存档往后走。`
+        : "这个月没有什么被夸张放大的桥段，只是把真实发生过的推进和心情留了下来。",
+    facts: sanitizePlayerFacingTextList(state.summary.notableFacts),
     fallback: true,
   }));
 }
@@ -267,6 +269,46 @@ function attachPresetMemory(input: {
       endingEvidence,
     })),
   };
+}
+
+function createFutureOffer(input: {
+  id: string;
+  type: FutureOffer["type"];
+  title: string;
+  tier: FutureOffer["tier"];
+  quality: FutureOffer["quality"];
+  monthIndex: number;
+  salaryLevel?: FutureOffer["salaryLevel"];
+  reasons: string[];
+  tradeoffs: string[];
+  sourceResumeIds?: string[];
+}): FutureOffer {
+  return {
+    id: input.id,
+    type: input.type,
+    title: input.title,
+    tier: input.tier,
+    quality: input.quality,
+    reasons: input.reasons,
+    tradeoffs: input.tradeoffs,
+    accepted: false,
+    rejected: false,
+    monthIndex: input.monthIndex,
+    salaryLevel: input.salaryLevel,
+    sourceResumeIds: input.sourceResumeIds,
+  };
+}
+
+function pushUniqueEvidence(run: GameRun, evidence: EndingEvidence[]): EndingEvidence[] {
+  const unique = new Map<string, EndingEvidence>();
+
+  for (const item of [...(run.endingEvidence ?? []), ...evidence]) {
+    if (!unique.has(item.id)) {
+      unique.set(item.id, item);
+    }
+  }
+
+  return [...unique.values()].sort((left, right) => left.monthIndex - right.monthIndex);
 }
 
 function createMonthlySummary(input: {
@@ -566,6 +608,14 @@ function buildTiandaEngineeringSeed(runId: string): PresetSeed {
     }),
     makeResumeRecord({
       year: 2,
+      month: 8,
+      category: "research",
+      title: "校内科研助理｜实验室协作",
+      summary: "开始跟着老师和学长做基础数据整理与实验协作，这段经历让推免材料第一次有了稳定科研痕迹。",
+      tags: ["科研助理", "实验室协作"],
+    }),
+    makeResumeRecord({
+      year: 2,
       month: 10,
       category: "competition",
       title: "工程训练综合项目｜市级三等奖",
@@ -689,6 +739,20 @@ function buildTiandaEngineeringSeed(runId: string): PresetSeed {
         progression,
       }),
     },
+    {
+      year: 2,
+      month: 8,
+      summary: createMonthlySummary({
+        year: 2,
+        month: 8,
+        statsBefore: { ...run.stats, money: 1460, stress: 58, semesterAcademics: 80, social: 42, mood: 49, fulfillment: 57 },
+        statsAfter: { ...run.stats, money: 1320, stress: 64, semesterAcademics: 83, social: 43, mood: 48, fulfillment: 60 },
+        actions: ["study", "writing_research"],
+        resumeAdditions: [makeResumeItem(runId, resumeRecords[3]!)],
+        notableFacts: ["project:lab-assistant:joined"],
+        progression,
+      }),
+    },
   ];
 
   return {
@@ -711,6 +775,332 @@ function buildTiandaEngineeringSeed(runId: string): PresetSeed {
   };
 }
 
+function buildNankaiEmploymentFinalSeed(runId: string): PresetSeed {
+  const junior = buildNankaiBusinessSeed(runId);
+  const extraResumeRecords = [
+    makeResumeRecord({
+      year: 3,
+      month: 10,
+      category: "internship",
+      title: "一线城市互联网商业分析实习",
+      summary: "真正把前面的商赛、调研和第一段实习接起来了，开始能独立做一部分分析和汇报整理。",
+      tags: ["实习", "商业分析"],
+    }),
+  ];
+  const resumeRecords = [...junior.resumeRecords, ...extraResumeRecords];
+  const futureOffer = createFutureOffer({
+    id: `${runId}-employment-offer-final`,
+    type: "employment",
+    title: "一线城市互联网商业分析 / 产品运营岗",
+    tier: "nankai_tianda",
+    quality: "good",
+    monthIndex: 46,
+    salaryLevel: "high",
+    reasons: [
+      "前置履历里已经有奖学金、商赛、调研项目和两段实习，投递后更容易拿到较好的业务岗面试与录用。",
+      "大三后的实习质量明显抬高了简历说服力。",
+    ],
+    tradeoffs: ["留在大城市意味着节奏更快、压力也更实在。"],
+  });
+
+  const monthlyStates = [
+    ...junior.monthlyStates,
+    {
+      year: 3,
+      month: 10,
+      summary: createMonthlySummary({
+        year: 3,
+        month: 10,
+        statsBefore: { ...junior.run.stats, money: 1420, stress: 58, semesterAcademics: 76, social: 65, mood: 56, fulfillment: 60 },
+        statsAfter: { ...junior.run.stats, money: 1160, stress: 64, semesterAcademics: 79, social: 68, mood: 55, fulfillment: 66 },
+        actions: ["job_prep", "student_activity"],
+        resumeAdditions: [makeResumeItem(runId, extraResumeRecords[0]!)],
+        notableFacts: ["internship:internet-business-analysis:advanced"],
+        progression: junior.run.progression,
+      }),
+    },
+    {
+      year: 4,
+      month: 10,
+      summary: createMonthlySummary({
+        year: 4,
+        month: 10,
+        statsBefore: { ...junior.run.stats, money: 930, stress: 63, semesterAcademics: 78, social: 66, mood: 52, fulfillment: 64 },
+        statsAfter: { ...junior.run.stats, money: 780, stress: 67, semesterAcademics: 79, social: 67, mood: 51, fulfillment: 68 },
+        actions: ["job_prep", "study"],
+        notableFacts: ["milestone:employment-offer:46"],
+        progression: junior.run.progression,
+      }),
+    },
+    {
+      year: 4,
+      month: 12,
+      summary: createMonthlySummary({
+        year: 4,
+        month: 12,
+        statsBefore: { ...junior.run.stats, money: 760, stress: 66, semesterAcademics: 79, social: 67, mood: 51, fulfillment: 68 },
+        statsAfter: { ...junior.run.stats, money: 690, stress: 62, semesterAcademics: 80, social: 69, mood: 55, fulfillment: 73 },
+        actions: ["job_prep", "relax"],
+        notableFacts: ["employment:offer-accepted:final"],
+        progression: junior.run.progression,
+      }),
+    },
+  ];
+
+  const seededRun = attachPresetMemory({
+    run: {
+      ...junior.run,
+      currentYear: 4,
+      currentMonth: 12,
+      currentSemester: 8,
+      semesterAverage: 78.5,
+      semesters: [
+        { semester: 1, academicScore: 70, feedback: "stable", passed: true },
+        { semester: 2, academicScore: 72, feedback: "stable", passed: true },
+        { semester: 3, academicScore: 74, feedback: "stable", passed: true },
+        { semester: 4, academicScore: 76, feedback: "excellent", passed: true },
+        { semester: 5, academicScore: 77, feedback: "stable", passed: true },
+        { semester: 6, academicScore: 79, feedback: "stable", passed: true },
+        { semester: 7, academicScore: 80, feedback: "stable", passed: true },
+        { semester: 8, academicScore: 80, feedback: "stable", passed: true },
+      ],
+      stats: {
+        ...junior.run.stats,
+        money: 690,
+        mood: 55,
+        stress: 62,
+        fulfillment: 73,
+        social: 69,
+        semesterAcademics: 80,
+      },
+      progression: {
+        ...junior.run.progression!,
+        dominantDirection: "employment",
+        employmentReadiness: 86,
+        postgraduateProgress: 22,
+        recommendationReadiness: 28,
+        latestHints: [
+          "就业路线已经非常明确，最后阶段更多是在确认去向，而不是重新找方向。",
+          "大三的高质量实习把前两年的积累真正接上了。",
+        ],
+      },
+      futureOffers: [futureOffer],
+      resume: resumeRecords.map((record) => makeResumeItem(runId, record)),
+    },
+    monthlyStates,
+    resumeRecords,
+  });
+
+  const acceptedRun = acceptFutureOfferDecision(seededRun, futureOffer.id, "accept");
+
+  return {
+    run: {
+      ...acceptedRun,
+      status: "completed",
+      currentYear: 4,
+      currentMonth: 12,
+      currentSemester: 8,
+      timelineNodes: [
+        ...(acceptedRun.timelineNodes ?? []),
+        {
+          id: `${runId}-timeline-employment-offer-final`,
+          kind: "offer",
+          monthIndex: 46,
+          title: "就业 offer 到手",
+          body: "大四后段等来了正式 offer，这次前面的竞赛、调研和实习终于被连成了一条完整证据链。",
+          facts: ["一线城市互联网商业分析 / 产品运营岗", "就业路线明确下来"],
+        },
+        {
+          id: `${runId}-timeline-employment-choice-final`,
+          kind: "final_choice",
+          monthIndex: 48,
+          title: "最终去向确认",
+          body: "最后还是选了就业，把这四年攒下来的履历和证据真正落到了现实去向上。",
+          facts: ["正常毕业", "接受较好就业 offer"],
+        },
+      ],
+      endingEvidence: pushUniqueEvidence(acceptedRun, [
+        {
+          id: `${runId}-ending-money-final`,
+          kind: "money",
+          title: "毕业前的现金状态",
+          body: "手头不算宽裕，但已经不再是会被日常开销立刻压垮的状态。",
+          monthIndex: 48,
+        },
+        {
+          id: `${runId}-ending-mood-final`,
+          kind: "mood",
+          title: "毕业前的心情起伏",
+          body: "临近毕业时还是会紧张，但已经能感觉到自己终于被看见了一次。",
+          monthIndex: 48,
+        },
+        {
+          id: `${runId}-ending-stress-final`,
+          kind: "stress",
+          title: "最后阶段的压力",
+          body: "后期压力一直在，但它最后没有把路线压垮，反而把选择推到了眼前。",
+          monthIndex: 48,
+        },
+      ]),
+    },
+    monthlyStates,
+    resumeRecords,
+  };
+}
+
+function buildTiandaRecommendationFinalSeed(runId: string): PresetSeed {
+  const junior = buildTiandaEngineeringSeed(runId);
+  const futureOffer = createFutureOffer({
+    id: `${runId}-recommendation-offer-final`,
+    type: "recommendation",
+    title: "天津大学｜推免录取通知",
+    tier: "nankai_tianda",
+    quality: "good",
+    monthIndex: 34,
+    reasons: [
+      "国家奖学金、市级奖学金、竞赛结果和科研助理经历一起把推免竞争力抬到了稳定线以上。",
+      "第 28 月已经打开考研准备，所以推免外还有保底路径。",
+    ],
+    tradeoffs: ["后期状态一直绷得比较紧，但学业线没有断。"],
+  });
+
+  const monthlyStates = [
+    ...junior.monthlyStates,
+    {
+      year: 3,
+      month: 4,
+      summary: createMonthlySummary({
+        year: 3,
+        month: 4,
+        statsBefore: { ...junior.run.stats, money: 1240, stress: 64, semesterAcademics: 84, social: 45, mood: 47, fulfillment: 61 },
+        statsAfter: { ...junior.run.stats, money: 1130, stress: 67, semesterAcademics: 86, social: 45, mood: 46, fulfillment: 64 },
+        actions: ["study", "postgraduate_prep"],
+        notableFacts: ["milestone:postgraduate-open:28"],
+        progression: {
+          ...junior.run.progression!,
+          postgraduateChoiceOpenedAtMonth: 28,
+        },
+      }),
+    },
+    {
+      year: 3,
+      month: 10,
+      summary: createMonthlySummary({
+        year: 3,
+        month: 10,
+        statsBefore: { ...junior.run.stats, money: 1170, stress: 66, semesterAcademics: 86, social: 45, mood: 46, fulfillment: 64 },
+        statsAfter: { ...junior.run.stats, money: 1080, stress: 68, semesterAcademics: 87, social: 46, mood: 47, fulfillment: 67 },
+        actions: ["study", "writing_research"],
+        notableFacts: ["milestone:recommendation-apply:34"],
+        progression: {
+          ...junior.run.progression!,
+          recommendationAppliedAtMonth: 34,
+          recommendationQualification: "eligible",
+        },
+      }),
+    },
+    {
+      year: 4,
+      month: 12,
+      summary: createMonthlySummary({
+        year: 4,
+        month: 12,
+        statsBefore: { ...junior.run.stats, money: 1080, stress: 68, semesterAcademics: 87, social: 46, mood: 47, fulfillment: 67 },
+        statsAfter: { ...junior.run.stats, money: 980, stress: 61, semesterAcademics: 88, social: 49, mood: 53, fulfillment: 75 },
+        actions: ["study", "relax"],
+        notableFacts: ["recommendation:accepted"],
+        progression: {
+          ...junior.run.progression!,
+          recommendationQualification: "accepted",
+          postgraduateChoiceOpenedAtMonth: 28,
+          recommendationAppliedAtMonth: 34,
+          postgraduateResultMonth: 36,
+        },
+      }),
+    },
+  ];
+
+  const seededRun = attachPresetMemory({
+    run: {
+      ...junior.run,
+      currentYear: 4,
+      currentMonth: 12,
+      currentSemester: 8,
+      semesterAverage: 82.6,
+      semesters: [
+        { semester: 1, academicScore: 76, feedback: "stable", passed: true },
+        { semester: 2, academicScore: 78, feedback: "excellent", passed: true },
+        { semester: 3, academicScore: 78, feedback: "excellent", passed: true },
+        { semester: 4, academicScore: 79, feedback: "excellent", passed: true },
+        { semester: 5, academicScore: 82, feedback: "excellent", passed: true },
+        { semester: 6, academicScore: 84, feedback: "excellent", passed: true },
+        { semester: 7, academicScore: 84, feedback: "excellent", passed: true },
+        { semester: 8, academicScore: 85, feedback: "excellent", passed: true },
+      ],
+      stats: {
+        ...junior.run.stats,
+        money: 980,
+        mood: 53,
+        stress: 61,
+        fulfillment: 75,
+        social: 49,
+        semesterAcademics: 88,
+      },
+      progression: {
+        ...junior.run.progression!,
+        dominantDirection: "recommendation",
+        recommendationQualification: "eligible",
+        recommendationReadiness: 90,
+        postgraduateProgress: 52,
+        employmentReadiness: 26,
+        postgraduateChoiceOpenedAtMonth: 28,
+        recommendationAppliedAtMonth: 34,
+        postgraduateResultMonth: 36,
+        latestHints: [
+          "推免线已经落到正式结果，考研只剩保底意义。",
+          "前两年的奖学金、竞赛和科研经历在最终材料里都被完整接住了。",
+        ],
+      },
+      futureOffers: [futureOffer],
+      resume: junior.resumeRecords.map((record) => makeResumeItem(runId, record)),
+    },
+    monthlyStates,
+    resumeRecords: junior.resumeRecords,
+  });
+
+  const acceptedRun = acceptFutureOfferDecision(seededRun, futureOffer.id, "accept");
+
+  return {
+    run: {
+      ...acceptedRun,
+      status: "completed",
+      currentYear: 4,
+      currentMonth: 12,
+      currentSemester: 8,
+      endingEvidence: pushUniqueEvidence(acceptedRun, [
+        {
+          id: `${runId}-ending-academic-final`,
+          kind: "academic",
+          title: "后期学业稳定性",
+          body: "后期课程压力一直在，但学业线没有掉下去，最后还是把推免资格稳住了。",
+          monthIndex: 48,
+        },
+        {
+          id: `${runId}-ending-stress-final`,
+          kind: "stress",
+          title: "后期压力",
+          body: "大四前后的压力很高，但没有把准备链路打断，更多像是在逼着节奏变得更硬。",
+          monthIndex: 48,
+        },
+      ]),
+    },
+    monthlyStates,
+    resumeRecords: junior.resumeRecords,
+  };
+}
+
+// Retained temporarily for local preset authoring reference.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function buildGenericPostgraduateSeed(runId: string): PresetSeed {
   const progression = {
     ...createDefaultCareerRouteState(),
@@ -792,6 +1182,8 @@ function buildGenericPostgraduateSeed(runId: string): PresetSeed {
   };
 }
 
+// Retained temporarily for local preset authoring reference.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function buildSecondTierWarningSeed(runId: string): PresetSeed {
   const progression = {
     ...createDefaultCareerRouteState(),
@@ -878,12 +1270,12 @@ function buildPresetSeed(presetId: DemoSavePresetId, runId: string): PresetSeed 
   switch (presetId) {
     case "nankai-business-employment-junior-fall":
       return buildNankaiBusinessSeed(runId);
+    case "nankai-business-employment-final":
+      return buildNankaiEmploymentFinalSeed(runId);
     case "tianda-engineering-recommendation-junior-fall":
       return buildTiandaEngineeringSeed(runId);
-    case "generic-211-postgraduate-junior-fall":
-      return buildGenericPostgraduateSeed(runId);
-    case "second-tier-employment-warning-junior-fall":
-      return buildSecondTierWarningSeed(runId);
+    case "tianda-engineering-recommendation-final":
+      return buildTiandaRecommendationFinalSeed(runId);
     default:
       return buildNankaiBusinessSeed(runId);
   }
@@ -897,6 +1289,7 @@ export async function createDemoPresetRun(input: {
   const runId = input.runId ?? randomUUID();
   const seed = buildPresetSeed(input.presetId, runId);
 
+  try {
   await input.repository.createRun({
     id: seed.run.id,
     currentYear: seed.run.currentYear,
@@ -959,6 +1352,10 @@ export async function createDemoPresetRun(input: {
       },
     },
   ]);
+  } catch (error) {
+    await input.repository.deleteRun?.(seed.run.id);
+    throw error;
+  }
 
   return {
     preset: demoSavePresets.find((preset) => preset.id === input.presetId)!,

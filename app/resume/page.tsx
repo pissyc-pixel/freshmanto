@@ -29,6 +29,11 @@ import { normalizeSaveState } from "@/lib/demo/save-state";
 import { readSearchParam, type DemoPageSearchParams } from "@/lib/demo/search-params";
 import { readActiveRunIdFromCookies } from "@/lib/demo/server-run-context";
 import { getServerResumeBundle } from "@/lib/demo/server";
+import {
+  formatPlayerFacingMonthIndex,
+  sanitizePlayerFacingText,
+  sanitizePlayerFacingTextList,
+} from "@/lib/player-facing-text";
 
 export const dynamic = "force-dynamic";
 
@@ -138,11 +143,13 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
   const resumeItems = bundle.resumeItems.map((item) => ({
     id: item.id,
     category: item.category,
-    title: item.title,
-    summary: item.summary,
+    title: sanitizePlayerFacingText(item.title),
+    summary: sanitizePlayerFacingText(item.summary),
     month: item.month,
     tags: Array.isArray(item.metadata_json?.tags)
-      ? item.metadata_json.tags.filter((tag): tag is string => typeof tag === "string")
+      ? sanitizePlayerFacingTextList(
+          item.metadata_json.tags.filter((tag): tag is string => typeof tag === "string"),
+        )
       : [],
   }));
 
@@ -333,7 +340,7 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
                             </div>
                           ) : null}
                         </div>
-                        <div className="fm-resume-line__date">M{item.month}</div>
+                        <div className="fm-resume-line__date">{formatPlayerFacingMonthIndex(item.month)}</div>
                       </article>
                     ))}
                   </div>
@@ -463,9 +470,9 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
                               <div className="fm-journal-card__month">{log.periodLabel}</div>
                               <h3 className="fm-journal-card__title">{log.title}</h3>
                             </div>
-                            <FmBadge tone="neutral">{log.badge}</FmBadge>
+                            <FmBadge tone="neutral">{sanitizePlayerFacingText(log.badge)}</FmBadge>
                           </div>
-                          <p className="fm-journal-card__copy">{log.message}</p>
+                          <p className="fm-journal-card__copy">{sanitizePlayerFacingText(log.message)}</p>
                         </div>
                       </article>
                     ))}
