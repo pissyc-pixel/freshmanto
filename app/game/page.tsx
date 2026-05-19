@@ -16,6 +16,7 @@ import { FmMotionSection } from "@/components/fm-ui/FmMotionSection";
 import { LogFeed } from "@/components/log-feed";
 import { ScrollIntoView } from "@/components/scroll-into-view";
 import { WeeklySettlementCard } from "@/components/weekly-settlement-card";
+import { WeeklyKickoffModal, type WeeklyKickoffNotice } from "@/components/weekly-kickoff-modal";
 import {
   FmInlineStat,
   FmMetricStrip,
@@ -201,6 +202,120 @@ function buildFinalDemoMilestone(run: GameRun) {
     : null;
 }
 
+type MonthCalendarItem = {
+  title: string;
+  body: string;
+  tone: "event" | "warning" | "ending";
+  label: "关键节点" | "机会事件" | "风险事件" | "正式结果";
+};
+
+function buildMonthCalendarItems(run: GameRun, currentWeekState: ReturnType<typeof resolveCurrentWeekState>) {
+  const items: MonthCalendarItem[] = [];
+  const milestone = buildFinalDemoMilestone(run);
+  const activeProjects = (run.competitionProjects ?? []).filter((project) => project.status === "active");
+
+  if (milestone) {
+    items.push({
+      title: milestone.title,
+      body: milestone.body,
+      tone: milestone.tone,
+      label: milestone.tone === "ending" ? "正式结果" : "关键节点",
+    });
+  }
+
+  if (currentWeekState.event) {
+    items.push({
+      title: currentWeekState.event.title,
+      body: currentWeekState.event.summary,
+      tone: "event",
+      label: "机会事件",
+    });
+  } else {
+    items.push({
+      title: "本周机会入口",
+      body: "本周如果刷出讲座、宣讲或项目入口，会先在这里预告，不会直接提前给结果。",
+      tone: "event",
+      label: "机会事件",
+    });
+  }
+
+  if (run.stats.money < getWeeklyLivingExpense(run) || run.stats.stress >= 60 || run.stats.mood <= 45) {
+    items.push({
+      title: "状态风险",
+      body: "现金、压力或心情里已经有一项偏紧；风险会提前亮出来，而不是等到结局才突然算账。",
+      tone: "warning",
+      label: "风险事件",
+    });
+  }
+
+  if (activeProjects.length > 0) {
+    items.push({
+      title: `${activeProjects.length} 个项目在推进`,
+      body: `本学期已经接住 ${activeProjects.length} 条竞赛 / 项目线，月底会按实际进度结算。`,
+      tone: "event",
+      label: "机会事件",
+    });
+  }
+
+  return items.slice(0, 4);
+}
+
+function buildWeeklyKickoffNotices(
+  run: GameRun,
+  currentWeekState: ReturnType<typeof resolveCurrentWeekState>,
+): WeeklyKickoffNotice[] {
+  const notices: WeeklyKickoffNotice[] = [];
+
+  if (currentWeekState.event) {
+    notices.push({
+      id: `event-${currentWeekState.event.id}`,
+      title: currentWeekState.event.title,
+      kind: "event",
+      whatHappened: currentWeekState.event.summary,
+      changes: [
+        currentWeekState.event.effectDescription,
+        currentWeekState.event.dayTypeOverride ? "本周有一天时间结构会被事件影响" : "这周会多一个需要回应的机会入口",
+      ],
+      reminder: "先看清这条事件会占掉什么，再决定要不要把当天行动改成更合适的安排。",
+    });
+  }
+
+  if (run.stats.money < getWeeklyLivingExpense(run) * 1.2) {
+    notices.push({
+      id: "money-risk",
+      title: "现金开始偏紧",
+      kind: "money",
+      whatHappened: "这周开始时，手头余额已经靠近基础生活开销线。",
+      changes: ["金钱风险上升", "可选高成本行动需要更谨慎"],
+      reminder: "至少留一个补现金动作，别让固定开销先把后面的选择压窄。",
+    });
+  }
+
+  if (run.stats.stress >= 60) {
+    notices.push({
+      id: "stress-risk",
+      title: "压力已经抬高",
+      kind: "stress",
+      whatHappened: "上一段时间的投入已经把压力顶上来，效率会更容易被拖住。",
+      changes: ["压力偏高", "高压行动收益可能打折"],
+      reminder: "如果这周还要继续冲，最好给自己留一个恢复位。",
+    });
+  }
+
+  if (run.stats.mood <= 45) {
+    notices.push({
+      id: "mood-risk",
+      title: "状态有点低",
+      kind: "mood",
+      whatHappened: "心情已经开始影响体感，硬把所有时间都塞满会更难持续。",
+      changes: ["心情偏低", "恢复路径变得更重要"],
+      reminder: "休息、社交或吃顿好的都不是浪费，它们是在帮后面的安排留出续航。",
+    });
+  }
+
+  return notices;
+}
+
 function toneForDay(kind: TimeBlockKind) {
   switch (kind) {
     case "free":
@@ -291,6 +406,9 @@ export default async function GamePage({ searchParams }: GamePageProps) {
   const publicExamExplanation = buildPublicExamExplanation(hydratedRun);
   const spotlightArtifacts = buildGameSpotlightArtifacts(hydratedRun);
   const finalDemoMilestone = buildFinalDemoMilestone(hydratedRun);
+  const monthCalendarItems = buildMonthCalendarItems(hydratedRun, currentWeekState);
+  const weeklyKickoffNotices = buildWeeklyKickoffNotices(hydratedRun, currentWeekState);
+  const monthIndex = (hydratedRun.currentYear - 1) * 12 + hydratedRun.currentMonth;
 
   return (
     <FmShellLayout
@@ -317,7 +435,13 @@ export default async function GamePage({ searchParams }: GamePageProps) {
       }
     >
       <div className="fm-stack" data-testid="game-page">
-        <ActiveRunSync runId={bundle.run.id} />
+        <ActiveRunSync runId={bundle.run.id} snapshot={hydratedRun} />
+        <WeeklyKickoffModal
+          runId={bundle.run.id}
+          monthIndex={monthIndex}
+          week={currentWeek}
+          notices={weeklyKickoffNotices}
+        />
         <FmMotionSection delay={40}>
           <FmMetricStrip items={buildMetricItems(hydratedRun.stats, hydratedRun)} />
         </FmMotionSection>
@@ -337,6 +461,24 @@ export default async function GamePage({ searchParams }: GamePageProps) {
             </FmPanel>
           </FmMotionSection>
         ) : null}
+
+        <FmMotionSection delay={80}>
+          <FmPanel>
+            <FmSectionHead
+              title="本月事件月历"
+              copy="这里提前展示关键、机会和风险层级；只预告节点，不提前泄露你会得到什么结果。"
+            />
+            <div className="mt-6 fm-month-event-grid">
+              {monthCalendarItems.map((item) => (
+                <article key={`${item.label}-${item.title}`} className="fm-month-event-card">
+                  <FmBadge tone={item.tone}>{item.label}</FmBadge>
+                  <h3>{item.title}</h3>
+                  <p>{item.body}</p>
+                </article>
+              ))}
+            </div>
+          </FmPanel>
+        </FmMotionSection>
 
         <div className="fm-grid-2">
           <div className="fm-stack">

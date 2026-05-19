@@ -22,6 +22,18 @@ function iconNameForArtifact(kind: FormalArtifact["kind"]) {
   }
 }
 
+const emotionalStages = ["等待", "揭晓", "被认可", "回看付出", "留下纪念"] as const;
+
+function EmotionalStageRail() {
+  return (
+    <ol className="fm-emotion-rail" aria-label="重要结果情绪阶段">
+      {emotionalStages.map((stage) => (
+        <li key={stage}>{stage}</li>
+      ))}
+    </ol>
+  );
+}
+
 export function FormalArtifactCards({
   artifacts,
   runId,
@@ -47,6 +59,7 @@ export function FormalArtifactCards({
             <FmBadge tone={artifact.badgeTone}>{artifact.badgeLabel}</FmBadge>
           </div>
           <p className="fm-formal-card__summary">{artifact.summary}</p>
+          <EmotionalStageRail />
           <div className="fm-formal-card__facts">
             {artifact.facts.map((fact) => (
               <span key={`${artifact.id}-${fact}`} className="fm-timeline-tag">
@@ -141,6 +154,8 @@ export function FormalDocumentPreview({
             以下归档信息可作为这段阶段性结果的正式留痕。
           </p>
         </div>
+
+        <EmotionalStageRail />
 
         <div className="fm-admission-footer">
           <div className="fm-info-box">

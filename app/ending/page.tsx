@@ -480,7 +480,7 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
       }
     >
       <div className="fm-stack">
-        <ActiveRunSync runId={bundle.run.id} />
+        <ActiveRunSync runId={bundle.run.id} snapshot={run} />
 
         {!completed ? (
           <>

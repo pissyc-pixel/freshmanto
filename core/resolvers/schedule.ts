@@ -12,6 +12,7 @@ import type {
   WeeklyEventInstance,
   TimeBlockKind,
   Weekday,
+  CompetitionProject,
 } from "@/types/game";
 import { weeklyActionCatalog } from "@/data/actions";
 
@@ -149,9 +150,48 @@ function isVacationActionAllowed(action: WeeklyActionOption["action"], run: Game
   return baselineVacationActions.has(action);
 }
 
+function getCompetitionActionLabel(project: CompetitionProject) {
+  const seed = `${project.title} ${project.category}`;
+
+  if (seed.includes("电子") || seed.includes("电赛")) {
+    return "【电赛】方案设计";
+  }
+  if (seed.includes("案例") || seed.includes("商赛")) {
+    return "【商赛】案例分析";
+  }
+  if (seed.includes("建模")) {
+    return "【建模】模拟训练";
+  }
+  if (seed.includes("调研")) {
+    return "【调研】问卷设计";
+  }
+  if (seed.includes("工程")) {
+    return "【工程】项目推进";
+  }
+
+  return `【${project.category}】项目推进`;
+}
+
+function getCompetitionActionDescription(project: CompetitionProject) {
+  return `继续推进“${project.title}”，当前独立进度 ${project.investedDays} / ${project.minimumEffortDays}。`;
+}
+
 function customizeActionOptionForRun(option: WeeklyActionOption, run: GameRun | undefined): WeeklyActionOption {
   if (!run) {
     return option;
+  }
+
+  if (option.action === "competition_project" && option.optionId.startsWith("competition_project:")) {
+    const projectId = option.optionId.slice("competition_project:".length);
+    const project = (run.competitionProjects ?? []).find((item) => item.id === projectId);
+
+    if (project) {
+      return {
+        ...option,
+        label: getCompetitionActionLabel(project),
+        description: getCompetitionActionDescription(project),
+      };
+    }
   }
 
   if (run.profile.collegeTrack !== "engineering") {
@@ -328,13 +368,24 @@ export function resolveAvailableWeeklyActions(input: {
   const baseOptions = limitedActions
     ? allowedByDayType.filter((option) => limitedActions.has(option.action))
     : allowedByDayType;
+  const activeProjects = (input.run?.competitionProjects ?? []).filter((project) => project.status === "active");
+  const expandedBaseOptions = baseOptions.flatMap((option) => {
+    if (option.action !== "competition_project" || activeProjects.length === 0) {
+      return [option];
+    }
+
+    return activeProjects.map((project) => ({
+      ...option,
+      optionId: `competition_project:${project.id}`,
+    }));
+  });
 
   const eventOption =
     shouldShowSpecialAction && input.event?.specialAction
       ? [customizeActionOptionForRun(input.event.specialAction, input.run)]
       : [];
 
-  return [...baseOptions, ...eventOption].map((option) => customizeActionOptionForRun(option, input.run));
+  return [...expandedBaseOptions, ...eventOption].map((option) => customizeActionOptionForRun(option, input.run));
 }
 
 export function isWeekReadyToConfirm(weekState: ActiveWeekState): boolean {

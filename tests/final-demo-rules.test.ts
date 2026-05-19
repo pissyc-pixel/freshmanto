@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createInitialGameRun } from "@/core/game-engine";
 import {
   acceptFutureOfferDecision,
+  applyAcceptedActionProgression,
   settleLongTermProgression,
 } from "@/core/resolvers/progression";
 import { normalizeSaveState } from "@/lib/demo/save-state";
@@ -149,5 +150,79 @@ describe("final demo long-term rules", () => {
     const accepted = acceptFutureOfferDecision(run, recommendationOffer!.id, "accept");
     expect(accepted.progression?.recommendationQualification).toBe("accepted");
     expect(accepted.endingEvidence!.some((item) => item.kind === "offer" && item.sourceId === recommendationOffer!.id)).toBe(true);
+  });
+
+  it("advances only the selected competition project when a dedicated project action is used", () => {
+    const run = createSettledRun("specific-competition-run", {
+      competitionProjects: [
+        {
+          id: "project-a",
+          title: "电子设计竞赛",
+          category: "工程实践",
+          track: "engineering",
+          routeBias: ["recommendation"],
+          semesterKey: "1-spring",
+          openedYear: 1,
+          openedMonth: 1,
+          deadlineYear: 1,
+          deadlineMonth: 6,
+          minimumEffortDays: 3,
+          investedDays: 1,
+          status: "active",
+          awardPool: ["school"],
+          result: null,
+        },
+        {
+          id: "project-b",
+          title: "案例分析商赛",
+          category: "案例赛",
+          track: "business",
+          routeBias: ["employment"],
+          semesterKey: "1-spring",
+          openedYear: 1,
+          openedMonth: 1,
+          deadlineYear: 1,
+          deadlineMonth: 6,
+          minimumEffortDays: 3,
+          investedDays: 1,
+          status: "active",
+          awardPool: ["school"],
+          result: null,
+        },
+      ],
+    });
+
+    const nextRun = applyAcceptedActionProgression(run, "competition_project", "competition_project:project-b");
+
+    expect(nextRun.competitionProjects?.find((project) => project.id === "project-a")?.investedDays).toBe(1);
+    expect(nextRun.competitionProjects?.find((project) => project.id === "project-b")?.investedDays).toBe(2);
+  });
+
+  it("creates career awareness in year one and a first internship in year two before junior choices", () => {
+    let run = createSettledRun("internship-sequence-run", {
+      progression: {
+        tendencies: {
+          employment: 70,
+          postgraduate: 20,
+          public_exam: 0,
+          recommendation: 10,
+          undecided: 0,
+        },
+        dominantDirection: "employment",
+        publicExam: { progress: 0, aptitudePrep: 0, essayPrep: 0 },
+        postgraduateProgress: 10,
+        employmentReadiness: 32,
+        recommendationReadiness: 10,
+        recommendationQualification: "pending",
+        latestHints: [],
+      },
+    });
+
+    run = settleLongTermProgression(run, { playedYear: 1, playedMonth: 10 }).run;
+    expect(run.internshipRecords?.some((item) => item.stage === "career_awareness")).toBe(true);
+
+    run = settleLongTermProgression(run, { playedYear: 2, playedMonth: 10 }).run;
+    expect(run.internshipRecords?.some((item) => item.stage === "first_internship")).toBe(true);
+    expect(run.resume.some((item) => item.category === "internship")).toBe(true);
   });
 });

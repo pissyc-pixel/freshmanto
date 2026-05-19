@@ -27,8 +27,40 @@ type JournalPageProps = {
   searchParams: DemoPageSearchParams;
 };
 
-function formatMoney(value: number) {
-  return `${value >= 0 ? "+" : ""}${value}`;
+function formatQualitativeMoney(value: number) {
+  if (value <= 250) {
+    return "偏紧";
+  }
+  if (value <= 700) {
+    return "需要留意";
+  }
+  return "还能周转";
+}
+
+function formatQualitativeStress(value: number) {
+  if (value >= 75) {
+    return "过高";
+  }
+  if (value >= 60) {
+    return "偏高";
+  }
+  if (value >= 40) {
+    return "有点紧";
+  }
+  return "可控";
+}
+
+function formatQualitativeMood(value: number) {
+  if (value >= 70) {
+    return "不错";
+  }
+  if (value >= 50) {
+    return "普通";
+  }
+  if (value >= 35) {
+    return "偏低";
+  }
+  return "很低";
 }
 
 function buildTimelineTags(summary: StructuredMonthlySummary | null | undefined) {
@@ -196,7 +228,7 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
       }
     >
       <div className="fm-grid-2">
-        <ActiveRunSync runId={hydratedRun.id} />
+        <ActiveRunSync runId={hydratedRun.id} snapshot={hydratedRun} />
 
         <div className="fm-journal-board">
           <FmMotionSection delay={40}>
@@ -210,12 +242,15 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
               <div className="mt-6 fm-month-paper-scene">
                 {latestReport && latestDigest ? (
                   <div className="fm-paper-stack fm-paper-stack--fixed">
-                    <article className="fm-paper">
+                    <details className="fm-letter-shell">
+                      <summary className="fm-letter-shell__summary">点击打开本月来信</summary>
+                      <article className="fm-paper">
                       <div className="fm-paper__clip" aria-hidden="true" />
                       <div className="fm-paper__stats">
                         <span className="fm-paper__stat tone-teal">学业 {latestDigest.endState.feedback}</span>
-                        <span className="fm-paper__stat tone-amber">现金 {formatMoney(latestDigest.endState.money)}</span>
-                        <span className="fm-paper__stat tone-rose">压力 {latestDigest.endState.stress}</span>
+                        <span className="fm-paper__stat tone-amber">现金 {formatQualitativeMoney(latestDigest.endState.money)}</span>
+                        <span className="fm-paper__stat tone-rose">压力 {formatQualitativeStress(latestDigest.endState.stress)}</span>
+                        <span className="fm-paper__stat tone-cyan">心情 {formatQualitativeMood(latestDigest.endState.mood)}</span>
                       </div>
                       <div className="fm-paper__date">{formatMonthLabel(latestReport.year, latestReport.month ?? 1)}</div>
                       <h2 className="fm-paper__title">本月记</h2>
@@ -224,16 +259,20 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
                       </div>
                       <div className="fm-paper__fade" aria-hidden="true" />
                       <div className="fm-paper__footer">方向线索：{latestDigest.directionSignal}</div>
-                    </article>
+                      </article>
+                    </details>
                   </div>
                 ) : latestRulesFallback && latestDigest ? (
                   <div className="fm-paper-stack fm-paper-stack--fixed">
-                    <article className="fm-paper">
+                    <details className="fm-letter-shell">
+                      <summary className="fm-letter-shell__summary">点击打开本月来信</summary>
+                      <article className="fm-paper">
                       <div className="fm-paper__clip" aria-hidden="true" />
                       <div className="fm-paper__stats">
                         <span className="fm-paper__stat tone-teal">学业 {latestDigest.endState.feedback}</span>
-                        <span className="fm-paper__stat tone-amber">现金 {formatMoney(latestDigest.endState.money)}</span>
-                        <span className="fm-paper__stat tone-rose">压力 {latestDigest.endState.stress}</span>
+                        <span className="fm-paper__stat tone-amber">现金 {formatQualitativeMoney(latestDigest.endState.money)}</span>
+                        <span className="fm-paper__stat tone-rose">压力 {formatQualitativeStress(latestDigest.endState.stress)}</span>
+                        <span className="fm-paper__stat tone-cyan">心情 {formatQualitativeMood(latestDigest.endState.mood)}</span>
                       </div>
                       <div className="fm-paper__date">{latestRulesFallback.monthLabel}</div>
                       <h2 className="fm-paper__title">{latestRulesFallback.title}</h2>
@@ -244,11 +283,14 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
                       </div>
                       <div className="fm-paper__fade" aria-hidden="true" />
                       <div className="fm-paper__footer">{latestRulesFallback.endStateLine}</div>
-                    </article>
+                      </article>
+                    </details>
                   </div>
                 ) : latestPersistedLetter ? (
                   <div className="fm-paper-stack fm-paper-stack--fixed">
-                    <article className="fm-paper">
+                    <details className="fm-letter-shell">
+                      <summary className="fm-letter-shell__summary">点击打开本月来信</summary>
+                      <article className="fm-paper">
                       <div className="fm-paper__clip" aria-hidden="true" />
                       <div className="fm-paper__stats">
                         <span className="fm-paper__stat tone-cyan">存档事实</span>
@@ -263,7 +305,8 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
                       <div className="fm-paper__footer">
                         {latestPersistedLetter.fallback ? "规则层事实信件" : "月记归档"}
                       </div>
-                    </article>
+                      </article>
+                    </details>
                   </div>
                 ) : pendingMonths.length > 0 ? (
                   <div className="fm-paper-stack fm-paper-stack--fixed">

@@ -385,7 +385,13 @@ export function closeCompetitionProject(run: GameRun, projectId: string): GameRu
   };
 }
 
-export function applyAcceptedActionProgression(run: GameRun, action: ActionType): GameRun {
+function resolveCompetitionProjectIdFromOption(optionId?: string) {
+  return optionId?.startsWith("competition_project:")
+    ? optionId.slice("competition_project:".length)
+    : undefined;
+}
+
+export function applyAcceptedActionProgression(run: GameRun, action: ActionType, optionId?: string): GameRun {
   let nextRun = ensureProgressionState(run);
 
   switch (action) {
@@ -418,7 +424,10 @@ export function applyAcceptedActionProgression(run: GameRun, action: ActionType)
         essayPrep: 3,
       });
     case "competition_project": {
-      const leadProject = getLeadCompetitionProject(nextRun);
+      const targetProjectId = resolveCompetitionProjectIdFromOption(optionId);
+      const leadProject = targetProjectId
+        ? nextRun.competitionProjects?.find((project) => project.id === targetProjectId && project.status === "active") ?? null
+        : getLeadCompetitionProject(nextRun);
 
       nextRun = withTendencyShift(nextRun, {
         recommendation: 3,
@@ -1164,6 +1173,100 @@ function addInternshipChoices(run: GameRun, monthIndex: number): GameRun {
   );
 }
 
+function addCareerAwareness(run: GameRun, monthIndex: number): GameRun {
+  if ((run.internshipRecords ?? []).some((record) => record.stage === "career_awareness")) {
+    return run;
+  }
+
+  const record: InternshipRecord = {
+    id: `${run.id}-career-awareness-${monthIndex}`,
+    title: "第一次认真整理职业方向",
+    stage: "career_awareness",
+    companyType: "校园职业启蒙",
+    roleType: "简历 / 信息收集",
+    cityTier: run.profile.cityTier,
+    growth: 18,
+    pressure: 12,
+    cost: 0,
+    routeBonus: ["employment"],
+    status: "completed",
+    openedMonthIndex: monthIndex,
+    completedMonthIndex: monthIndex,
+    summary: "大一阶段只做职业启蒙，不直接给正式实习，但玩家开始知道简历和岗位并不是毕业才需要面对的事。",
+  };
+
+  return addTimelineNode(
+    {
+      ...run,
+      internshipRecords: [...(run.internshipRecords ?? []), record],
+    },
+    {
+      monthIndex,
+      kind: "internship",
+      title: record.title,
+      body: record.summary,
+      sourceId: record.id,
+      facts: ["career_awareness"],
+    },
+  );
+}
+
+function addFirstInternship(run: GameRun, monthIndex: number): GameRun {
+  if ((run.internshipRecords ?? []).some((record) => record.stage === "first_internship")) {
+    return run;
+  }
+
+  const enoughReadiness = (run.progression?.employmentReadiness ?? 0) >= 10 || run.resume.some((item) => item.category === "job_progress");
+  if (!enoughReadiness) {
+    return run;
+  }
+
+  const record: InternshipRecord = {
+    id: `${run.id}-first-internship-${monthIndex}`,
+    title: run.profile.collegeTrack === "business" ? "本地消费品公司市场运营助理" : "本地企业助理型短实习",
+    stage: "first_internship",
+    companyType: "本地普通单位",
+    roleType: run.profile.collegeTrack === "business" ? "市场运营助理" : "助理型岗位",
+    cityTier: run.profile.cityTier,
+    growth: 42,
+    pressure: 36,
+    cost: 180,
+    routeBonus: ["employment"],
+    status: "completed",
+    openedMonthIndex: monthIndex,
+    completedMonthIndex: monthIndex,
+    summary: "这是第一段真正接到校园外面的工作经历，门槛不高，但已经足够写进履历。",
+  };
+  const resumeItem = createResumeItem(
+    run,
+    record.title,
+    record.summary,
+    "internship",
+    ["internship", "first_internship"],
+  );
+  let nextRun: GameRun = {
+    ...run,
+    internshipRecords: [...(run.internshipRecords ?? []), record],
+    resume: [...run.resume, resumeItem],
+  };
+
+  nextRun = addTimelineNode(nextRun, {
+    monthIndex,
+    kind: "internship",
+    title: "第一段实习进入履历",
+    body: record.summary,
+    sourceId: record.id,
+    facts: [record.title],
+  });
+  return addEndingEvidence(nextRun, {
+    monthIndex,
+    kind: "internship",
+    title: record.title,
+    body: record.summary,
+    sourceId: record.id,
+  });
+}
+
 function offerTierForRun(run: GameRun): FutureOffer["tier"] {
   return run.profile.schoolTier;
 }
@@ -1575,6 +1678,21 @@ export function settleLongTermProgression(run: GameRun, input: {
     });
   }
 
+  if (monthIndex === 10) {
+    nextRun = addCareerAwareness(nextRun, monthIndex);
+    factsForLetter.push("第一次职业启蒙");
+  }
+
+  if (monthIndex === 22) {
+    const beforeCount = nextRun.internshipRecords?.length ?? 0;
+    const beforeResumeIds = new Set(nextRun.resume.map((item) => item.id));
+    nextRun = addFirstInternship(nextRun, monthIndex);
+    if ((nextRun.internshipRecords?.length ?? 0) > beforeCount) {
+      resumeAdditions.push(...nextRun.resume.filter((item) => !beforeResumeIds.has(item.id)));
+      factsForLetter.push("第一段实习进入履历");
+    }
+  }
+
   if (monthIndex === 34) {
     nextRun = generateRecommendationOffer(nextRun, monthIndex);
     notableFacts.push("milestone:recommendation-apply:34");
@@ -1608,8 +1726,8 @@ export function settleLongTermProgression(run: GameRun, input: {
   }
 
   if (
-    nextRun.currentYear === 3 &&
-    nextRun.currentMonth >= 7 &&
+    input.playedYear === 3 &&
+    input.playedMonth >= 7 &&
     nextRun.progression?.recommendationQualification === "pending"
   ) {
     const qualification = evaluateRecommendationQualification(nextRun);
@@ -1618,8 +1736,8 @@ export function settleLongTermProgression(run: GameRun, input: {
       progression: {
         ...nextRun.progression!,
         recommendationQualification: qualification,
-        recommendationEvaluatedAtYear: nextRun.currentYear,
-        recommendationEvaluatedAtMonth: nextRun.currentMonth,
+        recommendationEvaluatedAtYear: input.playedYear,
+        recommendationEvaluatedAtMonth: input.playedMonth,
         latestHints: [
           `大三下已经出现了一次较明确的推免资格判断：${qualification}。`,
           ...nextRun.progression!.latestHints,

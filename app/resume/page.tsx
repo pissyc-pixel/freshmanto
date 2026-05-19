@@ -204,7 +204,7 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
       }
     >
       <div className="fm-grid-2">
-        <ActiveRunSync runId={bundle.run.id} />
+        <ActiveRunSync runId={bundle.run.id} snapshot={hydratedRun} />
 
         <div className="fm-stack">
           <FmMotionSection delay={40}>

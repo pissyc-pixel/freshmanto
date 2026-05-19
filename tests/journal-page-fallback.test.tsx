@@ -152,7 +152,9 @@ describe("journal page fallback", () => {
     expect(markup).toContain("fm-paper__title");
     expect(markup).toContain("fm-paper__copy");
     expect(markup).toContain("月底状态");
+    expect(markup).toContain("点击打开本月来信");
     expect(markup).not.toContain("学业变化");
     expect(markup).not.toContain("压力 / 心情变化");
+    expect(markup).not.toContain("moneyDelta");
   });
 });

@@ -129,6 +129,16 @@ describe("key month game page rendering", () => {
       expected: "本周周历",
     },
     {
+      label: "month 13",
+      run: createRunForMonth({
+        id: "game-month-13",
+        year: 2,
+        month: 1,
+        scholarships: [scholarship],
+      }),
+      expected: "奖学金评定月",
+    },
+    {
       label: "month 25",
       run: createRunForMonth({
         id: "game-month-25",
@@ -147,6 +157,24 @@ describe("key month game page rendering", () => {
         ],
       }),
       expected: "阶段成果聚光灯",
+    },
+    {
+      label: "month 28",
+      run: createRunForMonth({
+        id: "game-month-28",
+        year: 3,
+        month: 4,
+      }),
+      expected: "考研开启选择",
+    },
+    {
+      label: "month 34",
+      run: createRunForMonth({
+        id: "game-month-34",
+        year: 3,
+        month: 10,
+      }),
+      expected: "推免申请节点",
     },
     {
       label: "month 36",
@@ -241,6 +269,15 @@ describe("key month game page rendering", () => {
         },
       }),
       expected: "阶段成果聚光灯",
+    },
+    {
+      label: "month 48",
+      run: createRunForMonth({
+        id: "game-month-48",
+        year: 4,
+        month: 12,
+      }),
+      expected: "最终结局月",
     },
   ])("renders $label safely", async ({ run, expected }) => {
     mockedBundleState.bundle = {
