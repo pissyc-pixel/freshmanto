@@ -120,8 +120,8 @@ function ConfirmWeekOverlay() {
 
   return (
     <LoadingOverlay
-      title="这一周正在往前走"
-      body="把这周过完需要一点时间。要是刚好到月底，这个月的回顾也会一起整理出来。"
+      title="这周结束了，稍等一下。"
+      body="正在把这段时间记下来……"
     />
   );
 }
@@ -602,8 +602,8 @@ export function ActionPlanForm({
 
         setLocalFeedback({
           kind: "success",
-          title: `${request.dayLabel} 已保存`,
-          message: `“${request.optionLabel}”已经写回本周安排。你可以继续安排后面的日期。`,
+          title: `${request.dayLabel} 已记下`,
+          message: `“${request.optionLabel}”已经留在这一天了。`,
         });
       } catch {
         setOptimisticPlans((currentPlans) => {
@@ -617,8 +617,8 @@ export function ActionPlanForm({
         }));
         setLocalFeedback({
           kind: "error",
-          title: `${request.dayLabel} 保存失败`,
-          message: "这一天的安排还没有写回存档，你可以重新点开这一天再试一次。",
+          title: `${request.dayLabel} 还没记上`,
+          message: "这一天的安排没留住，再点开试一次就行。",
         });
       } finally {
         pendingSaveQueueRef.current = pendingSaveQueueRef.current.slice(1);
@@ -727,8 +727,8 @@ export function ActionPlanForm({
         <div className="fm-planner-save-note">
           <FmLoadingState
             inline
-            title="最近的安排还在落位"
-            body={`还有 ${queuedSaveCount} 天安排在写进去，你可以先继续看下一天。`}
+            title="刚定下来的安排还在落稳"
+            body={`还有 ${queuedSaveCount} 天正在记下，你可以先继续看下一天。`}
           />
         </div>
       ) : null}
@@ -759,12 +759,12 @@ export function ActionPlanForm({
         <div className="flex flex-wrap items-center gap-3">
           <SubmitButton
             label="这周就这样上课"
-            pendingLabel="正在记下这周上课节奏..."
+            pendingLabel="正在记下这周怎么上课……"
             disabled={attendanceLocked || plannerSavePending}
             className="rounded-full bg-amber-600 px-5 py-3 font-semibold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-stone-400"
             testId="set-attendance-submit"
           />
-          <PendingHint text="正在记下这周怎么上课..." />
+          <PendingHint text="正在记下这周怎么上课……" />
         </div>
       </form>
 
@@ -827,10 +827,10 @@ export function ActionPlanForm({
               </p>
               {day.eventTitle ? <p className="fm-day-card__meta">{day.eventTitle}</p> : null}
               {saveState === "saving" ? (
-                <p className="fm-day-card__meta">保存中，先看下一天。</p>
+                <p className="fm-day-card__meta">先留在这里了，去看下一天吧。</p>
               ) : null}
               {saveState === "error" ? (
-                <p className="fm-day-card__meta">没存好，再点一次。</p>
+                <p className="fm-day-card__meta">这一下没记住，再点一次试试。</p>
               ) : null}
               {!attendanceLocked ? (
                 <p className="fm-day-card__meta">先定这周怎么上课。</p>
@@ -851,8 +851,8 @@ export function ActionPlanForm({
         <input type="hidden" name="plannedActionsSnapshot" value={plannedActionsSnapshot} />
         <div className="flex flex-wrap items-center gap-3">
           <SubmitButton
-            label="确认本周安排"
-            pendingLabel="正在结算本周安排 / 生成 AI 月记..."
+            label="确认"
+            pendingLabel="这周结束了，稍等一下。"
             disabled={!readyToConfirmNow}
             className="rounded-full bg-stone-900 px-5 py-3 font-semibold text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-400"
             testId="confirm-week-submit"
@@ -863,7 +863,7 @@ export function ActionPlanForm({
             <span className="text-sm text-stone-500">先把这周怎么上课定下来。</span>
           )}
         </div>
-        <PendingHint text="这周正在往前走；要是刚好到月底，这个月的回顾也会一起整理。" />
+        <PendingHint text="这周结束了，稍等一下。" />
         <ConfirmWeekOverlay />
       </form>
 
@@ -995,7 +995,7 @@ export function ActionPlanForm({
                   取消
                 </button>
                 <button type="button" className="fm-solid-button" disabled>
-                  保存这天安排
+                  确认
                 </button>
               </div>
             </div>

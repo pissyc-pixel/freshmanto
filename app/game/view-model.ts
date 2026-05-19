@@ -12,6 +12,10 @@ import {
   formatWeeklyDayType,
   formatWeeklyEventFact,
 } from "@/lib/demo/options";
+import {
+  buildPlannerActionNarrative,
+  buildWeeklySettlementNarrative,
+} from "@/lib/action-narratives";
 import { annotatePlannerOptions } from "@/lib/planner-option-priority";
 import type {
   ActiveMonthState,
@@ -49,39 +53,6 @@ function uniqueLines(lines: Array<string | undefined | null>): string[] {
   return [...new Set(lines.filter((line): line is string => Boolean(line && line.trim().length > 0)))];
 }
 
-function buildActionTrendText(action: WeeklySettlementSummary["dailyResults"][number]["resolvedAction"]["action"]) {
-  switch (action) {
-    case "study":
-      return "把今天留给学习，进度会更踏实。";
-    case "writing_research":
-      return "适合安静坐下来，把材料和想法理顺。";
-    case "job_prep":
-      return "改简历、投递、准备面试，慢慢往前推。";
-    case "postgraduate_prep":
-      return "把整块时间留给考研或深造准备。";
-    case "public_exam_prep":
-      return "给公考这条线认真留出一点时间。";
-    case "competition_project":
-      return "适合把整块时间投进项目里。";
-    case "part_time":
-      return "去赚点钱，回来会更累一点。";
-    case "social":
-      return "去见见人，让这一天松一点。";
-    case "relax":
-      return "把这一天留给自己，先缓一缓。";
-    case "big_meal":
-      return "吃顿好的，心里会松一点。";
-    case "student_activity":
-      return "去参加活动，顺手接住一点校园里的机会。";
-    case "remedy":
-      return "先补眼前的漏洞，别让麻烦继续堆着。";
-    case "ask_family":
-      return "先把钱的事顶过去，心里会有点不是滋味。";
-    default:
-      return "给今天留一个安排。";
-  }
-}
-
 function buildCompetitionProgressText(run: GameRun | undefined) {
   const activeProject = run?.competitionProjects?.find((project) => project.status === "active");
 
@@ -90,58 +61,6 @@ function buildCompetitionProgressText(run: GameRun | undefined) {
   }
 
   return `这条项目已经投了 ${activeProject.investedDays} / ${activeProject.minimumEffortDays} 天。`;
-}
-
-function formatCompetitionProgressFact(fact: string) {
-  if (fact.startsWith("competition-progress-ready:")) {
-    const [, title, current, minimum] = fact.split(":");
-    return `${title}已达到最低参赛门槛，目前 ${current} / ${minimum}，继续投入会提高奖项概率和上限。`;
-  }
-
-  if (fact.startsWith("competition-progress:")) {
-    const [, title, current, minimum, remaining] = fact.split(":");
-    return `${title}进度 +1，目前 ${current} / ${minimum}，距离最低参赛门槛还差 ${remaining} 次。`;
-  }
-
-  return undefined;
-}
-
-function buildDailyMoneySummary(turn: WeeklySettlementSummary["dailyResults"][number]) {
-  const breakdown = turn.moneyBreakdown;
-
-  if (!breakdown) {
-    return undefined;
-  }
-
-  const actionLabel = turn.resolvedAction.label ?? formatActionType(turn.resolvedAction.action);
-  const clauses = [`今天基础生活开销 -${breakdown.baseLivingCost}`];
-
-  if (breakdown.actionCost > 0) {
-    clauses.push(`${actionLabel}额外花费 -${breakdown.actionCost}`);
-  }
-
-  if (breakdown.actionIncome > 0) {
-    clauses.push(
-      turn.resolvedAction.action === "part_time"
-        ? `兼职收入 +${breakdown.actionIncome}`
-        : `${actionLabel}收入 +${breakdown.actionIncome}`,
-    );
-  }
-
-  if (breakdown.specialCost > 0) {
-    clauses.push(`特殊事件支出 -${breakdown.specialCost}`);
-  }
-
-  if (breakdown.specialIncome > 0) {
-    clauses.push(`特殊事件收入 +${breakdown.specialIncome}`);
-  }
-
-  const netLine =
-    breakdown.netChange >= 0
-      ? `当天净变化 +${breakdown.netChange}。`
-      : `所以当天共减少 ${breakdown.netChange}。`;
-
-  return `${clauses.join("，")}，${netLine}`;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -268,6 +187,14 @@ export function buildWeeklyScheduleBlocks(input: {
 }
 
 export function buildPlannerDaysView(currentWeekState: ActiveWeekState, run?: GameRun) {
+  const currentYear = run?.currentYear ?? 1;
+  const currentMonth = run?.currentMonth ?? 1;
+  const money = run?.stats.money ?? 0;
+  const mood = run?.stats.mood ?? 50;
+  const stress = run?.stats.stress ?? 50;
+  const collegeTrack = run?.profile.collegeTrack ?? "engineering";
+  const monthlyTurns = run?.activeMonth?.turns ?? [];
+
   return (currentWeekState.days ?? []).map((day) => {
     const normalOptions = resolveAvailableWeeklyActions({
       day,
@@ -286,12 +213,33 @@ export function buildPlannerDaysView(currentWeekState: ActiveWeekState, run?: Ga
     const hasCashRisk = (currentWeekState.planningWarnings ?? []).length > 0;
     const plannedOptionId = day.plannedAction?.optionId;
     const dayEvent = currentWeekState.event?.weekday === day.weekday ? currentWeekState.event : null;
+    const normalDayType = day.effectiveDayType;
+    const skipDayType = day.skipClassAvailable ? "full_day" : day.effectiveDayType;
+    const countActionRepeats = (action: WeeklySettlementSummary["dailyResults"][number]["resolvedAction"]["action"]) =>
+      (currentWeekState.days ?? []).filter((item) => item.plannedAction?.action === action).length +
+      monthlyTurns.filter((turn) => turn.resolvedAction.action === action).length;
     const prioritizedNormalOptions = annotatePlannerOptions({
       options: normalOptions.map((option) => ({
         optionId: option.optionId,
         action: option.action,
         label: option.label,
-        description: buildActionTrendText(option.action),
+        description: buildPlannerActionNarrative({
+          saveId: run?.id ?? "demo",
+          year: currentYear,
+          month: currentMonth,
+          week: currentWeekState.week,
+          weekday: day.weekday,
+          action: option.action,
+          actionId: option.optionId,
+          dayType: normalDayType,
+          hasEvent: Boolean(dayEvent),
+          eventTitle: dayEvent?.title,
+          mood,
+          stress,
+          money,
+          collegeTrack,
+          repeatedCount: countActionRepeats(option.action),
+        }),
         source: option.source,
         sourceEventId: option.sourceEventId,
       selected:
@@ -307,7 +255,23 @@ export function buildPlannerDaysView(currentWeekState: ActiveWeekState, run?: Ga
         optionId: option.optionId,
         action: option.action,
         label: option.label,
-        description: buildActionTrendText(option.action),
+        description: buildPlannerActionNarrative({
+          saveId: run?.id ?? "demo",
+          year: currentYear,
+          month: currentMonth,
+          week: currentWeekState.week,
+          weekday: day.weekday,
+          action: option.action,
+          actionId: option.optionId,
+          dayType: skipDayType,
+          hasEvent: Boolean(dayEvent),
+          eventTitle: dayEvent?.title,
+          mood,
+          stress,
+          money,
+          collegeTrack,
+          repeatedCount: countActionRepeats(option.action),
+        }),
         source: option.source,
         sourceEventId: option.sourceEventId,
       selected:
@@ -357,39 +321,16 @@ export function buildWeeklySettlementView(settlement?: WeeklySettlementSummary) 
     id: `${settlement.week}-${turn.weekday ?? turn.turn}`,
     label: turn.dayLabel ?? `第 ${turn.turn} 次`,
     actionLabel: turn.resolvedAction.label ?? formatActionType(turn.resolvedAction.action),
-    summary: turn.resolvedAction.accepted
-      ? uniqueLines([
-          ...turn.notableFacts.map((fact) =>
-            fact.startsWith("weekly-event:") ? formatPlannerWeeklyEventFact(fact) : formatPlayerFacingFact(fact),
-          ),
-          ...turn.flags.map(formatPlayerFacingFlag),
-        ])[0] ?? "这一天按计划落地了。"
-      : formatPlannerReason(turn.resolvedAction.reason),
+    summary: buildWeeklySettlementNarrative(turn),
     statsDelta: turn.statsDelta,
   }));
-  const enrichedDayLines = dayLines.map((line, index) => {
-    const turn = settlement.dailyResults[index];
-    const moneySummary = turn ? buildDailyMoneySummary(turn) : undefined;
-    const progressSummary = turn
-      ? uniqueLines(
-          turn.notableFacts.map((fact) =>
-            fact.startsWith("competition-progress") ? formatCompetitionProgressFact(fact) : undefined,
-          ),
-        ).join(" ")
-      : "";
-
-    return {
-      ...line,
-      summary: [moneySummary, progressSummary, line.summary].filter(Boolean).join(" "),
-    };
-  });
 
   return {
-    title: `第 ${settlement.week} 周结算`,
+    title: `第 ${settlement.week} 周回看`,
     subtitle: `课程态度：${formatAttendanceStrategy(settlement.attendanceStrategy)}`,
     eventTitle: settlement.event?.title ?? null,
     eventSummary: settlement.event?.summary ?? null,
-    dayLines: enrichedDayLines,
+    dayLines,
     totalLines: [
       { label: "钱", value: settlement.totals.money },
       { label: "心情", value: settlement.totals.mood },

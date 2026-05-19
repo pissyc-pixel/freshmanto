@@ -218,7 +218,6 @@ describe("game page view-model helpers", () => {
 
     const studyOption = monday?.normalOptions.find((option) => option.action === "study");
     expect(studyOption?.description).toBeDefined();
-    expect(studyOption!.description!).toContain("学习");
-    expect(studyOption!.description!).toContain("进度");
+    expect(studyOption!.description!).toMatch(/教室|笔记|进度|复习|课本/);
   });
 });

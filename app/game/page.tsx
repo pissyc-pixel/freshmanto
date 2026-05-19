@@ -120,7 +120,7 @@ function formatDirectionStage(stage: "undecided" | "forming" | "clear") {
     case "forming":
       return "方向正在成形";
     default:
-      return "还在慢慢定下来";
+      return "还只是个苗头";
   }
 }
 
@@ -369,13 +369,6 @@ export default async function GamePage({ searchParams }: GamePageProps) {
   const latestGrowthLog = latestMonthlyState?.snapshot_json
     ? buildGrowthJournalEntry(latestMonthlyState.snapshot_json, latestMonthlyState.year, latestMonthlyState.month)
     : null;
-  const latestSystemLogs = bundle.logs.slice(-6).reverse().map((log) => ({
-    id: log.id,
-    logType: log.log_type,
-    message: log.message,
-    year: log.year,
-    month: log.month,
-  }));
   const directionSignals = summarizeDirectionSignals(hydratedRun);
   const directionPerception = buildDirectionPerception(hydratedRun);
   const publicExamExplanation = buildPublicExamExplanation(hydratedRun);
@@ -591,7 +584,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
               <FmPanel>
               <FmSectionHead
                 title="后半程方向"
-                copy="现在更像在往哪里走，先在这里看看。"
+                copy="有些选择正在慢慢留下痕迹。"
                 aside={<span className="fm-chip fm-chip--brand">{formatDirectionStage(directionPerception.stage)}</span>}
               />
               <div className="mt-6 fm-stack">
@@ -642,15 +635,6 @@ export default async function GamePage({ searchParams }: GamePageProps) {
                 </FmPanel>
               </FmMotionSection>
             ) : null}
-
-            <FmMotionSection delay={220}>
-              <FmPanel>
-              <FmSectionHead title="最近留下的记录" copy="翻一翻，看看这局刚刚走到哪了。" />
-              <div className="mt-6">
-                <LogFeed items={latestSystemLogs} emptyMessage="这局暂时还没有新的记录。" />
-              </div>
-              </FmPanel>
-            </FmMotionSection>
 
             <div className="flex flex-wrap gap-3">
               <Link href={buildRunHref("/settlement", bundle.run.id)} className="fm-button-secondary">

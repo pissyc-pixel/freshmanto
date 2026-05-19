@@ -10,6 +10,7 @@ import {
   FmShellLayout,
 } from "@/components/fm-ui/FmScaffold";
 import { buildMonthlyJournalRulesFallback } from "@/lib/ai/reports";
+import { normalizeMonthlyDiaryBody } from "@/lib/action-narratives";
 import { resolveActiveRunId } from "@/lib/demo/active-run";
 import { buildGrowthJournalEntry, buildMonthlyDiaryDigest } from "@/lib/demo/monthly-digest";
 import { formatMonthLabel } from "@/lib/demo/options";
@@ -115,7 +116,7 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
         active="journal"
         runId={runId}
         title="本月来信"
-        subtitle="这里会收集每个月的 AI 月记、成长节点和阶段感受整理成能回看的来信。"
+        subtitle="这里会收集每个月留下来的月记和痕迹。"
         headerMeta={
           <>
             <FmInlineStat tone="teal" icon="book" label="月记归档" value="0 篇" />
@@ -127,12 +128,12 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
           <FmPanel>
             <FmSectionHead
               title="本月来信"
-              copy="这次没有顺利把月记读出来，但不会影响存档。先回到首页创建一局，或者继续推进当前存档；这里不会凭空生成不存在的月记。"
+              copy="这次还没读到可展开的内容，但存档本身不受影响。先回到首页创建一局，或者继续推进当前存档；这里不会凭空出现不存在的月记。"
             />
             <div className="mt-6">
               <FmEmptyState
                 title="读不到这封月记"
-                body="这通常是旧存档缺字段、演示存档写入中断，或者当前月份还没成功结算。页面会保留为空状态，不会凭空生成不存在的月记，也不再直接崩掉。"
+                body="这通常是旧存档缺字段、演示存档写入中断，或者当前月份还没真正过完。页面会先保留为空状态，不会凭空出现不存在的月记。"
               />
             </div>
           </FmPanel>
@@ -297,7 +298,11 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
                         <div className="fm-paper__date">{formatMonthLabel(latestReport.year, latestReport.month ?? 1)}</div>
                         <h2 className="fm-paper__title">本月来信</h2>
                         <div className="fm-paper__copy fm-paper__copy--scroll">
-                          {sanitizePlayerFacingText(latestReport.output_markdown)}
+                          {normalizeMonthlyDiaryBody(latestReport.output_markdown)
+                            .split("\n\n")
+                            .map((paragraph, index) => (
+                              <p key={index}>{paragraph}</p>
+                            ))}
                         </div>
                         <div className="fm-paper__fade" aria-hidden="true" />
                         <div className="fm-paper__footer">
@@ -376,8 +381,8 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
                       <h2 className="fm-paper__title">这封月记还在路上</h2>
                       <div className="fm-paper__copy fm-paper__copy--scroll">
                         <FmLoadingState
-                          title="AI 月记还没整理完"
-                          body={`这些月份已经过完了，还在整理成能翻的来信：${pendingMonths
+                          title="这个月的记录还在整理"
+                          body={`这些月份已经过完了，还在慢慢收成能翻回去看的来信：${pendingMonths
                             .map((state) => formatMonthLabel(state.year, state.month))
                             .join("、")}。`}
                         />

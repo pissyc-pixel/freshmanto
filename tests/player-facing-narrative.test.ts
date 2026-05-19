@@ -464,8 +464,8 @@ describe("player-facing narrative helpers", () => {
     const report = renderMonthlyJournalFallback(monthlyInput);
 
     expect(report.usedFallback).toBe(true);
-    expect(report.markdown).toContain("# 第2学年");
     expect(report.markdown).toContain("我");
+    expect(report.markdown).not.toContain("#");
     expect(report.markdown).not.toContain("整体而言");
     expect(report.markdown).not.toContain("这个月主要");
     expect(report.markdown).not.toContain("综上");
@@ -505,9 +505,9 @@ describe("player-facing narrative helpers", () => {
 
     expect(digest.mainActions).toEqual([]);
     expect(journal.title.length).toBeGreaterThan(0);
-    expect(report.markdown).toContain("#");
     expect(report.usedFallback).toBe(true);
     expect(report.markdown).toContain("我");
+    expect(report.markdown).not.toContain("#");
     expect(report.markdown).not.toContain("本月数据如下");
   });
 
@@ -578,8 +578,9 @@ describe("player-facing narrative helpers", () => {
       .join("\n");
 
     expect(monthlyPromptText).toContain("第一人称");
-    expect(monthlyPromptText).toContain("不要写成系统播报");
-    expect(monthlyPromptText).toContain("AI 只负责表达");
+    expect(monthlyPromptText).toContain("私人日记");
+    expect(monthlyPromptText).toContain("深夜");
+    expect(monthlyPromptText).toContain("不要出现 markdown 标题");
     expect(monthlyPromptText).toMatch(
       /不要出现.*规则层|不要出现.*系统判定|不要原样复述.*字段名/,
     );
