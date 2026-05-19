@@ -258,8 +258,8 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
       active="journal"
       runId={runId}
       title="本月来信"
-      subtitle="这里不会展示后台字段或结算原文，而是把规则层事实整理成能回看的月记和时间线。"
-      sidebarSummary="月记归档、成长节点和路线证据会在这里慢慢堆起来。即使 AI 月记缺失，页面也会退回规则层来信，不再因为单条数据失败而整页崩掉。"
+      subtitle="把每个月留下的心事和痕迹，慢慢收进这里。"
+      sidebarSummary="月记、节点和回头再看的证据，会一月一月地堆起来。"
       headerMeta={
         <>
           <FmInlineStat tone="teal" icon="book" label="月记归档" value={`${overview.monthlyJournalCount} 篇`} />
@@ -377,7 +377,7 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
                       <div className="fm-paper__copy fm-paper__copy--scroll">
                         <FmLoadingState
                           title="AI 月记还没整理完"
-                          body={`这些月份已经结算完成，但当前只保留了规则层事实：${pendingMonths
+                          body={`这些月份已经过完了，还在整理成能翻的来信：${pendingMonths
                             .map((state) => formatMonthLabel(state.year, state.month))
                             .join("、")}。`}
                         />
@@ -454,7 +454,7 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
           <FmPanel>
             <FmSectionHead
               title="成长时间线"
-              copy="这里只展示玩家能理解的节点名字，不会再把内部 key、字段名或调试标记直接露出来。"
+              copy="这里只留一眼能看懂的节点名字。"
             />
 
             <div className="mt-6">

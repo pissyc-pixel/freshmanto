@@ -165,7 +165,7 @@ describe("key month game page rendering", () => {
         year: 3,
         month: 4,
       }),
-      expected: "考研开启选择",
+      expected: "考研准备月",
     },
     {
       label: "month 34",
@@ -174,7 +174,7 @@ describe("key month game page rendering", () => {
         year: 3,
         month: 10,
       }),
-      expected: "推免申请节点",
+      expected: "推免申请月",
     },
     {
       label: "month 36",
@@ -277,7 +277,7 @@ describe("key month game page rendering", () => {
         year: 4,
         month: 12,
       }),
-      expected: "最终结局月",
+      expected: "毕业月",
     },
   ])("renders $label safely", async ({ run, expected }) => {
     mockedBundleState.bundle = {
@@ -335,6 +335,6 @@ describe("key month game page rendering", () => {
     );
 
     expect(markup).toContain(label);
-    expect(markup).toContain("本月关键节点");
+    expect(markup).toContain("本月会发生什么");
   });
 });

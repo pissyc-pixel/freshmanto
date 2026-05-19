@@ -52,33 +52,33 @@ function uniqueLines(lines: Array<string | undefined | null>): string[] {
 function buildActionTrendText(action: WeeklySettlementSummary["dailyResults"][number]["resolvedAction"]["action"]) {
   switch (action) {
     case "study":
-      return "学业提升 · 压力上升 · 心情下降";
+      return "把今天留给学习，进度会更踏实。";
     case "writing_research":
-      return "学业提升 · 履历积累 · 压力上升";
+      return "适合安静坐下来，把材料和想法理顺。";
     case "job_prep":
-      return "履历积累 · 金钱下降 · 压力上升";
+      return "改简历、投递、准备面试，慢慢往前推。";
     case "postgraduate_prep":
-      return "学业提升 · 深造推进 · 压力上升";
+      return "把整块时间留给考研或深造准备。";
     case "public_exam_prep":
-      return "公考推进 · 金钱下降 · 压力上升";
+      return "给公考这条线认真留出一点时间。";
     case "competition_project":
-      return "履历积累 · 学业提升 · 压力上升";
+      return "适合把整块时间投进项目里。";
     case "part_time":
-      return "金钱提升 · 压力上升 · 心情下降";
+      return "去赚点钱，回来会更累一点。";
     case "social":
-      return "社交提升 · 心情回升 · 金钱下降";
+      return "去见见人，让这一天松一点。";
     case "relax":
-      return "心情回升 · 压力下降";
+      return "把这一天留给自己，先缓一缓。";
     case "big_meal":
-      return "心情回升 · 压力下降 · 金钱下降";
+      return "吃顿好的，心里会松一点。";
     case "student_activity":
-      return "社交提升 · 履历积累 · 压力下降";
+      return "去参加活动，顺手接住一点校园里的机会。";
     case "remedy":
-      return "学业止损 · 压力下降 · 金钱下降";
+      return "先补眼前的漏洞，别让麻烦继续堆着。";
     case "ask_family":
-      return "金钱提升 · 压力上升";
+      return "先把钱的事顶过去，心里会有点不是滋味。";
     default:
-      return "状态微调";
+      return "给今天留一个安排。";
   }
 }
 
@@ -89,7 +89,7 @@ function buildCompetitionProgressText(run: GameRun | undefined) {
     return undefined;
   }
 
-  return `当前投入 ${activeProject.investedDays} / ${activeProject.minimumEffortDays}，达到 ${activeProject.minimumEffortDays} 次后可形成参赛成果。`;
+  return `这条项目已经投了 ${activeProject.investedDays} / ${activeProject.minimumEffortDays} 天。`;
 }
 
 function formatCompetitionProgressFact(fact: string) {
@@ -231,27 +231,37 @@ export function buildWeeklyScheduleBlocks(input: {
     detail:
       week.week === input.currentWeek
         ? input.currentWeekState.attendanceLocked
-          ? `本周课程态度已定为“${formatAttendanceStrategy(input.currentWeekState.attendanceStrategy)}”，目前已经排了 ${plannedCount} / 7 天。`
-          : "这一周先定课程态度，再逐天点击每一天安排行动。"
+          ? `这周已经排了 ${plannedCount} / 7 天。`
+          : "先看课表，再安排这周。"
         : week.week < input.currentWeek
-          ? "这一周已经结算完成。"
-          : "还没轮到这一周。",
+          ? "这周过完了。"
+          : "还没到这周。",
     timeSummary:
       week.week === input.currentWeek && input.currentWeekState.event
-        ? `${weekdayLabels[input.currentWeekState.event.weekday]}有本周事件：${input.currentWeekState.event.title}`
+        ? `${weekdayLabels[input.currentWeekState.event.weekday]}｜${input.currentWeekState.event.title}`
         : undefined,
     days: week.days.map((day) => {
       const plannerDay = input.currentWeekState.days?.find((item) => item.weekday === day.weekday);
+      const dayEvent =
+        input.currentWeekState.event?.weekday === day.weekday ? input.currentWeekState.event.title : undefined;
+      const kind = plannerDay ? mapWeeklyDayTypeToBlockKind(plannerDay.effectiveDayType) : day.dayType;
+      const dayHint =
+        plannerDay?.plannedAction
+          ? `已安排：${plannerDay.plannedAction.label ?? formatActionType(plannerDay.plannedAction.action)}`
+          : plannerDay
+            ? plannerDay.effectiveDayType === "night_only"
+              ? "夜晚可安排"
+              : plannerDay.effectiveDayType === "half_day"
+                ? "可安排半天"
+                : "适合推进大事"
+            : "";
 
       return {
         label: weekdayLabels[day.weekday],
-        kind: plannerDay ? mapWeeklyDayTypeToBlockKind(plannerDay.effectiveDayType) : day.dayType,
+        kind,
         released: plannerDay?.skipClassSelected,
-        detail: plannerDay?.plannedAction
-          ? `已安排：${plannerDay.plannedAction.label ?? formatActionType(plannerDay.plannedAction.action)}`
-          : plannerDay
-            ? formatWeeklyDayType(plannerDay.effectiveDayType)
-            : "",
+        detail: dayHint,
+        eventLabel: dayEvent ? `有${dayEvent.replace(/^[有去处理参加]+/, "")}` : undefined,
       };
     }),
   }));
@@ -284,12 +294,13 @@ export function buildPlannerDaysView(currentWeekState: ActiveWeekState, run?: Ga
         description: buildActionTrendText(option.action),
         source: option.source,
         sourceEventId: option.sourceEventId,
-        selected:
+      selected:
           currentWeekState.lastSelectedOptionId === option.optionId ||
           plannedOptionId === option.optionId,
       })),
       event: dayEvent,
       hasCashRisk,
+      dayType: day.effectiveDayType,
     });
     const prioritizedSkipOptions = annotatePlannerOptions({
       options: skipOptions.map((option) => ({
@@ -299,12 +310,13 @@ export function buildPlannerDaysView(currentWeekState: ActiveWeekState, run?: Ga
         description: buildActionTrendText(option.action),
         source: option.source,
         sourceEventId: option.sourceEventId,
-        selected:
+      selected:
           currentWeekState.lastSelectedOptionId === option.optionId ||
           plannedOptionId === option.optionId,
       })),
       event: dayEvent,
       hasCashRisk,
+      dayType: day.effectiveDayType,
     });
 
     return {
@@ -313,7 +325,9 @@ export function buildPlannerDaysView(currentWeekState: ActiveWeekState, run?: Ga
       status: day.plannedAction ? "已安排" : "待安排",
       plannedActionLabel: day.plannedAction?.label ?? (day.plannedAction ? formatActionType(day.plannedAction.action) : null),
       justPlanned: currentWeekState.lastPlannedWeekday === day.weekday,
+      baseDayTypeKey: day.baseDayType,
       baseTypeLabel: formatWeeklyDayType(day.baseDayType),
+      effectiveDayTypeKey: day.effectiveDayType,
       effectiveTypeLabel: formatWeeklyDayType(day.effectiveDayType),
       skipClassAvailable: day.skipClassAvailable,
       skipClassSelected: day.skipClassSelected,
@@ -396,28 +410,28 @@ export function buildPlannerStatusText(currentWeekState: ActiveWeekState) {
   const plannedCount = currentWeekState.days?.filter((day) => day.plannedAction).length ?? 0;
 
   if (!currentWeekState.attendanceLocked) {
-    return "这周还没定课程态度。";
+    return "先定这周怎么上课。";
   }
 
   if (plannedCount < 7) {
-    return `这周已经排了 ${plannedCount} / 7 天，没点到的天数会在确认时自动补成摆烂 / 发呆。`;
+    return `这周已经排了 ${plannedCount} / 7 天。`;
   }
 
-  return "这一周已经排满，可以确认本周安排并统一结算。";
+  return "这周已经排满了。";
 }
 
 export function buildPlannerFeedbackLines(currentWeekState: ActiveWeekState) {
   const isVacationWeek = currentWeekState.days?.every((day) => day.baseDayType === "full_day") ?? false;
   const lines = [
-    isVacationWeek ? "这是一个假期周，不再按普通上课周锁白天；这周更多是在安排休息、兼职、实践和后续准备。" : "",
+    isVacationWeek ? "这周像假期，时间基本都在自己手里。" : "",
     currentWeekState.event
-      ? `本周事件落在${weekdayLabels[currentWeekState.event.weekday]}：${currentWeekState.event.title}。`
+      ? `${weekdayLabels[currentWeekState.event.weekday]}有${currentWeekState.event.title}。`
       : "",
     currentWeekState.releasedClassDays.length > 0
-      ? `这周已经决定翘掉的白天课程：${formatReleasedClassDayList(currentWeekState.releasedClassDays)}。`
+      ? `已经腾出的白天：${formatReleasedClassDayList(currentWeekState.releasedClassDays)}。`
       : "",
     ...(currentWeekState.planningWarnings ?? []),
-    "如果某天没点行动，系统会在确认时自动补成“摆烂 / 发呆”，不会卡死，也不会偷偷跳周。",
+    "没安排的日子，会自然滑过去。",
   ];
 
   return uniqueLines(lines);
@@ -430,8 +444,8 @@ export function buildCurrentActionFeedback(input: {
   const { turn, currentWeekState } = input;
   const plannedCount = currentWeekState.days?.filter((day) => day.plannedAction).length ?? 0;
   const nextStepHint = currentWeekState.readyToConfirm
-    ? "这一周已经排满，可以直接确认本周安排并统一结算。"
-    : `这周目前已经排了 ${plannedCount} / 7 天，继续把剩下的天数点完再统一结算。`;
+    ? "这周排满了，可以把它过完了。"
+    : `这周已经排了 ${plannedCount} / 7 天，剩下的日子慢慢补上就行。`;
 
   const eventLines = uniqueLines([
     turn.resolvedAction.reason ? formatPlannerReason(turn.resolvedAction.reason) : "",

@@ -174,7 +174,7 @@ function buildPreviewRisk(input: {
     return {
       label: "高风险",
       tone: "danger" as const,
-      body: "规则层已经能看到比较重的毕业风险，主要还是学业基础和长期风险没有稳住。",
+      body: "现在看起来，毕业这件事已经有点吃力了。",
     };
   }
 
@@ -364,7 +364,7 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
         runId={runId}
         title="结局预览"
         subtitle="这里会把当前已经形成的走向整理成预览。没有存档时，不会凭空生成结局。"
-        headerMeta={<FmInlineStat tone="teal" icon="chart" label="当前状态" value="尚未开始" />}
+        headerMeta={<FmInlineStat tone="teal" icon="chart" label="现在进度" value="尚未开始" />}
       >
         <FmPanel>
           <FmSectionHead
@@ -457,10 +457,10 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
       title={completed ? "最终结局报告" : "结局预览"}
       subtitle={
         completed
-          ? "这里回收的是你四年里真实做过的选择，不会把不存在的结果补写进来。"
-          : "未来还没有写完，但现在已经能看出一些正在形成的趋势。"
+          ? "这里收着你四年里一步步走出来的结果。"
+          : "未来还没写完，但轮廓已经慢慢显出来了。"
       }
-      sidebarSummary="结局页只读取这局存档已经形成的毕业结果、路径倾向、状态与证据，不会由前端自己判定结局。"
+      sidebarSummary="毕业结果、去向和一路留下的证据，都会在这里回头看。"
       headerMeta={
         <>
           <FmInlineStat
@@ -489,7 +489,7 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
                 <div className="fm-ending-cover__eyebrow">未来预览</div>
                 <h1 className="fm-ending-cover__title">未来还没有写完</h1>
                 <p className="fm-ending-cover__subtitle">
-                  现在只能看到一些正在形成的趋势，真正的结局会由后面的选择决定。
+                  现在只能看到一点轮廓，最后会走到哪，还得看后面的日子怎么过。
                 </p>
                 <p className="fm-ending-cover__subtitle">当前学年位置：{positionLabel}</p>
                 <div className="fm-ending-cover__meta">
@@ -508,7 +508,7 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
                     <div className="fm-ending-result">
                       <div className="fm-ending-result__value">{previewRisk.label}</div>
                       <div className="fm-ending-result__copy">
-                        这是基于当前学业、压力和已经留下的规则层事实做出的阶段判断，不代表最后已经完全定型。
+                        这只是眼下看起来的样子，不是最后一句话。
                       </div>
                     </div>
                   </div>
@@ -565,7 +565,7 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
             <div className="fm-ending-grid">
               <FmMotionSection delay={120}>
                 <FmCard variant="active">
-                  <FmSectionHead title="毕业状态" copy="这是规则层已经正式判定的第一层结果。" />
+                  <FmSectionHead title="毕业状态" copy="先看看四年最后落到了哪里。" />
                   <div className="mt-6 fm-ending-result">
                     <FmBadge tone="ending">最终结果</FmBadge>
                     <div className="fm-ending-result__value">{outcomeLabel}</div>
@@ -578,7 +578,7 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
 
               <FmMotionSection delay={220}>
                 <FmCard variant="normal">
-                  <FmSectionHead title="人生去向" copy="这里写的是最后更接近的方向，不是系统替你下定义。" />
+                  <FmSectionHead title="人生去向" copy="这里写的是最后更靠近的方向。" />
                   <div className="mt-6 fm-ending-result">
                     <div className="fm-ending-result__value">你最后更接近的是{pathLabel}</div>
                     <div className="fm-ending-result__copy">

@@ -1931,17 +1931,6 @@
   background: rgba(245, 248, 247, 0.92);
 }
 
-.fm-trend-stack {
-  display: inline-flex;
-  align-items: center;
-  gap: 1px;
-}
-
-.fm-trend-stack svg {
-  width: 12px;
-  height: 12px;
-}
-
 .fm-option-effect--academic {
   color: var(--fm-academic);
 }

@@ -38,7 +38,7 @@ export function WeeklySettlementCard(props: WeeklySettlementCardProps) {
       data-testid="weekly-settlement-card"
     >
       <div className="flex flex-wrap items-center gap-3">
-        <span className="rounded-full bg-amber-600 px-3 py-1 text-xs font-semibold text-white">本周结算</span>
+        <span className="rounded-full bg-amber-600 px-3 py-1 text-xs font-semibold text-white">这周过完了</span>
         <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-stone-700">
           {props.subtitle}
         </span>
@@ -77,7 +77,7 @@ export function WeeklySettlementCard(props: WeeklySettlementCardProps) {
       </div>
 
       <div className="mt-6 rounded-2xl border border-dashed border-[var(--border)] bg-white/85 p-4">
-        <p className="text-sm font-semibold text-stone-900">本周总变化</p>
+        <p className="text-sm font-semibold text-stone-900">这周留下的变化</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {props.totalLines.map((item) => (
             <div key={item.label} className="rounded-2xl bg-stone-50 px-4 py-3">
@@ -100,7 +100,7 @@ export function WeeklySettlementCard(props: WeeklySettlementCardProps) {
 
       {props.riskLines.length > 0 ? (
         <div className="mt-6 rounded-2xl bg-stone-100/90 p-4 text-sm leading-6 text-stone-700">
-          <p className="font-semibold text-stone-900">本周新增风险 / 机会</p>
+          <p className="font-semibold text-stone-900">这周冒出来的事</p>
           <ul className="mt-2 space-y-2">
             {props.riskLines.map((line) => (
               <li key={line}>{line}</li>

@@ -92,12 +92,12 @@ describe("game page view-model helpers", () => {
 
     expect(blocks[0]).toMatchObject({
       label: "第 1 周",
-      detail: "本周课程态度已定为“正常混课”，目前已经排了 1 / 7 天。",
+      detail: "这周已经排了 1 / 7 天。",
     });
     expect(blocks[0]?.days.find((day) => day.label === "周一")?.detail).toBe("已安排：复习 / 学习");
     expect(blocks[1]).toMatchObject({
       label: "第 2 周",
-      detail: "还没轮到这一周。",
+      detail: "还没到这周。",
     });
   });
 
@@ -121,7 +121,7 @@ describe("game page view-model helpers", () => {
       currentWeekState,
     });
 
-    expect(feedback.nextStepHint).toContain("这周目前已经排了 0 / 7 天");
+    expect(feedback.nextStepHint).toContain("这周已经排了 0 / 7 天");
     expect(feedback.eventLines.join(" ")).toContain("宣讲");
     expect(feedback.eventLines.join(" ")).not.toContain("mon");
     expect(feedback.eventLines.join(" ")).not.toContain("wed");
@@ -156,7 +156,7 @@ describe("game page view-model helpers", () => {
 
     expect(competitionOption).toBeDefined();
     expect(competitionOption?.progressText).toContain("2 / 4");
-    expect(competitionOption?.progressText).toContain("达到 4 次后");
+    expect(competitionOption?.progressText).toContain("这条项目已经投了");
   });
 
   it("renders one dedicated planner action per active competition project", () => {
@@ -218,7 +218,7 @@ describe("game page view-model helpers", () => {
 
     const studyOption = monday?.normalOptions.find((option) => option.action === "study");
     expect(studyOption?.description).toBeDefined();
-    expect(studyOption!.description!).toContain("学业");
-    expect(studyOption!.description!).toContain("压力上升");
+    expect(studyOption!.description!).toContain("学习");
+    expect(studyOption!.description!).toContain("进度");
   });
 });
