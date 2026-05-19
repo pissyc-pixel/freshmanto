@@ -38,6 +38,28 @@ const employmentArtifact: FormalArtifact = {
   offerType: "employment",
   accepted: false,
   rejected: false,
+  documentHighlights: [
+    {
+      label: "单位类型",
+      value: "一家位于杭州的互联网平台公司",
+    },
+    {
+      label: "岗位",
+      value: "商业分析助理",
+    },
+    {
+      label: "工作城市",
+      value: "杭州",
+    },
+    {
+      label: "薪资参考",
+      value: "年总包约 18-22 万",
+    },
+  ],
+  documentNarrative: [
+    "你最终收到了一家位于杭州的互联网平台公司的录用通知，岗位是商业分析助理，年总包约 18-22 万。",
+    "大学后期留下的调研项目、商赛经历和实习记录，让这份 offer 显得不是突然出现的结果。",
+  ],
 };
 
 describe("formal result experience", () => {
@@ -66,6 +88,24 @@ describe("formal result experience", () => {
     expect(markup).not.toContain("market-ops");
     expect(markup).not.toContain("quality");
     expect(markup).not.toContain("salaryLevel");
+  });
+
+  it("renders the final employment document around the offer body instead of a repeated side summary", () => {
+    const markup = renderToStaticMarkup(
+      <FormalDocumentPreview artifact={employmentArtifact} recipientName="同学" />,
+    );
+
+    expect(markup).toContain("单位类型");
+    expect(markup).toContain("岗位");
+    expect(markup).toContain("工作城市");
+    expect(markup).toContain("薪资参考");
+    expect(markup).toContain("一家位于杭州的互联网平台公司");
+    expect(markup).toContain("商业分析助理");
+    expect(markup).toContain("年总包约 18-22 万");
+    expect(markup).toContain("调研项目、商赛经历和实习记录");
+    expect(markup).not.toContain("结果类型");
+    expect(markup).not.toContain("归档时间");
+    expect(markup).not.toContain("现在留下的是");
   });
 
   it("dedupes duplicate artifacts before rendering cards", () => {

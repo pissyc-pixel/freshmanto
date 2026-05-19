@@ -186,36 +186,20 @@ export function FormalDocumentPreview({
   recipientName: string;
 }) {
   const title = sanitizePlayerFacingText(artifact.title);
-  const subtitle = sanitizePlayerFacingText(artifact.subtitle);
-  const summary = sanitizePlayerFacingText(artifact.summary);
   const badgeLabel = sanitizePlayerFacingText(artifact.badgeLabel);
   const sealLabel = sanitizePlayerFacingText(artifact.sealLabel);
   const issuer = sanitizePlayerFacingText(artifact.issuer);
   const periodLabel = sanitizePlayerFacingText(artifact.periodLabel);
+  const summary = sanitizePlayerFacingText(artifact.summary);
+  const documentHighlights = (artifact.documentHighlights ?? []).map((item) => ({
+    label: sanitizePlayerFacingText(item.label),
+    value: sanitizePlayerFacingText(item.value),
+  }));
+  const documentNarrative = sanitizePlayerFacingTextList(artifact.documentNarrative ?? []);
+  const letterParagraphs = documentNarrative.length > 0 ? documentNarrative : [summary];
 
   return (
     <div className="fm-formal-doc-scene">
-      <aside className="fm-side-sheet">
-        <div className="fm-brand-mark">Freshmanto</div>
-        <div className="mt-6 fm-stack">
-          <div className="fm-stat-card">
-            <div className="fm-stat-card__label">结果类型</div>
-            <div className="fm-stat-card__value">{title}</div>
-            <div className="fm-stat-card__copy">{subtitle}</div>
-          </div>
-          <div className="fm-stat-card">
-            <div className="fm-stat-card__label">归档时间</div>
-            <div className="fm-stat-card__value">{periodLabel}</div>
-            <div className="fm-stat-card__copy">{artifact.serialNumber}</div>
-          </div>
-          <div className="fm-stat-card">
-            <div className="fm-stat-card__label">现在留下的是</div>
-            <div className="fm-stat-card__value">{sealLabel}</div>
-            <div className="fm-stat-card__copy">{issuer}</div>
-          </div>
-        </div>
-      </aside>
-
       <section className="fm-document-card">
         <div className="fm-admission-header">
           <div>
@@ -233,12 +217,21 @@ export function FormalDocumentPreview({
           <p>
             <strong>{recipientName}</strong>：
           </p>
-          <p>{summary}</p>
-          <p>
-            这份档案只整理已经发生的结果，不会替你多写没出现过的录取、录用或奖项。
-            下面这些信息，代表它已经被认真留了下来。
-          </p>
+          {letterParagraphs.map((paragraph) => (
+            <p key={`${artifact.id}-${paragraph}`}>{paragraph}</p>
+          ))}
         </div>
+
+        {documentHighlights.length > 0 ? (
+          <div className="fm-document-highlight-grid">
+            {documentHighlights.map((item) => (
+              <div key={`${artifact.id}-${item.label}`} className="fm-document-highlight">
+                <div className="fm-document-highlight__label">{item.label}</div>
+                <div className="fm-document-highlight__value">{item.value}</div>
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         <EmotionalStageRail />
 
@@ -247,11 +240,11 @@ export function FormalDocumentPreview({
             <table>
               <tbody>
                 <tr>
-                  <td>归档时间</td>
+                  <td>归档节点</td>
                   <td>{periodLabel}</td>
                 </tr>
                 <tr>
-                  <td>结果类型</td>
+                  <td>文件状态</td>
                   <td>{badgeLabel}</td>
                 </tr>
                 <tr>

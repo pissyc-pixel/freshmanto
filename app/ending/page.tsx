@@ -329,23 +329,65 @@ function buildEvidenceRows(input: {
   ] satisfies EvidenceRow[];
 }
 
+function inferFutureCity(run: GameRun) {
+  const title = run.acceptedOffer?.title ?? "";
+
+  if (title.includes("天津")) {
+    return "天津";
+  }
+
+  if (title.includes("杭州")) {
+    return "杭州";
+  }
+
+  if (title.includes("上海")) {
+    return "上海";
+  }
+
+  if (title.includes("深圳")) {
+    return "深圳";
+  }
+
+  if (title.includes("北京")) {
+    return "北京";
+  }
+
+  if (title.includes("广州")) {
+    return "广州";
+  }
+
+  if (run.acceptedOffer?.type === "employment") {
+    if (run.profile.collegeTrack === "business") {
+      return "杭州";
+    }
+
+    if (run.profile.collegeTrack === "engineering") {
+      return "深圳";
+    }
+  }
+
+  return "一座新的城市";
+}
+
 function buildFallbackLetter(input: {
-  outcomeLabel: string;
   pathLabel: string;
-  pathResultLabel: string;
-  evidenceChips: EvidenceChip[];
-  money: number;
-  mood: number;
-  stress: number;
+  nextCity: string;
 }) {
-  const chipSummary = input.evidenceChips.map((item) => item.text).slice(0, 3).join("，");
+  const destination =
+    input.nextCity === "一座新的城市" ? input.nextCity : `${input.nextCity}这座新的城市`;
+  const nextStep =
+    input.pathLabel === "就业"
+      ? "第一份真正需要你自己扛起来的工作"
+      : input.pathLabel === "考研" || input.pathLabel === "推免 / 保研"
+        ? "下一段更密集也更独立的学习生活"
+        : input.pathLabel === "考公"
+          ? "一段需要继续沉住气往前走的准备期"
+          : "毕业之后真正属于你自己的下一段生活";
 
   return [
-    `四年走到这里，你最后留下的是“${input.outcomeLabel}”，更靠近的方向是“${input.pathLabel}”，结果层落在“${input.pathResultLabel}”。`,
-    chipSummary.length > 0
-      ? `回头看，这个结局不是突然掉下来的。更明显的线索一直都在：${chipSummary}。`
-      : "回头看，这个结局更像是四年里很多小选择慢慢叠出来的结果。",
-    `毕业节点时，你手头还有 ${input.money} 元，心情 ${input.mood}，压力 ${input.stress}。这些现实状态，和前面的投入一起，把你推到了现在的位置。`,
+    `你会去到${destination}，开始${nextStep}。刚开始也许不会轻松，陌生的环境、通勤和租房的琐碎、需要重新认识的人和节奏，都会让人有一点紧张。可这一次，你已经不是四年前那个完全不知道路在哪里的新生了。`,
+    "以后也许还是会有压力，也会有很多需要重新学习和适应的地方。但你会一点点找到自己的位置，把日子过稳，也把真正想要的生活慢慢看清楚。",
+    "前面的路不一定总是顺利，可它终于是你自己一步步走出来的。毕业不是故事的收尾，而是你真正开始过自己的生活。",
   ].join("\n\n");
 }
 
@@ -412,38 +454,11 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
     resumeCount: run.resume?.length ?? 0,
     directionLabel,
   });
-  const evidenceRows = buildEvidenceRows({
-    gpa: academicProfile.gpa,
-    longTermAcademicAverage: bundle.endingSummary.longTermAcademicAverage,
-    resumeCount: run.resume?.length ?? 0,
-    money: run.stats?.money ?? 0,
-    mood: run.stats?.mood ?? 0,
-    stress: run.stats?.stress ?? 0,
-    directionSummary: directionPerception.summary,
-    directionLabel,
-    pathLabel,
-    pathResultLabel,
-    recommendationSummary: recommendationExplanation.summary,
-    publicExamSummary: publicExamExplanation.summary,
-    academicEvidence: resumeEvidence.academic,
-    practiceEvidence: resumeEvidence.practice,
-    opportunityEvidence: resumeEvidence.opportunities,
-    failedSemesterCount,
-    riskFlagCount,
-  });
-  const savedEndingEvidence = (run.endingEvidence ?? [])
-    .slice()
-    .sort((left, right) => left.monthIndex - right.monthIndex);
   const letterBody = bundle.savedEndingReport?.output_markdown
     ? sanitizePlayerFacingText(bundle.savedEndingReport.output_markdown)
     : buildFallbackLetter({
-        outcomeLabel,
         pathLabel,
-        pathResultLabel,
-        evidenceChips,
-        money: run.stats?.money ?? 0,
-        mood: run.stats?.mood ?? 0,
-        stress: run.stats?.stress ?? 0,
+        nextCity: inferFutureCity(run),
       });
   const positionLabel = completed
     ? formatMonthLabel(bundle.endingSummary.finalYear, 12)
@@ -455,12 +470,7 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
       active="ending"
       runId={runId}
       title={completed ? "最终结局报告" : "结局预览"}
-      subtitle={
-        completed
-          ? "这里收着你四年里一步步走出来的结果。"
-          : "未来还没写完，但轮廓已经慢慢显出来了。"
-      }
-      sidebarSummary="毕业结果、去向和一路留下的证据，都会在这里回头看。"
+      subtitle={completed ? undefined : "未来还没写完，但轮廓已经慢慢显出来了。"}
       headerMeta={
         <>
           <FmInlineStat
@@ -551,7 +561,6 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
               <section className="fm-ending-cover">
                 <div className="fm-ending-cover__eyebrow">最终归档</div>
                 <h1 className="fm-ending-cover__title">四年之后</h1>
-                <p className="fm-ending-cover__subtitle">你把这四年过成了这样。</p>
                 <p className="fm-ending-cover__subtitle">当前学年位置：{positionLabel}</p>
                 <div className="fm-ending-cover__meta">
                   <FmBadge tone="ending">{formatSchoolTier(run.profile.schoolTier)}</FmBadge>
@@ -565,25 +574,18 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
             <div className="fm-ending-grid">
               <FmMotionSection delay={120}>
                 <FmCard variant="active">
-                  <FmSectionHead title="毕业状态" copy="先看看四年最后落到了哪里。" />
+                  <FmSectionHead title="毕业状态" />
                   <div className="mt-6 fm-ending-result">
-                    <FmBadge tone="ending">最终结果</FmBadge>
                     <div className="fm-ending-result__value">{outcomeLabel}</div>
-                    <div className="fm-ending-result__copy">
-                      这不是突然给出的单点结论，而是四年里学业、风险和状态一路累积之后的落点。
-                    </div>
                   </div>
                 </FmCard>
               </FmMotionSection>
 
               <FmMotionSection delay={220}>
                 <FmCard variant="normal">
-                  <FmSectionHead title="人生去向" copy="这里写的是最后更靠近的方向。" />
+                  <FmSectionHead title="人生去向" />
                   <div className="mt-6 fm-ending-result">
-                    <div className="fm-ending-result__value">你最后更接近的是{pathLabel}</div>
-                    <div className="fm-ending-result__copy">
-                      这四年把你推向了{pathLabel}。{directionPerception.summary}
-                    </div>
+                    <div className="fm-ending-result__value">{pathLabel}</div>
                   </div>
                 </FmCard>
               </FmMotionSection>
@@ -591,7 +593,7 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
 
             <FmMotionSection delay={320}>
               <FmCard variant="muted">
-                <FmSectionHead title="第三层结果" copy="如果这层结果已经形成，就在这里展示；没有时不硬编。" />
+                <FmSectionHead title="第三层结果" />
                 <div className="mt-6 fm-ending-result__copy">{pathResultLabel}</div>
               </FmCard>
             </FmMotionSection>
@@ -601,7 +603,6 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
                 <FmPanel>
                   <FmSectionHead
                     title="正式结果文件"
-                    copy="这是根据最终结局事实生成的正式录取 / offer 文件，不补写未发生的学校、单位或录用细节。"
                     aside={<FmBadge tone="ending">{endingFormalArtifact.badgeLabel}</FmBadge>}
                   />
                   <div className="mt-6">
@@ -615,41 +616,6 @@ export default async function EndingPage({ searchParams }: EndingPageProps) {
             ) : null}
 
             <FmMotionSection delay={420}>
-              <FmCard variant="normal">
-                <FmSectionHead title="为什么会走到这个结局？" copy="证据链只引用真实数据：投入、学业、履历、状态、金钱和方向变化。" />
-                <div className="mt-6 fm-evidence-list">
-                  {evidenceRows.map((row) => (
-                    <div key={row.title} className="fm-evidence-row">
-                      <div className="fm-evidence-row__title">{row.title}</div>
-                      <div className="fm-evidence-row__copy">{row.body}</div>
-                      <FmBadge tone={row.tone}>{row.status}</FmBadge>
-                    </div>
-                  ))}
-                </div>
-              </FmCard>
-            </FmMotionSection>
-
-            {savedEndingEvidence.length > 0 ? (
-              <FmMotionSection delay={470}>
-                <FmCard variant="completed">
-                  <FmSectionHead
-                    title="存档证据链"
-                    copy="这些条目来自 run state 已经写入的证据链，不从前端临时编造。"
-                  />
-                  <div className="mt-6 fm-evidence-list">
-                    {savedEndingEvidence.map((item) => (
-                      <div key={item.id} className="fm-evidence-row">
-                        <div className="fm-evidence-row__title">{item.title}</div>
-                        <div className="fm-evidence-row__copy">{item.body}</div>
-                        <FmBadge tone="resume">{formatPlayerFacingMonthIndex(item.monthIndex)}</FmBadge>
-                      </div>
-                    ))}
-                  </div>
-                </FmCard>
-              </FmMotionSection>
-            ) : null}
-
-            <FmMotionSection delay={520}>
               <section className="fm-ending-letter">
                 <div className="fm-paper__clip" aria-hidden="true" />
                 {!bundle.savedEndingReport ? (

@@ -1,4 +1,5 @@
 import {
+  formatCollegeTrack,
   formatGraduationOutcome,
 } from "@/lib/demo/options";
 import {
@@ -25,6 +26,11 @@ export type FormalArtifactKind =
   | "employment"
   | "ending";
 
+export type FormalArtifactDetail = {
+  label: string;
+  value: string;
+};
+
 export type FormalArtifact = {
   id: string;
   kind: FormalArtifactKind;
@@ -43,6 +49,8 @@ export type FormalArtifact = {
   offerType?: FutureOffer["type"];
   accepted?: boolean;
   rejected?: boolean;
+  documentHighlights?: FormalArtifactDetail[];
+  documentNarrative?: string[];
 };
 
 function clampMonthIndex(value: number) {
@@ -96,6 +104,202 @@ function normalizeFactList(values: Array<string | null | undefined>) {
   return sanitizePlayerFacingTextList(
     values.filter((value): value is string => Boolean(value && value.trim().length > 0)).slice(0, 4),
   );
+}
+
+function pickLatestEmploymentOffer(run: GameRun) {
+  if (run.acceptedOffer?.type === "employment") {
+    return run.acceptedOffer;
+  }
+
+  return (run.futureOffers ?? [])
+    .filter((offer) => offer.type === "employment")
+    .slice()
+    .sort((left, right) => {
+      const leftScore = (left.accepted ? 100 : 0) + left.monthIndex;
+      const rightScore = (right.accepted ? 100 : 0) + right.monthIndex;
+      return rightScore - leftScore;
+    })[0] ?? null;
+}
+
+function inferEmploymentCity(run: GameRun, offer: FutureOffer | null) {
+  const title = sanitizeArtifactText(offer?.title);
+
+  if (title.includes("天津")) {
+    return "天津";
+  }
+
+  if (title.includes("杭州")) {
+    return "杭州";
+  }
+
+  if (title.includes("上海")) {
+    return "上海";
+  }
+
+  if (title.includes("深圳")) {
+    return "深圳";
+  }
+
+  if (title.includes("北京")) {
+    return "北京";
+  }
+
+  if (title.includes("广州")) {
+    return "广州";
+  }
+
+  if (title.includes("成都")) {
+    return "成都";
+  }
+
+  if (offer?.quality === "excellent") {
+    return run.profile.collegeTrack === "business" ? "杭州" : "深圳";
+  }
+
+  if (run.profile.cityTier === "tier_1") {
+    return "上海";
+  }
+
+  switch (run.profile.collegeTrack) {
+    case "business":
+      return "杭州";
+    case "engineering":
+      return "深圳";
+    case "science":
+    case "medicine":
+      return "北京";
+    case "arts":
+      return "广州";
+    default:
+      return "成都";
+  }
+}
+
+function inferEmploymentEmployer(run: GameRun, offer: FutureOffer | null, city: string) {
+  const title = sanitizeArtifactText(offer?.title);
+
+  if (title.includes("稳定")) {
+    return `一家${city}本地头部零售企业`;
+  }
+
+  switch (run.profile.collegeTrack) {
+    case "business":
+      if (title.includes("商业分析")) {
+        return `一家位于${city}的互联网平台公司`;
+      }
+
+      if (offer?.quality === "ordinary") {
+        return `一家${city}的消费品企业区域运营中心`;
+      }
+
+      return `一家科技公司的商业运营部门`;
+    case "engineering":
+      return `一家位于${city}的科技公司产品与项目团队`;
+    case "science":
+    case "medicine":
+      return `一家位于${city}的数据与研究支持团队`;
+    case "arts":
+      return `一家位于${city}的品牌与内容团队`;
+    default:
+      return `一家位于${city}的企业运营团队`;
+  }
+}
+
+function inferEmploymentRole(run: GameRun, offer: FutureOffer | null) {
+  const title = sanitizeArtifactText(offer?.title);
+
+  if (title.includes("商业分析")) {
+    return "商业分析助理";
+  }
+
+  if (title.includes("产品运营")) {
+    return offer?.quality === "excellent" ? "产品运营管培生" : "产品运营专员";
+  }
+
+  if (title.includes("工程项目")) {
+    return "工程项目助理";
+  }
+
+  if (title.includes("市场")) {
+    return "市场运营培训生";
+  }
+
+  switch (run.profile.collegeTrack) {
+    case "business":
+      return offer?.quality === "ordinary" ? "市场运营培训生" : "商业分析助理";
+    case "engineering":
+      return "工程项目助理";
+    case "science":
+    case "medicine":
+      return "业务分析助理";
+    case "arts":
+      return "品牌内容运营专员";
+    default:
+      return "业务分析助理";
+  }
+}
+
+function inferEmploymentCompensation(offer: FutureOffer | null) {
+  switch (offer?.salaryLevel) {
+    case "high":
+      return "年总包约 18-22 万";
+    case "medium":
+      return "税前年薪约 14-18 万";
+    case "low":
+      return "税前年薪约 12-14 万";
+    default:
+      return "税前年薪约 15-18 万";
+  }
+}
+
+function collectEmploymentEvidence(run: GameRun, offer: FutureOffer | null) {
+  const sourceIds = new Set(offer?.sourceResumeIds ?? []);
+  const relevantResume = run.resume
+    .filter((item) => {
+      if (sourceIds.size > 0) {
+        return sourceIds.has(item.id);
+      }
+
+      return ["internship", "competition", "project", "research", "job_progress"].includes(item.category);
+    })
+    .slice()
+    .sort((left, right) => right.month - left.month)
+    .slice(0, 5);
+
+  const evidence: string[] = [];
+
+  if (relevantResume.some((item) => item.category === "internship")) {
+    evidence.push("实习经历");
+  }
+
+  if (relevantResume.some((item) => item.category === "competition")) {
+    evidence.push("商赛经历");
+  }
+
+  if (relevantResume.some((item) => item.category === "project" || item.category === "research")) {
+    evidence.push(run.profile.collegeTrack === "business" ? "调研项目" : "项目经历");
+  }
+
+  if (
+    relevantResume.some((item) => item.category === "job_progress") ||
+    (offer?.reasons ?? []).some((reason) => reason.includes("宣讲") || reason.includes("投递"))
+  ) {
+    evidence.push("宣讲会和投递积累");
+  }
+
+  if (evidence.length === 0 && relevantResume.length > 0) {
+    evidence.push(sanitizeArtifactText(relevantResume[0]?.title));
+  }
+
+  return [...new Set(evidence)].slice(0, 4);
+}
+
+function joinEvidenceList(values: string[]) {
+  if (values.length <= 1) {
+    return values[0] ?? "后期留下的履历证据";
+  }
+
+  return `${values.slice(0, -1).join("、")}和${values.at(-1)}`;
 }
 
 function formatOfferTypeTitle(type: FutureOffer["type"]) {
@@ -335,16 +539,28 @@ function buildEmploymentEndingArtifact(run: GameRun, endingSummary: StructuredEn
   }
 
   const monthIndex = toMonthIndex(endingSummary.finalYear, 12);
+  const offer = pickLatestEmploymentOffer(run);
+  const city = inferEmploymentCity(run, offer);
+  const employer = inferEmploymentEmployer(run, offer, city);
+  const role = inferEmploymentRole(run, offer);
+  const compensation = inferEmploymentCompensation(offer);
+  const evidenceList = collectEmploymentEvidence(run, offer);
+  const evidenceSummary = joinEvidenceList(evidenceList);
+  const leadingParagraph = `你最终收到了一份来自${employer}的录用通知，岗位是${role}，工作城市在${city}，${compensation}。`;
+  const overviewParagraph =
+    evidenceList.length > 0
+      ? `大学后期留下的${evidenceSummary}，让这份 offer 显得不是突然出现的结果。它更像是你把就业这条路一点点走清楚之后，真正落在手里的那份回信。`
+      : "这份录用通知并不是凭空落下来的。它更像是你把就业这条路一点点走清楚之后，真正落在手里的那份回信。";
+  const reasonsParagraph =
+    sanitizeArtifactText(offer?.reasons.join(" ")) ||
+    `这份结果和你在${formatCollegeTrack(run.profile.collegeTrack)}方向上慢慢攒下来的履历证据接上了。`;
 
   return {
     id: `employment-ending-${run.id}`,
     kind: "employment",
     title: endingSummary.pathResult === "success" ? "就业录用通知" : "录用意向通知",
-    subtitle: "基于最终结局结果归档",
-    summary:
-      endingSummary.pathResult === "success"
-        ? "你在毕业前把就业线真正走通了，这份结果来自履历、实践和求职准备一起兑现。"
-        : "你已经拿到了明确录用意向，最后落地成色取决于毕业前的收尾与选择。",
+    subtitle: `${city} · ${role}`,
+    summary: leadingParagraph,
     issuer: "校园招聘结果归档中心",
     serialNumber: createSerialNumber("OFR", monthIndex, run.id),
     sealLabel: endingSummary.pathResult === "success" ? "已录用" : "意向录用",
@@ -352,11 +568,31 @@ function buildEmploymentEndingArtifact(run: GameRun, endingSummary: StructuredEn
     badgeTone: "ending",
     facts: normalizeFactList([
       `毕业结果：${formatGraduationOutcome(endingSummary.outcome)}`,
-      `最终方向：${sanitizeArtifactText(endingSummary.graduationPath ?? "employment")}`,
-      "这份结果已经写进正式档案",
+      `工作城市：${city}`,
+      `岗位：${role}`,
+      `薪资参考：${compensation}`,
     ]),
     periodLabel: formatPlayerFacingMonthIndex(monthIndex),
     monthIndex,
+    documentHighlights: [
+      {
+        label: "单位类型",
+        value: employer,
+      },
+      {
+        label: "岗位",
+        value: role,
+      },
+      {
+        label: "工作城市",
+        value: city,
+      },
+      {
+        label: "薪资参考",
+        value: compensation,
+      },
+    ],
+    documentNarrative: [leadingParagraph, overviewParagraph, reasonsParagraph],
   };
 }
 

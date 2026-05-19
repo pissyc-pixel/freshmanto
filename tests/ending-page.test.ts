@@ -129,6 +129,20 @@ describe("ending page", () => {
 
     expect(markup).toContain("正式结果文件");
     expect(markup).toContain("就业录用通知");
+    expect(markup).toContain("人生去向");
+    expect(markup).toContain("就业");
+    expect(markup).not.toContain("你最后更接近的是");
+    expect(markup).not.toContain("为什么会走到这个结局？");
+    expect(markup).not.toContain("这里收着你四年里一步步走出来的结果。");
+    expect(markup).not.toContain("毕业结果、去向和一路留下的证据，都会在这里回头看。");
+    expect(markup).not.toContain("你把这四年过成了这样。");
+    expect(markup).not.toContain("先看看四年最后落到了哪里。");
+    expect(markup).not.toContain("最终结果");
+    expect(markup).not.toContain("这不是突然给出的单点结论，而是四年里学业、风险和状态一路累积之后的落点。");
+    expect(markup).not.toContain("如果这层结果已经形成，就在这里展示；没有时不硬编。");
+    expect(markup).not.toContain(
+      "这是根据最终结局事实生成的正式录取 / offer 文件，不补写未发生的学校、单位或录用细节。",
+    );
   });
 
   it("renders a formal recommendation document for a completed recommendation ending", async () => {
@@ -296,7 +310,7 @@ describe("ending page", () => {
     expect(markup).toContain("关键证据");
   });
 
-  it("renders saved ending evidence from the run state in the final report", async () => {
+  it("keeps the final report focused on the ending document and letter instead of replaying raw evidence rows", async () => {
     mockedGetServerEndingPreview.mockResolvedValue({
       run: {
         id: "ending-run-saved-evidence",
@@ -336,8 +350,8 @@ describe("ending page", () => {
       }),
     );
 
-    expect(markup).toContain("Saved Evidence Title");
-    expect(markup).toContain("Saved evidence body from actual run state.");
-    expect(markup).toContain("第 25 月");
+    expect(markup).not.toContain("Saved Evidence Title");
+    expect(markup).not.toContain("Saved evidence body from actual run state.");
+    expect(markup).not.toContain("存档证据链");
   });
 });

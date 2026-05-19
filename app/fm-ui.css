@@ -433,6 +433,36 @@
   font-size: 1.12rem;
 }
 
+.fm-document-highlight-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.fm-document-highlight {
+  padding: 16px 18px;
+  border: 1px solid rgba(17, 37, 44, 0.08);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(250, 252, 251, 0.96), rgba(243, 248, 246, 0.88)),
+    radial-gradient(circle at top right, rgba(76, 164, 148, 0.12), transparent 42%);
+}
+
+.fm-document-highlight__label {
+  color: #607176;
+  font-size: 0.86rem;
+  letter-spacing: 0.04em;
+}
+
+.fm-document-highlight__value {
+  margin-top: 10px;
+  color: #203238;
+  font-size: 1.06rem;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
 .fm-admission-footer {
   display: flex;
   justify-content: space-between;
@@ -2375,8 +2405,8 @@
 
 .fm-formal-doc-scene {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
 }
 
 .fm-dialog-backdrop {

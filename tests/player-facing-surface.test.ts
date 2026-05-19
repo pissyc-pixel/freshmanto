@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { createInitialGameRun } from "@/core/generators/opening";
-import { buildResumeFormalArtifacts } from "@/lib/demo/formal-artifacts";
+import {
+  buildEndingFormalArtifact,
+  buildResumeFormalArtifacts,
+} from "@/lib/demo/formal-artifacts";
 import {
   formatPlayerFacingMonthIndex,
   sanitizePlayerFacingText,
@@ -84,5 +87,84 @@ describe("player-facing surface cleanup", () => {
     expect(offer?.facts.join(" ")).not.toContain("nankai_tianda");
     expect(offer?.facts.join(" ")).not.toContain("good");
     expect(offer?.facts.join(" ")).not.toContain("high");
+  });
+
+  it("builds a player-facing ending offer with concrete employer, role, city and compensation details", () => {
+    const run = createInitialGameRun({
+      id: "ending-offer-run",
+      name: "测试同学",
+      discipline: "business",
+      randomValues: [0.3, 0.5, 0.7, 0.9],
+    });
+
+    run.currentYear = 4;
+    run.currentMonth = 12;
+    run.resume = [
+      {
+        id: "resume-1",
+        category: "internship",
+        title: "本地消费品公司市场运营助理",
+        summary: "第一次把实习真正写进履历。",
+        month: 28,
+        tags: ["实习", "市场运营助理"],
+      },
+      {
+        id: "resume-2",
+        category: "competition",
+        title: "商赛获奖记录",
+        summary: "商赛经历开始能在面试里说清楚了。",
+        month: 31,
+        tags: ["school", "first"],
+      },
+      {
+        id: "resume-3",
+        category: "project",
+        title: "市场调研项目",
+        summary: "调研和分析工作第一次有了完整产出。",
+        month: 34,
+        tags: ["调研", "项目经历"],
+      },
+    ];
+    run.acceptedOffer = {
+      id: "accepted-offer-1",
+      type: "employment",
+      title: "一线城市商业分析 / 产品运营岗 Offer",
+      tier: "first_tier",
+      quality: "good",
+      reasons: ["宣讲会和投递积累慢慢换来了真正的回信。"],
+      tradeoffs: ["要去新的城市重新开始。"],
+      accepted: true,
+      rejected: false,
+      monthIndex: 46,
+      salaryLevel: "high",
+      sourceResumeIds: ["resume-1", "resume-2", "resume-3"],
+    };
+
+    const artifact = buildEndingFormalArtifact(run, {
+      finalYear: 4,
+      outcome: "graduate",
+      longTermAcademicAverage: 83,
+      resumeHighlights: [],
+      notableFacts: [],
+      graduationPath: "employment",
+      pathResult: "success",
+      recommendationQualification: "pending",
+      dominantDirection: "employment",
+      publicExamProgress: 0,
+    });
+
+    expect(artifact?.title).toBe("就业录用通知");
+    expect(artifact?.documentHighlights).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: "单位类型" }),
+        expect.objectContaining({ label: "岗位" }),
+        expect.objectContaining({ label: "工作城市" }),
+        expect.objectContaining({ label: "薪资参考" }),
+      ]),
+    );
+    expect(artifact?.documentNarrative?.join(" ")).toContain("宣讲会和投递积累");
+    expect(artifact?.documentNarrative?.join(" ")).toContain("调研项目");
+    expect(artifact?.documentNarrative?.join(" ")).toContain("商赛经历");
+    expect(artifact?.documentNarrative?.join(" ")).toContain("实习");
   });
 });
