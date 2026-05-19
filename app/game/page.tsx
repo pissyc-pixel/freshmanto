@@ -50,6 +50,16 @@ type GamePageProps = {
   searchParams: DemoPageSearchParams;
 };
 
+const weekdayLabels = {
+  mon: "周一",
+  tue: "周二",
+  wed: "周三",
+  thu: "周四",
+  fri: "周五",
+  sat: "周六",
+  sun: "周日",
+} as const;
+
 function clampProgress(value: number, max = 100) {
   return Math.max(0, Math.min(value / max, 1));
 }
@@ -119,67 +129,67 @@ function buildFinalDemoMilestone(run: GameRun) {
   const milestones: Record<number, { title: string; body: string; tone: "ending" | "event" | "warning" }> = {
     4: {
       title: "竞赛评奖月",
-      body: "第 4 周会按规则结算本学期竞赛项目；这里只预告节点，不提前泄露奖项。",
+      body: "有些努力会在月底被看见。",
       tone: "event",
     },
     10: {
       title: "竞赛评奖月",
-      body: "本月末会检查竞赛进度，没达到门槛就不会强行给奖。",
+      body: "月底会回头看看，这段时间到底推进了多少。",
       tone: "event",
     },
     13: {
       title: "奖学金评定月",
-      body: "本月会回看上一学年表现，同一学年只会记录最高一项奖学金。",
+      body: "上一学年的用力，会在这个月慢慢有回音。",
       tone: "ending",
     },
     16: {
       title: "竞赛评奖月",
-      body: "本学期项目会在月末进入规则结算，结果会写入履历和时间线。",
+      body: "月底会有人回头看看，这学期做出来了什么。",
       tone: "event",
     },
     22: {
       title: "竞赛评奖月",
-      body: "这里是大二下的项目回收点，系统只按实际投入结算。",
+      body: "这一阵子的投入，到月底会慢慢见分晓。",
       tone: "event",
     },
     25: {
       title: "奖学金评定月",
-      body: "本月回看第 2 学年表现，奖学金会进入证书、履历和证据链。",
+      body: "第二学年的表现，会在这个月被重新翻出来看。",
       tone: "ending",
     },
     28: {
-      title: "考研开启选择",
-      body: "本月末会打开考研准备选择；选择准备不会锁死最终路线。",
+      title: "考研准备月",
+      body: "有些念头会在这个月变得更认真一点。",
       tone: "warning",
     },
     34: {
-      title: "推免申请节点",
-      body: "本月末会根据 GPA、排名、竞赛、奖学金和经历评估推免申请。",
+      title: "推免申请月",
+      body: "之前攒下来的东西，会在这里被一起端出来看。",
       tone: "ending",
     },
     36: {
-      title: "考研结果节点",
-      body: "本月会生成考研结果；没有考上或没有接受推免时，后面仍可转向就业。",
+      title: "考研结果月",
+      body: "前面那段长长的准备，会在这里慢慢落下来。",
       tone: "warning",
     },
     37: {
-      title: "就业 offer 季开始",
-      body: "大四开始进入 offer 生成与选择阶段，薪资不会加到在校现金里。",
+      title: "求职季开始",
+      body: "快毕业了，有些门会在这时候慢慢打开。",
       tone: "event",
     },
     40: {
       title: "竞赛评奖月",
-      body: "大四上项目会在月末结算，适合给最终履历补证据。",
+      body: "如果还有想补的一笔，这个月会是最后几次机会之一。",
       tone: "event",
     },
     46: {
       title: "最后一轮竞赛评奖",
-      body: "这是毕业前最后一轮项目结算窗口，结果会回收到最终报告。",
+      body: "临近毕业，很多事都快到最后一眼了。",
       tone: "event",
     },
     48: {
-      title: "最终结局月",
-      body: "本月会生成最终报告，毕业状态、人生去向和证据链会正式落档。",
+      title: "毕业月",
+      body: "这四年会在这里慢慢合上。",
       tone: "ending",
     },
   };
@@ -196,8 +206,8 @@ function buildFinalDemoMilestone(run: GameRun) {
   return nextMonth
     ? {
         monthIndex: nextMonth,
-        title: `下一个关键节点：${milestones[nextMonth]!.title}`,
-        body: `当前不会提前判结果；可以提前知道第 ${nextMonth} 月有规则节点，方便安排本月行动。`,
+        title: `第 ${nextMonth} 月｜${milestones[nextMonth]!.title}`,
+        body: "这个月有些日子值得留意。",
         tone: milestones[nextMonth]!.tone,
       }
     : null;
@@ -207,7 +217,7 @@ type MonthCalendarItem = {
   title: string;
   body: string;
   tone: "event" | "warning" | "ending";
-  label: "关键节点" | "机会事件" | "风险事件" | "正式结果";
+  label: "关键节点" | "机会事件" | "临时占用";
 };
 
 function buildMonthCalendarItems(run: GameRun, currentWeekState: ReturnType<typeof resolveCurrentWeekState>) {
@@ -220,21 +230,21 @@ function buildMonthCalendarItems(run: GameRun, currentWeekState: ReturnType<type
       title: milestone.title,
       body: milestone.body,
       tone: milestone.tone,
-      label: milestone.tone === "ending" ? "正式结果" : "关键节点",
+      label: "关键节点",
     });
   }
 
   if (currentWeekState.event) {
     items.push({
       title: currentWeekState.event.title,
-      body: currentWeekState.event.summary,
+      body: "那天可能要给它留点时间。",
       tone: "event",
       label: "机会事件",
     });
   } else {
     items.push({
-      title: "本周机会入口",
-      body: "本周如果刷出讲座、宣讲或项目入口，会先在这里预告，不会直接提前给结果。",
+      title: "这个月也许会冒出新机会",
+      body: "有些事不会提前说满，但值得你留一点心。",
       tone: "event",
       label: "机会事件",
     });
@@ -242,17 +252,17 @@ function buildMonthCalendarItems(run: GameRun, currentWeekState: ReturnType<type
 
   if (run.stats.money < getWeeklyLivingExpense(run) || run.stats.stress >= 60 || run.stats.mood <= 45) {
     items.push({
-      title: "状态风险",
-      body: "现金、压力或心情里已经有一项偏紧；风险会提前亮出来，而不是等到结局才突然算账。",
+      title: "这阵子节奏有点挤",
+      body: "这个月可能会有几天不太由你自己说了算。",
       tone: "warning",
-      label: "风险事件",
+      label: "临时占用",
     });
   }
 
   if (activeProjects.length > 0) {
     items.push({
       title: `${activeProjects.length} 个项目在推进`,
-      body: `本学期已经接住 ${activeProjects.length} 条竞赛 / 项目线，月底会按实际进度结算。`,
+      body: "如果愿意继续投时间，这个月会很有存在感。",
       tone: "event",
       label: "机会事件",
     });
@@ -262,59 +272,23 @@ function buildMonthCalendarItems(run: GameRun, currentWeekState: ReturnType<type
 }
 
 function buildWeeklyKickoffNotices(
-  run: GameRun,
   currentWeekState: ReturnType<typeof resolveCurrentWeekState>,
 ): WeeklyKickoffNotice[] {
-  const notices: WeeklyKickoffNotice[] = [];
+  if (!currentWeekState.event) {
+    return [];
+  }
 
-  if (currentWeekState.event) {
-    notices.push({
+  return [
+    {
       id: `event-${currentWeekState.event.id}`,
-      title: currentWeekState.event.title,
-      kind: "event",
-      whatHappened: currentWeekState.event.summary,
-      changes: [
-        currentWeekState.event.effectDescription,
-        currentWeekState.event.dayTypeOverride ? "本周有一天时间结构会被事件影响" : "这周会多一个需要回应的机会入口",
+      title: "本周提醒",
+      subtitle: `${weekdayLabels[currentWeekState.event.weekday]}｜${currentWeekState.event.title}`,
+      bodyLines: [
+        currentWeekState.event.summary,
+        "那天的安排可能要稍微挪一挪。",
       ],
-      reminder: "先看清这条事件会占掉什么，再决定要不要把当天行动改成更合适的安排。",
-    });
-  }
-
-  if (run.stats.money < getWeeklyLivingExpense(run) * 1.2) {
-    notices.push({
-      id: "money-risk",
-      title: "现金开始偏紧",
-      kind: "money",
-      whatHappened: "这周开始时，手头余额已经靠近基础生活开销线。",
-      changes: ["金钱风险上升", "可选高成本行动需要更谨慎"],
-      reminder: "至少留一个补现金动作，别让固定开销先把后面的选择压窄。",
-    });
-  }
-
-  if (run.stats.stress >= 60) {
-    notices.push({
-      id: "stress-risk",
-      title: "压力已经抬高",
-      kind: "stress",
-      whatHappened: "上一段时间的投入已经把压力顶上来，效率会更容易被拖住。",
-      changes: ["压力偏高", "高压行动收益可能打折"],
-      reminder: "如果这周还要继续冲，最好给自己留一个恢复位。",
-    });
-  }
-
-  if (run.stats.mood <= 45) {
-    notices.push({
-      id: "mood-risk",
-      title: "状态有点低",
-      kind: "mood",
-      whatHappened: "心情已经开始影响体感，硬把所有时间都塞满会更难持续。",
-      changes: ["心情偏低", "恢复路径变得更重要"],
-      reminder: "休息、社交或吃顿好的都不是浪费，它们是在帮后面的安排留出续航。",
-    });
-  }
-
-  return notices;
+    },
+  ];
 }
 
 function toneForDay(kind: TimeBlockKind) {
@@ -335,11 +309,11 @@ function labelForDayKind(kind: TimeBlockKind, released?: boolean) {
 
   switch (kind) {
     case "free":
-      return "全天";
+      return "全天空档";
     case "half_free":
-      return "半天";
+      return "下午有空";
     default:
-      return "排课";
+      return "白天有课";
   }
 }
 
@@ -358,13 +332,13 @@ export default async function GamePage({ searchParams }: GamePageProps) {
         active="game"
         runId={runId}
         title="本周周历"
-        subtitle="先创建一局真实存档，再从这里进入逐天排周历和统一周结算。"
+        subtitle="从这一周开始，把大学慢慢过出来。"
         headerMeta={<FmInlineStat tone="teal" icon="calendar" label="当前进度" value="未开局" />}
       >
         <FmPanel>
           <FmSectionHead
             title="还没有进行中的存档"
-            copy="当前主流程已经换成“先定课程态度，再逐天安排一周，最后统一结算”。"
+            copy="先去开一局，再回来安排这一周。"
           />
           <div className="mt-6">
             <Link href="/" className="fm-button-secondary">
@@ -408,7 +382,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
   const spotlightArtifacts = buildGameSpotlightArtifacts(hydratedRun);
   const finalDemoMilestone = buildFinalDemoMilestone(hydratedRun);
   const monthCalendarItems = buildMonthCalendarItems(hydratedRun, currentWeekState);
-  const weeklyKickoffNotices = buildWeeklyKickoffNotices(hydratedRun, currentWeekState);
+  const weeklyKickoffNotices = buildWeeklyKickoffNotices(currentWeekState);
   const monthIndex = (hydratedRun.currentYear - 1) * 12 + hydratedRun.currentMonth;
 
   return (
@@ -418,10 +392,10 @@ export default async function GamePage({ searchParams }: GamePageProps) {
       title={vacationMonth ? "假期安排" : "本周周历"}
       subtitle={
         vacationMonth
-          ? `${formatMonthLabel(bundle.run.currentYear, bundle.run.currentMonth)} 处在假期阶段，这个月不再按普通上课周锁白天，主要安排休息、兼职、实践和后续准备。`
-          : `${formatMonthLabel(bundle.run.currentYear, bundle.run.currentMonth)} 的周排程与统一周结算都在这里完成。`
+          ? "假期到了，看看这周想怎么过。"
+          : "先看课表，再安排这一周。"
       }
-      sidebarSummary="这里只承接当前存档的真实周流程，不靠前端内存猜状态。"
+      sidebarSummary="排课、做选择，看看四年后会走到哪里。"
       headerMeta={
         <>
           <FmInlineStat tone="teal" icon="calendar" label="当前月份" value={formatMonthLabel(bundle.run.currentYear, bundle.run.currentMonth)} />
@@ -455,8 +429,8 @@ export default async function GamePage({ searchParams }: GamePageProps) {
           <FmMotionSection delay={65}>
             <FmPanel>
               <FmSectionHead
-                title="本月关键节点"
-                copy="本月提醒只预告规则节点，不提前泄露奖学金、竞赛、offer 或结局结果。"
+                title="本月会发生什么"
+                copy="这个月有些日子值得留意。"
                 aside={
                   <FmBadge tone={finalDemoMilestone.tone}>
                     {formatMonthLabel(
@@ -475,10 +449,10 @@ export default async function GamePage({ searchParams }: GamePageProps) {
         ) : null}
 
         <FmMotionSection delay={80}>
-          <FmPanel>
+            <FmPanel>
             <FmSectionHead
-              title="本月事件月历"
-              copy="这里提前展示关键、机会和风险层级；只预告节点，不提前泄露你会得到什么结果。"
+              title="本月日历"
+              copy="提前看看这个月可能打乱节奏的事。"
             />
             <div className="mt-6 fm-month-event-grid">
               {monthCalendarItems.map((item) => (
@@ -500,8 +474,8 @@ export default async function GamePage({ searchParams }: GamePageProps) {
                 title={vacationMonth ? "安排这个假期周" : "安排这一周"}
                 copy={
                   vacationMonth
-                    ? "假期周不再按普通课表锁白天，但依然按周逐天安排，再统一确认这一周。"
-                    : "先确定这周课程态度，再逐天安排行动。没点到的日期会在确认本周时自动补成默认安排。"
+                    ? "时间都在自己手里，慢慢把这周排出来。"
+                    : "没安排的日子，会自然滑过去。"
                 }
               />
               <div className="mt-6">
@@ -528,7 +502,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
                 <div id="weekly-settlement">
                   <FmMotionSection delay={130}>
                     <FmPanel>
-                    <FmSectionHead title="上周结算" copy="这里只读取已经落地的统一周结算结果，不会重算，也不会猜玩家选择。" />
+                    <FmSectionHead title="上周回看" copy="这周已经过完了。" />
                     <div className="mt-6">
                       <WeeklySettlementCard {...weeklySettlement} />
                     </div>
@@ -546,8 +520,8 @@ export default async function GamePage({ searchParams }: GamePageProps) {
                 title={vacationMonth ? "本月假期节奏" : "本月周历"}
                 copy={
                   vacationMonth
-                    ? "假期月不再按普通上课周处理，四周都会以可自由支配时间为主。"
-                    : "四周节奏做成总览卡，当前周会高亮；具体逐天选择仍在左侧操作区完成。"
+                    ? "这个月的时间大多在自己手里。"
+                    : "看看这个月四周怎么排开。"
                 }
               />
               <div className="mt-6 fm-week-grid">
@@ -575,7 +549,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
                         {week.days.slice(0, 4).map((day) => (
                           <div
                             key={`${week.label}-${day.label}`}
-                            className={`fm-day-chip ${day.detail.startsWith("已安排") ? "is-planned" : ""} ${day.detail.includes("事件") ? "is-event" : ""} ${weekState === "completed" ? "is-settled" : ""} ${weekState === "upcoming" ? "is-locked" : ""}`}
+                            className={`fm-day-chip ${day.detail.startsWith("已安排") ? "is-planned" : ""} ${day.eventLabel ? "is-event" : ""} ${weekState === "completed" ? "is-settled" : ""} ${weekState === "upcoming" ? "is-locked" : ""}`}
                           >
                             <div className="fm-day-chip__row">
                               <strong>{day.label}</strong>
@@ -584,6 +558,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
                               </span>
                             </div>
                             <p>{day.detail}</p>
+                            {day.eventLabel ? <p>{day.eventLabel}</p> : null}
                           </div>
                         ))}
                       </div>
@@ -592,7 +567,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
                         {week.days.slice(4).map((day) => (
                           <div
                             key={`${week.label}-${day.label}`}
-                            className={`fm-day-chip ${day.detail.startsWith("已安排") ? "is-planned" : ""} ${day.detail.includes("事件") ? "is-event" : ""} ${weekState === "completed" ? "is-settled" : ""} ${weekState === "upcoming" ? "is-locked" : ""}`}
+                            className={`fm-day-chip ${day.detail.startsWith("已安排") ? "is-planned" : ""} ${day.eventLabel ? "is-event" : ""} ${weekState === "completed" ? "is-settled" : ""} ${weekState === "upcoming" ? "is-locked" : ""}`}
                           >
                             <div className="fm-day-chip__row">
                               <strong>{day.label}</strong>
@@ -601,6 +576,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
                               </span>
                             </div>
                             <p>{day.detail}</p>
+                            {day.eventLabel ? <p>{day.eventLabel}</p> : null}
                           </div>
                         ))}
                       </div>
@@ -615,12 +591,12 @@ export default async function GamePage({ searchParams }: GamePageProps) {
               <FmPanel>
               <FmSectionHead
                 title="后半程方向"
-                copy="这里只帮你看清当前的倾向变化，不会提前把这一局的最终去向说死。"
+                copy="现在更像在往哪里走，先在这里看看。"
                 aside={<span className="fm-chip fm-chip--brand">{formatDirectionStage(directionPerception.stage)}</span>}
               />
               <div className="mt-6 fm-stack">
                 <article className="fm-stat-card">
-                  <div className="fm-stat-card__label">最近趋势</div>
+                  <div className="fm-stat-card__label">最近的方向感</div>
                   <div className="fm-stat-card__value">{directionPerception.primary.label}</div>
                   <div className="fm-stat-card__copy">{directionPerception.summary}</div>
                 </article>
@@ -646,8 +622,8 @@ export default async function GamePage({ searchParams }: GamePageProps) {
                 <FmPanel>
                   <FmSectionHead
                     title="阶段成果聚光灯"
-                    copy="这里展示的是当前存档里已经真实发生并且已经结算进规则层的正式阶段结果，不提前发奖，也不提前发 offer。"
-                    aside={<FmBadge tone="ending">真实归档</FmBadge>}
+                    copy="这几件事，已经能算是这段时间留下的成果了。"
+                    aside={<FmBadge tone="ending">阶段成果</FmBadge>}
                   />
                   <div className="mt-6">
                     <FormalArtifactCards artifacts={spotlightArtifacts} runId={runId} showOfferActions />
@@ -659,7 +635,7 @@ export default async function GamePage({ searchParams }: GamePageProps) {
             {latestGrowthLog ? (
               <FmMotionSection delay={190}>
                 <FmPanel>
-                <FmSectionHead title="最近一条成长日志" copy="这里只读取最近一次真实月结算留下来的记录。" />
+                <FmSectionHead title="最近一条成长日志" copy="刚过去的那阵子，留下了这些话。" />
                 <div className="mt-6">
                   <LogFeed items={[latestGrowthLog]} variant="player" />
                 </div>
@@ -669,9 +645,9 @@ export default async function GamePage({ searchParams }: GamePageProps) {
 
             <FmMotionSection delay={220}>
               <FmPanel>
-              <FmSectionHead title="最近动态" copy="这里会保留最近的行动、事件和结算记录，方便你回看这局刚刚发生了什么。" />
+              <FmSectionHead title="最近留下的记录" copy="翻一翻，看看这局刚刚走到哪了。" />
               <div className="mt-6">
-                <LogFeed items={latestSystemLogs} emptyMessage="目前还没有系统日志留档。" />
+                <LogFeed items={latestSystemLogs} emptyMessage="这局暂时还没有新的记录。" />
               </div>
               </FmPanel>
             </FmMotionSection>

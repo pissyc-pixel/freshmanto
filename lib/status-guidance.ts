@@ -77,8 +77,8 @@ export function buildStatusGuidance(input: { mood: number; stress: number }): St
     return {
       mood,
       stress,
-      summary: "压力偏高，建议先安排一次低负担恢复行动。",
-      strategy: "先把压力往下拉，再决定要不要继续堆学习、兼职或高压推进。",
+      summary: "这周别排太满。",
+      strategy: "先缓一缓，再去碰更费劲的事，会稳很多。",
       recommendedActions: ["relax", "big_meal", "social"],
     };
   }
@@ -87,8 +87,8 @@ export function buildStatusGuidance(input: { mood: number; stress: number }): St
     return {
       mood,
       stress,
-      summary: "心情偏低，建议先做一次恢复节奏的行动。",
-      strategy: "先恢复一点体感和情绪，不然高压力任务的收益很容易打折。",
+      summary: "先让自己缓过来一点。",
+      strategy: "把节奏放轻一点，今天不适合硬顶。",
       recommendedActions: ["relax", "big_meal", "social"],
     };
   }
@@ -97,8 +97,8 @@ export function buildStatusGuidance(input: { mood: number; stress: number }): St
     return {
       mood,
       stress,
-      summary: "状态有点紧，最好把推进和恢复混着排。",
-      strategy: "可以推进学业或履历，但最好给自己留一个缓冲动作。",
+      summary: "这周节奏有点紧。",
+      strategy: "推进和休息穿着来，会更接得住。",
       recommendedActions: ["relax", "study", "student_activity"],
     };
   }
@@ -106,8 +106,8 @@ export function buildStatusGuidance(input: { mood: number; stress: number }): St
   return {
     mood,
     stress,
-    summary: "当前状态还稳，可以正常推进本周安排。",
-    strategy: "如果这周有关键学业或履历动作，现在是比较能接得住的时候。",
+    summary: "这周节奏还算平稳。",
+    strategy: "有空的话，可以给重要的事留点时间。",
     recommendedActions: ["study", "job_prep", "student_activity"],
   };
 }

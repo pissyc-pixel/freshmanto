@@ -68,9 +68,9 @@ describe("game page final-demo experience layers", () => {
     );
 
     expect(markup).toContain("fm-month-event-grid");
-    expect(markup).toContain("风险事件");
+    expect(markup).toContain("临时占用");
     expect(markup).toContain("机会事件");
-    expect(markup).toContain("现金");
+    expect(markup).toContain("金钱");
     expect(markup).toContain("压力");
   });
 });

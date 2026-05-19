@@ -209,7 +209,7 @@ export function FormalDocumentPreview({
             <div className="fm-stat-card__copy">{artifact.serialNumber}</div>
           </div>
           <div className="fm-stat-card">
-            <div className="fm-stat-card__label">当前状态</div>
+            <div className="fm-stat-card__label">现在留下的是</div>
             <div className="fm-stat-card__value">{sealLabel}</div>
             <div className="fm-stat-card__copy">{issuer}</div>
           </div>
@@ -235,8 +235,8 @@ export function FormalDocumentPreview({
           </p>
           <p>{summary}</p>
           <p>
-            这份档案只会整理已经发生、并且已经进入存档的正式结果，不会替你补写不存在的录取、
-            录用或奖项细节。下面这些信息，代表它已经被认真留了下来。
+            这份档案只整理已经发生的结果，不会替你多写没出现过的录取、录用或奖项。
+            下面这些信息，代表它已经被认真留了下来。
           </p>
         </div>
 

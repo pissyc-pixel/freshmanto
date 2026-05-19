@@ -29,12 +29,12 @@ export function ReportPreview({
           </pre>
         ) : (
           <div className="mt-4 rounded-2xl bg-stone-900/80 p-4 text-sm leading-6 text-stone-200">
-            这一侧默认隐藏后台结构化原文，避免把系统字段、事件标记和内部摘要直接塞给玩家。
+            这一侧收着写信时参考的梗概，不直接摊开给你看。
           </div>
         )}
       </article>
       <article className="rounded-2xl border border-[var(--border)] bg-white/80 p-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">玩家可见正文</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">来信正文</p>
         <h3 className="mt-2 text-lg font-semibold text-stone-900">{title}</h3>
         <div className="mt-4 whitespace-pre-wrap text-sm leading-7 text-stone-700">
           {sanitizePlayerFacingText(markdown)}

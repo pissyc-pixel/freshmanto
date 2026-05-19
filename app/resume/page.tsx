@@ -200,8 +200,8 @@ export default async function ResumePage({ searchParams }: ResumePageProps) {
       active="resume"
       runId={runId}
       title="履历档案"
-      subtitle="这里记录能慢慢写进简历和未来选择里的东西。它更像学生档案夹，而不是一张后台字段表。"
-      sidebarSummary="这里展示的是当前存档已经形成的真实档案：GPA、排名、履历条目、机会线索和阶段日志。"
+      subtitle="这里放着这几年慢慢攒下来的东西。"
+      sidebarSummary="GPA、履历、机会线索和阶段记录，都会收在这里。"
       headerMeta={
         <>
           <FmInlineStat tone="teal" icon="chart" label="GPA" value={formatAcademicValue(academicProfile.gpa)} />

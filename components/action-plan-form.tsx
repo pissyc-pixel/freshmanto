@@ -18,7 +18,7 @@ import { FmIcon } from "@/components/fm-ui/FmScaffold";
 import { LoadingOverlay } from "@/components/loading-overlay";
 import { buildPlannerEventNotice } from "@/lib/planner-option-priority";
 import { buildStatusGuidance } from "@/lib/status-guidance";
-import type { ActionType, CourseAttendanceStrategy } from "@/types/game";
+import type { ActionType, CourseAttendanceStrategy, WeeklyDayType } from "@/types/game";
 
 type PlannerDayOptionView = {
   optionId: string;
@@ -40,7 +40,9 @@ export type PlannerDayView = {
   status: string;
   plannedActionLabel: string | null;
   justPlanned: boolean;
+  baseDayTypeKey: WeeklyDayType;
   baseTypeLabel: string;
+  effectiveDayTypeKey: WeeklyDayType;
   effectiveTypeLabel: string;
   skipClassAvailable: boolean;
   skipClassSelected: boolean;
@@ -118,8 +120,8 @@ function ConfirmWeekOverlay() {
 
   return (
     <LoadingOverlay
-      title="正在整理这个月的记录"
-      body="系统正在结算本周安排。如果这是月末，AI 也在把本月经历写成月记，可能需要几秒钟。失败时会自动保留规则摘要。"
+      title="这一周正在往前走"
+      body="把这周过完需要一点时间。要是刚好到月底，这个月的回顾也会一起整理出来。"
     />
   );
 }
@@ -208,95 +210,92 @@ function optionVisual(optionId: string) {
 }
 
 type ActionEffectTone = "academic" | "money" | "mood" | "stress" | "resume" | "event";
-type ActionEffectDirection = "up" | "down" | "flat";
-
 type ActionEffect = {
   label: string;
   tone: ActionEffectTone;
-  direction: ActionEffectDirection;
-  level: 1 | 2 | 3;
+  direction: "up" | "down" | "flat";
 };
 
 function buildActionEffects(action: ActionType): ActionEffect[] {
   switch (action) {
     case "study":
       return [
-        { label: "学业", tone: "academic", direction: "up", level: 3 },
-        { label: "压力", tone: "stress", direction: "up", level: 2 },
-        { label: "心情", tone: "mood", direction: "down", level: 1 },
+        { label: "学业", tone: "academic", direction: "up" },
+        { label: "压力", tone: "stress", direction: "up" },
+        { label: "心情", tone: "mood", direction: "down" },
       ];
     case "writing_research":
       return [
-        { label: "学业", tone: "academic", direction: "up", level: 2 },
-        { label: "履历", tone: "resume", direction: "up", level: 2 },
-        { label: "压力", tone: "stress", direction: "up", level: 1 },
+        { label: "学业", tone: "academic", direction: "up" },
+        { label: "履历", tone: "resume", direction: "up" },
+        { label: "压力", tone: "stress", direction: "up" },
       ];
     case "job_prep":
       return [
-        { label: "履历", tone: "resume", direction: "up", level: 3 },
-        { label: "金钱", tone: "money", direction: "down", level: 1 },
-        { label: "压力", tone: "stress", direction: "up", level: 2 },
+        { label: "履历", tone: "resume", direction: "up" },
+        { label: "金钱", tone: "money", direction: "down" },
+        { label: "压力", tone: "stress", direction: "up" },
       ];
     case "postgraduate_prep":
       return [
-        { label: "学业", tone: "academic", direction: "up", level: 2 },
-        { label: "深造", tone: "resume", direction: "up", level: 2 },
-        { label: "压力", tone: "stress", direction: "up", level: 2 },
+        { label: "学业", tone: "academic", direction: "up" },
+        { label: "深造", tone: "resume", direction: "up" },
+        { label: "压力", tone: "stress", direction: "up" },
       ];
     case "public_exam_prep":
       return [
-        { label: "公考", tone: "resume", direction: "up", level: 2 },
-        { label: "金钱", tone: "money", direction: "down", level: 1 },
-        { label: "压力", tone: "stress", direction: "up", level: 2 },
+        { label: "公考", tone: "resume", direction: "up" },
+        { label: "金钱", tone: "money", direction: "down" },
+        { label: "压力", tone: "stress", direction: "up" },
       ];
     case "competition_project":
       return [
-        { label: "履历", tone: "resume", direction: "up", level: 3 },
-        { label: "学业", tone: "academic", direction: "up", level: 1 },
-        { label: "压力", tone: "stress", direction: "up", level: 2 },
+        { label: "履历", tone: "resume", direction: "up" },
+        { label: "学业", tone: "academic", direction: "up" },
+        { label: "压力", tone: "stress", direction: "up" },
       ];
     case "part_time":
       return [
-        { label: "金钱", tone: "money", direction: "up", level: 3 },
-        { label: "压力", tone: "stress", direction: "up", level: 2 },
-        { label: "心情", tone: "mood", direction: "down", level: 1 },
+        { label: "金钱", tone: "money", direction: "up" },
+        { label: "压力", tone: "stress", direction: "up" },
+        { label: "心情", tone: "mood", direction: "down" },
       ];
     case "social":
       return [
-        { label: "社交", tone: "event", direction: "up", level: 3 },
-        { label: "心情", tone: "mood", direction: "up", level: 2 },
-        { label: "金钱", tone: "money", direction: "down", level: 1 },
+        { label: "社交", tone: "event", direction: "up" },
+        { label: "心情", tone: "mood", direction: "up" },
+        { label: "金钱", tone: "money", direction: "down" },
       ];
     case "relax":
       return [
-        { label: "心情", tone: "mood", direction: "up", level: 2 },
-        { label: "压力", tone: "stress", direction: "down", level: 3 },
+        { label: "心情", tone: "mood", direction: "up" },
+        { label: "压力", tone: "stress", direction: "down" },
       ];
     case "big_meal":
       return [
-        { label: "心情", tone: "mood", direction: "up", level: 2 },
-        { label: "压力", tone: "stress", direction: "down", level: 2 },
-        { label: "金钱", tone: "money", direction: "down", level: 2 },
+        { label: "心情", tone: "mood", direction: "up" },
+        { label: "压力", tone: "stress", direction: "down" },
+        { label: "金钱", tone: "money", direction: "down" },
       ];
     case "student_activity":
       return [
-        { label: "社交", tone: "event", direction: "up", level: 2 },
-        { label: "履历", tone: "resume", direction: "up", level: 1 },
-        { label: "压力", tone: "stress", direction: "down", level: 1 },
+        { label: "社交", tone: "event", direction: "up" },
+        { label: "履历", tone: "resume", direction: "up" },
+        { label: "压力", tone: "stress", direction: "down" },
       ];
     case "remedy":
       return [
-        { label: "学业", tone: "academic", direction: "flat", level: 1 },
-        { label: "压力", tone: "stress", direction: "down", level: 2 },
-        { label: "金钱", tone: "money", direction: "down", level: 1 },
+        { label: "学业", tone: "academic", direction: "flat" },
+        { label: "压力", tone: "stress", direction: "down" },
+        { label: "金钱", tone: "money", direction: "down" },
       ];
     case "ask_family":
       return [
-        { label: "金钱", tone: "money", direction: "up", level: 3 },
-        { label: "压力", tone: "stress", direction: "up", level: 2 },
+        { label: "金钱", tone: "money", direction: "up" },
+        { label: "压力", tone: "stress", direction: "up" },
       ];
     default:
-      return [{ label: "状态", tone: "event", direction: "flat", level: 1 }];
+      return [{ label: "状态", tone: "event", direction: "flat" }];
   }
 }
 
@@ -312,16 +311,57 @@ function badgeTone(badge: string) {
   return "ending" as const;
 }
 
-function effectDirectionIcon(direction: ActionEffectDirection) {
-  if (direction === "up") {
-    return "trend-up" as const;
+function formatActionEffectLabel(effect: ActionEffect) {
+  if (effect.direction === "flat") {
+    return effect.label;
   }
 
-  if (direction === "down") {
-    return "trend-down" as const;
+  if (effect.direction === "up") {
+    if (effect.label === "压力") {
+      return "压力上升";
+    }
+
+    if (effect.label === "心情") {
+      return "心情回升";
+    }
+
+    if (effect.label === "金钱") {
+      return "手头变宽";
+    }
+
+    return `${effect.label}提升`;
   }
 
-  return "minus" as const;
+  if (effect.label === "压力") {
+    return "压力缓和";
+  }
+
+  if (effect.label === "心情") {
+    return "心情下降";
+  }
+
+  if (effect.label === "金钱") {
+    return "花钱";
+  }
+
+  return `${effect.label}下降`;
+}
+
+function buildDayAvailabilityCopy(day: PlannerDayView, skipClassDraft: boolean) {
+  if (day.eventTitle) {
+    return "今天有事插进来，安排要留点余地。";
+  }
+
+  const dayType = skipClassDraft && day.skipClassAvailable ? "full_day" : day.effectiveDayTypeKey;
+
+  switch (dayType) {
+    case "night_only":
+      return "白天有课，晚上还能安排一点事。";
+    case "half_day":
+      return "下午有空，可以认真做一件事。";
+    default:
+      return "今天时间完整，适合推进重要安排。";
+  }
 }
 
 function clonePlannerDay(day: PlannerDayView): PlannerDayView {
@@ -594,7 +634,7 @@ export function ActionPlanForm({
       setLocalFeedback({
         kind: "info",
         title: "先确认这周课程态度",
-        message: "课程态度还没锁定前，这些天还不能真正排进去。先保存本周课程态度，再逐天点选。",
+        message: "先把这周怎么上课定下来，再给每天留安排。",
       });
       return;
     }
@@ -636,7 +676,7 @@ export function ActionPlanForm({
     setLocalFeedback({
       kind: "success",
       title: `${day.label} 已安排`,
-      message: `已经把“${option.label}”排到这一天，后台会按顺序写回存档。`,
+      message: `“${option.label}”已经留在这一天了。`,
     });
     setSelectedWeekday(null);
     setSkipClassDraft(false);
@@ -658,18 +698,14 @@ export function ActionPlanForm({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="font-semibold text-stone-900">第 {currentWeek} 周安排</p>
           {missingCount > 0 ? (
-            <FmBadge tone="neutral">
-              还差 {missingCount} 天没点，确认时会自动补成摆烂 / 发呆
-            </FmBadge>
+            <FmBadge tone="neutral">还剩 {missingCount} 天没安排</FmBadge>
           ) : (
-            <FmBadge tone="academic">
-              这一周已经全部排完
-            </FmBadge>
+            <FmBadge tone="academic">这一周已经排满</FmBadge>
           )}
         </div>
         <p className="mt-2">
           {attendanceLocked
-            ? `这周已经排了 ${7 - missingCount} / 7 天，顶部计数、当天卡片和确认状态现在都会同步更新。`
+            ? `这周已经排了 ${7 - missingCount} / 7 天。`
             : plannerStatusText}
         </p>
         {plannerLines.length > 0 ? (
@@ -691,8 +727,8 @@ export function ActionPlanForm({
         <div className="fm-planner-save-note">
           <FmLoadingState
             inline
-            title="正在保存最近安排"
-            body={`后台还在写回 ${queuedSaveCount} 天安排。你可以继续点开下一天，但确认本周前会先全部保存完成。`}
+            title="最近的安排还在落位"
+            body={`还有 ${queuedSaveCount} 天安排在写进去，你可以先继续看下一天。`}
           />
         </div>
       ) : null}
@@ -706,7 +742,7 @@ export function ActionPlanForm({
         <input type="hidden" name="intent" value="set_attendance" />
         <div className="space-y-3">
           <label className="text-sm font-semibold text-stone-800" htmlFor="attendanceStrategy">
-            本周课程态度
+            这周怎么上课
           </label>
           <select
             id="attendanceStrategy"
@@ -722,13 +758,13 @@ export function ActionPlanForm({
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <SubmitButton
-            label={attendanceLocked ? "本周课程态度已锁定" : "先确认本周课程态度"}
-            pendingLabel="正在保存课程态度..."
+            label="这周就这样上课"
+            pendingLabel="正在记下这周上课节奏..."
             disabled={attendanceLocked || plannerSavePending}
             className="rounded-full bg-amber-600 px-5 py-3 font-semibold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-stone-400"
             testId="set-attendance-submit"
           />
-          <PendingHint text="正在保存这周的课程态度..." />
+          <PendingHint text="正在记下这周怎么上课..." />
         </div>
       </form>
 
@@ -791,16 +827,13 @@ export function ActionPlanForm({
               </p>
               {day.eventTitle ? <p className="fm-day-card__meta">{day.eventTitle}</p> : null}
               {saveState === "saving" ? (
-                <p className="fm-day-card__meta">这一天正在写回存档，可以先继续安排别的日期。</p>
+                <p className="fm-day-card__meta">保存中，先看下一天。</p>
               ) : null}
               {saveState === "error" ? (
-                <p className="fm-day-card__meta">上一次保存没有成功，重新点开这一天后可以再试一次。</p>
-              ) : null}
-              {day.hasCashRisk ? (
-                <p className="fm-day-card__meta">这周现金有点紧，赚钱或止损行动会优先显示。</p>
+                <p className="fm-day-card__meta">没存好，再点一次。</p>
               ) : null}
               {!attendanceLocked ? (
-                <p className="fm-day-card__meta">先定课程态度，再点这一天。</p>
+                <p className="fm-day-card__meta">先定这周怎么上课。</p>
               ) : null}
             </div>
           );
@@ -825,14 +858,12 @@ export function ActionPlanForm({
             testId="confirm-week-submit"
           />
           {attendanceLocked ? (
-            <span className="text-sm text-stone-500">
-              没点到的日期会自动补成“摆烂 / 发呆”，不会因为漏选卡住。
-            </span>
+            <span className="text-sm text-stone-500">没安排的日子，会自然滑过去。</span>
           ) : (
-            <span className="text-sm text-stone-500">先把这周课程态度锁定，系统才能结算这一周。</span>
+            <span className="text-sm text-stone-500">先把这周怎么上课定下来。</span>
           )}
         </div>
-        <PendingHint text="正在统一结算本周安排；如果这是月末，也会顺带生成 AI 月记 / 月度总结。" />
+        <PendingHint text="这周正在往前走；要是刚好到月底，这个月的回顾也会一起整理。" />
         <ConfirmWeekOverlay />
       </form>
 
@@ -852,24 +883,10 @@ export function ActionPlanForm({
                     {selectedDay.label}
                   </p>
                   <h2 id="planner-action-dialog-title" className="mt-2 text-2xl font-semibold text-stone-900">
-                    给这一天排一个行动
+                    给这一天留一个安排
                   </h2>
                   <p className="mt-2 text-sm leading-6 text-stone-600">
-                    可安排时间：
-                    {skipClassDraft && selectedDay.skipClassAvailable
-                      ? selectedDay.baseTypeLabel.includes("半天")
-                        ? "翘掉半天课后补成完整白天"
-                        : "翘掉白天课后释放完整白天时间"
-                      : selectedDay.effectiveTypeLabel}
-                    。
-                  </p>
-                  {selectedDay.eventTitle ? (
-                    <p className="mt-2 text-sm leading-6 text-amber-700">
-                      {selectedDay.eventTitle}：{selectedDay.eventSummary}
-                    </p>
-                  ) : null}
-                  <p className="mt-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">
-                    {statusGuidance.summary}
+                    {buildDayAvailabilityCopy(selectedDay, skipClassDraft)}
                   </p>
                 </div>
                 <button
@@ -905,9 +922,9 @@ export function ActionPlanForm({
                       className="mt-1 h-4 w-4 rounded border-stone-300 text-amber-600"
                     />
                     <span>
-                      {selectedDay.baseTypeLabel.includes("半天")
-                        ? "这天翘掉半天课，把半天空档补成完整白天。代价较轻，学业、压力和风险都会小幅波动。"
-                        : "这天翘掉白天课，释放白天时间。代价是学业会掉一点、压力会再上来一点。"}
+                      {selectedDay.baseDayTypeKey === "half_day"
+                        ? "翘掉半天课，腾出更完整的白天。学业会受一点影响。"
+                        : "翘掉白天课，腾出一整天。学业会受影响，压力也会更明显。"}
                     </span>
                   </label>
                 ) : null}
@@ -954,16 +971,7 @@ export function ActionPlanForm({
                           <div className="fm-option-effects">
                             {buildActionEffects(option.action).map((effect) => (
                               <span key={`${option.optionId}-${effect.label}`} className={`fm-option-effect fm-option-effect--${effect.tone}`}>
-                                <span className="fm-trend-stack" aria-hidden="true">
-                                  {Array.from({ length: effect.level }).map((_, index) => (
-                                    <FmIcon
-                                      key={`${option.optionId}-${effect.label}-${index}`}
-                                      name={effectDirectionIcon(effect.direction)}
-                                      className="h-3 w-3"
-                                    />
-                                  ))}
-                                </span>
-                                {effect.label}
+                                {formatActionEffectLabel(effect)}
                               </span>
                             ))}
                           </div>
@@ -987,7 +995,7 @@ export function ActionPlanForm({
                   取消
                 </button>
                 <button type="button" className="fm-solid-button" disabled>
-                  点选后自动后台保存
+                  保存这天安排
                 </button>
               </div>
             </div>

@@ -19,8 +19,10 @@ function createPlannerDay(overrides?: Partial<PlannerDayView>): PlannerDayView {
     status: "待安排",
     plannedActionLabel: null,
     justPlanned: false,
-    baseTypeLabel: "白天满课，默认只有夜里可以安排",
-    effectiveTypeLabel: "白天满课，默认只有夜里可以安排",
+    baseDayTypeKey: "night_only",
+    baseTypeLabel: "白天有课",
+    effectiveDayTypeKey: "night_only",
+    effectiveTypeLabel: "白天有课",
     skipClassAvailable: true,
     skipClassSelected: false,
     eventTitle: null,
@@ -122,7 +124,7 @@ describe("weekly planner state helpers", () => {
 
     expect(status).toContain("这周已经排了");
     expect(status).not.toContain("\\u");
-    expect(feedbackLines).toContain("自动补成");
+    expect(feedbackLines).toContain("自然滑过去");
     expect(feedbackLines).not.toContain("\\u");
   });
 
@@ -201,7 +203,8 @@ describe("weekly planner state helpers", () => {
     const plannedLabel = buildPlannerDayAriaLabel(
       createPlannerDay({
         plannedActionLabel: "复习 / 学习",
-        effectiveTypeLabel: "这天基本能自己支配",
+        effectiveDayTypeKey: "full_day",
+        effectiveTypeLabel: "全天空档",
         status: "已安排",
       }),
       true,
@@ -240,6 +243,8 @@ describe("weekly planner state helpers", () => {
 
     expect(source).toContain('role="dialog"');
     expect(source).toContain('aria-modal="true"');
+    expect(source).not.toContain("点选后自动后台保存");
+    expect(source).not.toContain("fm-trend-stack");
   });
 
   it("builds a lightweight confirm-week snapshot from only the weekdays the player actually selected", () => {

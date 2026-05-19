@@ -8,10 +8,8 @@ import { FmBadge } from "@/components/fm-ui/FmBadge";
 export type WeeklyKickoffNotice = {
   id: string;
   title: string;
-  kind: "event" | "money" | "mood" | "stress";
-  whatHappened: string;
-  changes: string[];
-  reminder: string;
+  subtitle: string;
+  bodyLines: string[];
 };
 
 function buildSeenKey(runId: string, monthIndex: number, week: number) {
@@ -27,17 +25,6 @@ function readSeenState(runId: string, monthIndex: number, week: number) {
     return window.localStorage.getItem(buildSeenKey(runId, monthIndex, week)) === "seen";
   } catch {
     return false;
-  }
-}
-
-function noticeBadge(kind: WeeklyKickoffNotice["kind"]) {
-  switch (kind) {
-    case "event":
-      return { tone: "event" as const, label: "周初事件" };
-    case "money":
-      return { tone: "money" as const, label: "手头提醒" };
-    default:
-      return { tone: "warning" as const, label: "状态提醒" };
   }
 }
 
@@ -96,6 +83,8 @@ export function WeeklyKickoffModal({
     return null;
   }
 
+  const notice = notices[0]!;
+
   return createPortal(
     <div
       className="fm-kickoff-backdrop"
@@ -112,38 +101,27 @@ export function WeeklyKickoffModal({
         <div className="fm-kickoff-modal__head">
           <div>
             <div className="fm-ending-cover__eyebrow">本周提醒</div>
-            <h2>本周开始前</h2>
+            <h2>这周有件事</h2>
+            <p className="mt-3 text-sm leading-6 text-stone-600">{notice.subtitle}</p>
           </div>
-          <button type="button" className="fm-dialog__close" onClick={close} aria-label="关闭本周开始前弹窗">
+          <button type="button" className="fm-dialog__close" onClick={close} aria-label="关闭本周提醒弹窗">
             关闭
           </button>
         </div>
         <div className="fm-stack">
-          {notices.map((notice) => {
-            const badge = noticeBadge(notice.kind);
-
-            return (
-              <article key={notice.id} className="fm-kickoff-card">
-                <div className="fm-kickoff-card__head">
-                  <FmBadge tone={badge.tone}>{badge.label}</FmBadge>
-                  <h3>{notice.title}</h3>
-                </div>
-                <p>
-                  <strong>发生了什么：</strong>
-                  {notice.whatHappened}
-                </p>
-                <div className="fm-kickoff-card__changes">
-                  {notice.changes.map((change) => (
-                    <span key={`${notice.id}-${change}`}>{change}</span>
-                  ))}
-                </div>
-                <p>
-                  <strong>这周留意：</strong>
-                  {notice.reminder}
-                </p>
-              </article>
-            );
-          })}
+          <article key={notice.id} className="fm-kickoff-card">
+            <div className="fm-kickoff-card__head">
+              <FmBadge tone="event">{notice.title}</FmBadge>
+            </div>
+            <div className="space-y-3 text-sm leading-6 text-stone-700">
+              {notice.bodyLines.map((line) => (
+                <p key={`${notice.id}-${line}`}>{line}</p>
+              ))}
+            </div>
+          </article>
+          <button type="button" className="fm-solid-button" onClick={close}>
+            知道了
+          </button>
         </div>
       </section>
     </div>,

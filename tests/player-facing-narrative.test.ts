@@ -348,9 +348,9 @@ describe("player-facing narrative helpers", () => {
     ]);
   });
 
-  it("uses the unified 白天满课 wording in planner-facing schedule labels", () => {
-    expect(formatTimeBlockKind("busy_day")).toContain("白天满课");
-    expect(formatWeeklyDayType("night_only")).toContain("白天满课");
+  it("uses the trimmed 有课 wording in planner-facing schedule labels", () => {
+    expect(formatTimeBlockKind("busy_day")).toContain("白天有课");
+    expect(formatWeeklyDayType("night_only")).toContain("白天有课");
   });
 
   it("keeps truancy out of weekly attendance strategy options", () => {
@@ -561,8 +561,8 @@ describe("player-facing narrative helpers", () => {
       }),
     );
 
-    expect(markup).toContain("玩家可见正文");
-    expect(markup).toContain("默认隐藏");
+    expect(markup).toContain("来信正文");
+    expect(markup).toContain("不直接摊开给你看");
     expect(markup).not.toContain("\"runId\"");
     expect(markup).not.toContain("\"eventIds\"");
   });

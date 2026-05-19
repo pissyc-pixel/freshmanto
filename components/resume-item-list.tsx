@@ -20,7 +20,7 @@ export function ResumeItemList({ items }: ResumeItemListProps) {
   if (items.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-[var(--border)] bg-white/60 px-4 py-5 text-sm leading-6 text-stone-600">
-        目前还没有可展示的履历条目。等后续出现比赛、项目、实习、奖学金或校园经历时，这里会自动补上。
+        现在还没攒出能放进来的经历。后面慢慢走，这里会一点点充实起来。
       </div>
     );
   }

@@ -47,7 +47,7 @@ describe("planner option priority", () => {
     });
 
     expect(sorted[0]?.optionId).toBe("competition_project");
-    expect(sorted[0]?.badges).toContain("本日事件相关");
+    expect(sorted[0]?.badges).toContain("今天相关");
   });
 
   it("puts cash-risk mitigation actions before ordinary leisure actions", () => {
@@ -61,8 +61,8 @@ describe("planner option priority", () => {
     });
 
     expect(sorted.slice(0, 2).map((option) => option.optionId)).toEqual(["part_time", "ask_family"]);
-    expect(sorted[0]?.badges).toContain("现金风险优先");
-    expect(sorted[1]?.badges).toContain("现金风险优先");
+    expect(sorted[0]?.badges).toContain("手头优先");
+    expect(sorted[1]?.badges).toContain("手头优先");
   });
 
   it("keeps explicit selected state understandable instead of relying on border style alone", () => {

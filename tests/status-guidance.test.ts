@@ -9,7 +9,7 @@ describe("status guidance", () => {
       stress: 44,
     });
 
-    expect(guidance.summary).toContain("心情偏低");
+    expect(guidance.summary).toContain("缓过来一点");
     expect(guidance.recommendedActions).toContain("relax");
   });
 
@@ -19,7 +19,7 @@ describe("status guidance", () => {
       stress: 86,
     });
 
-    expect(guidance.summary).toContain("压力偏高");
+    expect(guidance.summary).toContain("别排太满");
     expect(guidance.recommendedActions).toContain("big_meal");
     expect(guidance.recommendedActions).toContain("social");
   });

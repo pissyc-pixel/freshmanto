@@ -110,15 +110,15 @@ const feedbackLabels: Record<SemesterFeedback, string> = {
 };
 
 const timeBlockLabels: Record<TimeBlockKind, string> = {
-  free: "全天都能自己安排",
-  half_free: "只有半天空档",
-  busy_day: "白天满课",
+  free: "全天空档",
+  half_free: "下午有空",
+  busy_day: "白天有课",
 };
 
 const weeklyDayTypeLabels: Record<WeeklyDayType, string> = {
-  night_only: "白天满课，默认只有夜里可以安排",
-  half_day: "这天只有半天空档",
-  full_day: "这天时间较完整，可以安排更重的行动",
+  night_only: "白天有课",
+  half_day: "下午有空",
+  full_day: "全天空档",
 };
 
 const statLabels: Record<keyof DynamicStats, string> = {
@@ -164,7 +164,7 @@ const flagLabels: Record<string, string> = {
   "midterm-pressure": "之前积下来的学业风险在这个月集中冒头了。",
   "economic-pressure": "手头太紧，经济压力已经开始明显影响状态。",
   "stress-surge": "这个月压力明显冲了上来，睡眠、耐心和执行力都被磨掉了一层。",
-  "burnout-slump": "压力和低落堆在一起，整个人都有点摆烂下去的趋势。",
+  "burnout-slump": "压力和低落堆在一起，人有点往下掉。",
   "state-refused-study": "有时候不是不想努力，是状态已经差到学不进去。",
   "state-refused-work": "这阵子连找工作和赚钱的心气都被压住了。",
   "instant-event:cash-crunch": "手头太紧，刚做完这一步就更明显地感到钱带来的分心和压力。",
@@ -315,7 +315,7 @@ function describeNotableFact(fact: string): string | undefined {
   }
 
   if (fact === "auto-filled-idle") {
-    return "这一天没有手动安排，系统自动补成了“摆烂 / 发呆”。";
+    return "这一天没特别安排，就这样过去了。";
   }
 
   if (fact === "vacation:winter-break") {

@@ -16,11 +16,8 @@ type IconName =
   | "compass"
   | "file"
   | "home"
-  | "minus"
   | "moon"
   | "spark"
-  | "trend-down"
-  | "trend-up"
   | "trophy"
   | "users";
 
@@ -177,26 +174,6 @@ export function FmIcon({
           <path d="M20 13.2A8 8 0 1 1 10.8 4 6.2 6.2 0 0 0 20 13.2Z" />
         </svg>
       );
-    case "trend-up":
-      return (
-        <svg className={className} {...common}>
-          <path d="M4 16 10 10l4 4 6-7" />
-          <path d="M16 7h4v4" />
-        </svg>
-      );
-    case "trend-down":
-      return (
-        <svg className={className} {...common}>
-          <path d="m4 8 6 6 4-4 6 7" />
-          <path d="M16 17h4v-4" />
-        </svg>
-      );
-    case "minus":
-      return (
-        <svg className={className} {...common}>
-          <path d="M5 12h14" />
-        </svg>
-      );
     case "trophy":
       return (
         <svg className={className} {...common}>
@@ -327,7 +304,7 @@ export function FmShellLayout({
   title,
   subtitle,
   sidebarTitle = "大学生活模拟器",
-  sidebarSubtitle = "这里整理的是当前存档已经形成的内容。",
+  sidebarSubtitle = "从这一周开始，把大学慢慢过出来。",
   sidebarSummary,
   headerMeta,
   children,
@@ -354,7 +331,7 @@ export function FmShellLayout({
           <section className="fm-profile-card">
             <div className="fm-profile-card__title">{sidebarTitle}</div>
             <p className="fm-profile-card__sub">
-              {sidebarSummary ?? "从新生建档、周安排到月末汇总，都会按这局存档的实际推进逐步展开。"}
+              {sidebarSummary ?? "排课、做选择，看看四年后会走到哪里。"}
             </p>
           </section>
 
